@@ -1,0 +1,45 @@
+# Sulton School ERP — Nginx reverse proxy (NAMUNA)
+# Bir marta nusxa oling:  cp deploy/nginx/default.conf.example deploy/nginx/default.conf
+# So'ng server_name / SSL ni SHU NUSXADA tahrirlang. Asl nusxa (default.conf)
+# .gitignore da — shuning uchun `git pull` (CI/CD) uni buzmaydi.
+# SSL (HTTPS) sozlash uchun DEPLOY.md dagi "SSL" bo'limiga qarang.
+
+upstream sulton_backend {
+    server backend:4000;
+}
+upstream sulton_frontend {
+    server frontend:3000;
+}
+
+server {
+    listen 80;
+    server_name _;            # domeningiz bilan almashtiring (masalan: erp.maktab.uz)
+    client_max_body_size 25m; # fayl/hujjat yuklash uchun
+
+    # Let's Encrypt (certbot) ACME tekshiruvi
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # API -> backend (NestJS). Global prefix "api" backendda mavjud.
+    location /api/ {
+        proxy_pass http://sulton_backend/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;   # PDF (puppeteer) sekinroq bo'lishi mumkin
+    }
+
+    # Qolgan hammasi -> frontend (Next.js)
+    location / {
+        proxy_pass http://sulton_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

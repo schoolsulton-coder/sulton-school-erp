@@ -1,0 +1,79 @@
+# Sulton School ERP & LMS — Production (VPS) stack
+# Ishga tushirish:  cp .env.prod.example .env  (qiymatlarni to'ldiring)
+#                   docker compose -f docker-compose.prod.yml up -d --build
+# `.env` (repo ildizida) ${...} interpolatsiya VA backend env_file uchun ishlatiladi.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env da POSTGRES_PASSWORD majburiy}
+      POSTGRES_DB: sulton_school
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d sulton_school']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-sulton}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?.env da MINIO_ROOT_PASSWORD majburiy}
+    volumes:
+      - miniodata:/data
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Xizmat nomlari orqali ulanish (compose tarmog'i)
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/sulton_school?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - '4000'
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # nginx bilan bir domen: brauzer /api ga so'rov yuboradi
+        NEXT_PUBLIC_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - backend
+    expose:
+      - '3000'
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certbot/www:/var/www/certbot
+      - ./deploy/certbot/conf:/etc/letsencrypt
+
+volumes:
+  pgdata:
+  miniodata:

@@ -1,0 +1,780 @@
+// ============================================================================
+//  Sulton School — ERP & LMS  |  Prisma Schema (yagona haqiqat manbai)
+//  DB: PostgreSQL 16  |  ORM: Prisma
+//  Eslatma: bu sxema docs/DATABASE.md hujjatining kod ko'rinishidir.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+//  ENUMS
+// ============================================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum StudentStatus {
+  ACTIVE        // o'qiyapti
+  GRADUATED     // bitirgan
+  EXPELLED      // chetlatilgan
+  ARCHIVED      // arxiv
+}
+
+enum LeadActivityType {
+  CALL          // qo'ng'iroq
+  NOTE          // izoh
+  REMINDER      // eslatma
+  MEETING       // uchrashuv
+}
+
+enum VisitStatus {
+  PLANNED       // rejadagi tashrif
+  ARRIVED       // keldi (real tashrif)
+  NO_SHOW       // kelmadi
+  CANCELLED     // bekor qilindi
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum InstallmentStatus {
+  PENDING       // kutilmoqda
+  PARTIAL       // qisman to'langan
+  PAID          // to'langan
+  OVERDUE       // muddati o'tgan
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum TransactionType {
+  INCOME        // kirim
+  EXPENSE       // chiqim
+  TRANSFER      // ichki o'tkazma
+  INVESTMENT    // investitsiya
+}
+
+enum SalaryType {
+  MONTHLY       // oylik stavka
+  HOURLY        // soatbay
+  PER_LESSON    // darsbay
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum GradeType {
+  DAILY         // kunlik
+  QUARTER       // chorak
+  SEMESTER      // yarim yillik
+  YEAR          // yillik
+  EXAM          // imtihon
+}
+
+enum AttendanceStatus {
+  PRESENT       // bor
+  ABSENT        // yo'q (sababsiz)
+  LATE          // kechikkan
+  EXCUSED       // sababli
+}
+
+enum HomeworkSubmissionStatus {
+  ASSIGNED      // berilgan
+  SUBMITTED     // topshirilgan
+  CHECKED       // tekshirilgan
+  LATE          // kech topshirilgan
+  MISSING       // topshirilmagan
+}
+
+enum BehaviorType {
+  POSITIVE
+  NEGATIVE
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+// ============================================================================
+//  AUTH & RBAC  (rol asosida kirish — 5 xodim roli + o'quvchi + ota-ona)
+// ============================================================================
+
+model User {
+  id        String     @id @default(uuid())
+  fullName  String
+  email     String?    @unique
+  phone     String     @unique
+  password  String
+  avatar    String?
+  status    UserStatus @default(ACTIVE)
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  // bog'liqliklar
+  employee        Employee?
+  studentProfile  Student?         @relation("StudentUser")
+  guardianProfile Guardian?        @relation("GuardianUser")
+  assignedLeads   Lead[]           @relation("LeadManager")
+  leadActivities  LeadActivity[]
+  taughtClasses   ClassTeacher[]
+  givenGrades     Grade[]          @relation("GradeTeacher")
+  givenHomeworks  Homework[]       @relation("HomeworkTeacher")
+  behaviorRecords BehaviorRecord[] @relation("BehaviorAuthor")
+  notifications   Notification[]
+  telegramLink    TelegramLink?
+  auditLogs       AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roleId])
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           // "Administrator", "Sotuv menejeri", ...
+  slug        String           @unique // admin, sales, coordinator, teacher, curator, student, guardian
+  description String?
+  users       User[]
+  permissions RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id    String           @id @default(uuid())
+  name  String           // "students.create", "finance.view", ...
+  slug  String           @unique
+  group String           // "students", "finance", "lms", ...
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================================================
+//  STUDENTS & GUARDIANS  (O'quvchi kabineti)
+// ============================================================================
+
+model Student {
+  id            String        @id @default(uuid())
+  userId        String?       @unique
+  user          User?         @relation("StudentUser", fields: [userId], references: [id])
+  firstName     String
+  lastName      String
+  middleName    String?
+  photo         String?
+  birthDate     DateTime?
+  gender        Gender?
+  address       String?
+  admissionDate DateTime?
+  status        StudentStatus @default(ACTIVE)
+
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id])
+
+  guardians   StudentGuardian[]
+  documents   StudentDocument[]
+  contracts   Contract[]
+  payments    Payment[]
+  grades      Grade[]
+  attendances Attendance[]
+  submissions HomeworkSubmission[]
+  behavior    BehaviorRecord[]
+  lead        Lead?                @relation("LeadStudent")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classId])
+  @@index([status])
+  @@map("students")
+}
+
+model Guardian {
+  id       String  @id @default(uuid())
+  userId   String? @unique
+  user     User?   @relation("GuardianUser", fields: [userId], references: [id])
+  fullName String
+  phone    String
+  relation String? // ota, ona, vasiy
+  passport String?
+  students StudentGuardian[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("guardians")
+}
+
+model StudentGuardian {
+  studentId  String
+  guardianId String
+  isPrimary  Boolean  @default(false)
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian   Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, guardianId])
+  @@map("student_guardians")
+}
+
+model StudentDocument {
+  id        String   @id @default(uuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  type      String   // metrika, ariza, surat, ...
+  filePath  String
+  fileName  String
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+  @@map("student_documents")
+}
+
+// ============================================================================
+//  CRM — QABUL OYNASI  (Lead funnel)
+// ============================================================================
+
+model LeadStage {
+  id    String @id @default(uuid())
+  name  String // Yangi, Bog'lanildi, Sinov darsi, Shartnoma, ...
+  order Int
+  color String?
+  leads Lead[]
+
+  @@map("lead_stages")
+}
+
+model Lead {
+  id         String @id @default(uuid())
+  fullName   String
+  phone      String
+  source     String? // Instagram, tavsiya, reklama, ...
+  childAge   Int?
+  note       String?
+
+  // Tashrif (qabul) ma'lumotlari
+  scheduledAt  DateTime? // belgilangan tashrif vaqti
+  filial       String? // Farg'ona, Lokomotiv, ...
+  gradeLevel   Int? // qaysi sinfga (0..11)
+  whoComes     String? // "Ota va farzand", "Ona", ...
+  crmUpdatedAt DateTime? // CRM dan oxirgi yangilanish
+  visitStatus  VisitStatus @default(PLANNED) // rejadagi/real tashrif
+  visitedAt    DateTime? // haqiqatda kelgan vaqt
+
+  stageId   String
+  stage     LeadStage @relation(fields: [stageId], references: [id])
+  managerId String?
+  manager   User?     @relation("LeadManager", fields: [managerId], references: [id])
+
+  // konversiya bo'lsa — o'quvchiga aylanadi
+  studentId  String?  @unique
+  student    Student? @relation("LeadStudent", fields: [studentId], references: [id])
+  convertedAt DateTime?
+
+  activities LeadActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stageId])
+  @@index([managerId])
+  @@map("leads")
+}
+
+model LeadActivity {
+  id      String           @id @default(uuid())
+  leadId  String
+  lead    Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  authorId String?
+  author   User?           @relation(fields: [authorId], references: [id])
+  type    LeadActivityType
+  note    String?
+  dueAt   DateTime?        // eslatma vaqti
+  doneAt  DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([leadId])
+  @@map("lead_activities")
+}
+
+// Qabul rejasi — sinf/filial bo'yicha rejalashtirilgan o'quvchilar soni
+model AdmissionPlan {
+  id           String   @id @default(uuid())
+  academicYear String // "2025-2026"
+  filial       String? // null => barcha filiallar
+  gradeLevel   Int // 0..11
+  plannedCount Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admission_plans")
+}
+
+// ============================================================================
+//  CLASSES, SUBJECTS & SCHEDULE  (Sinflar va guruhlar)
+// ============================================================================
+
+model Class {
+  id           String  @id @default(uuid())
+  name         String  // "5-A", "10-B"
+  gradeLevel   Int     // 1..11
+  academicYear String  // "2025-2026"
+  capacity     Int     @default(30)
+  room         String?
+
+  students   Student[]
+  teachers   ClassTeacher[]
+  schedules  Schedule[]
+  attendances Attendance[]
+  homeworks  Homework[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("classes")
+}
+
+model ClassTeacher {
+  id        String  @id @default(uuid())
+  classId   String
+  teacherId String
+  isCurator Boolean @default(false) // true => kurator, false => fan o'qituvchisi
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher   User    @relation(fields: [teacherId], references: [id])
+
+  @@unique([classId, teacherId])
+  @@map("class_teachers")
+}
+
+model Subject {
+  id        String     @id @default(uuid())
+  name      String
+  code      String?    @unique
+  schedules Schedule[]
+  grades    Grade[]
+  homeworks Homework[]
+
+  @@map("subjects")
+}
+
+model Schedule {
+  id        String  @id @default(uuid())
+  classId   String
+  subjectId String
+  teacherId String?
+  weekday   Int     // 1=Dushanba ... 7=Yakshanba
+  startTime String  // "08:30"
+  endTime   String  // "09:15"
+  room      String?
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  @@index([classId])
+  @@map("schedules")
+}
+
+// ============================================================================
+//  CONTRACTS  (Shartnoma tizimi)
+// ============================================================================
+
+model Discount {
+  id        String       @id @default(uuid())
+  name      String
+  type      DiscountType
+  value     Float
+  contracts Contract[]
+
+  @@map("discounts")
+}
+
+model Contract {
+  id            String         @id @default(uuid())
+  number        String         @unique // SHRT-2025-0001
+  studentId     String
+  student       Student        @relation(fields: [studentId], references: [id])
+  startDate     DateTime
+  endDate       DateTime?
+  monthlyAmount Float
+  discountId    String?
+  discount      Discount?      @relation(fields: [discountId], references: [id])
+  status        ContractStatus @default(DRAFT)
+  pdfPath       String?
+
+  installments ContractInstallment[]
+  payments     Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@map("contracts")
+}
+
+model ContractInstallment {
+  id         String            @id @default(uuid())
+  contractId String
+  contract   Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  dueDate    DateTime
+  amount     Float
+  paidAmount Float             @default(0)
+  status     InstallmentStatus @default(PENDING)
+
+  @@index([contractId])
+  @@index([status])
+  @@map("contract_installments")
+}
+
+model Payment {
+  id         String   @id @default(uuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id])
+  contractId String?
+  contract   Contract? @relation(fields: [contractId], references: [id])
+  amount     Float
+  method     String   // naqd, plastik, click, payme
+  paidAt     DateTime @default(now())
+  note       String?
+
+  @@index([studentId])
+  @@index([contractId])
+  @@map("payments")
+}
+
+// ============================================================================
+//  TREASURY & FINANCE  (G'azna & Moliya)
+// ============================================================================
+
+model Account {
+  id           String        @id @default(uuid())
+  name         String        // Asosiy kassa, Bank, ...
+  balance      Float         @default(0)
+  transactions Transaction[]
+
+  @@map("accounts")
+}
+
+model FinanceCategory {
+  id           String          @id @default(uuid())
+  name         String
+  type         TransactionType
+  transactions Transaction[]
+
+  @@map("finance_categories")
+}
+
+model Transaction {
+  id         String           @id @default(uuid())
+  type       TransactionType
+  amount     Float
+  accountId  String
+  account    Account          @relation(fields: [accountId], references: [id])
+  categoryId String?
+  category   FinanceCategory? @relation(fields: [categoryId], references: [id])
+  date       DateTime         @default(now())
+  description String?
+  createdAt  DateTime         @default(now())
+
+  @@index([type])
+  @@index([date])
+  @@map("transactions")
+}
+
+// ============================================================================
+//  HR & PAYROLL  (HR bo'limi + oylik hisob-kitob)
+// ============================================================================
+
+model Department {
+  id        String     @id @default(uuid())
+  name      String
+  positions Position[]
+  employees Employee[]
+
+  @@map("departments")
+}
+
+model Position {
+  id           String     @id @default(uuid())
+  name         String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  employees    Employee[]
+
+  @@map("positions")
+}
+
+model Employee {
+  id           String         @id @default(uuid())
+  userId       String         @unique
+  user         User           @relation(fields: [userId], references: [id])
+  departmentId String?
+  department   Department?    @relation(fields: [departmentId], references: [id])
+  positionId   String?
+  position     Position?      @relation(fields: [positionId], references: [id])
+  hireDate     DateTime
+  fireDate     DateTime?
+  status       EmployeeStatus @default(ACTIVE)
+
+  salary       Salary?
+  payrollItems PayrollItem[]
+  documents    EmployeeDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("employees")
+}
+
+model EmployeeDocument {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       String   // mehnat shartnomasi, ariza, ...
+  filePath   String
+  fileName   String
+  createdAt  DateTime @default(now())
+
+  @@map("employee_documents")
+}
+
+model Salary {
+  id         String     @id @default(uuid())
+  employeeId String     @unique
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       SalaryType
+  baseRate   Float
+
+  @@map("salaries")
+}
+
+model PayrollRun {
+  id        String        @id @default(uuid())
+  period    String        @unique // "2026-06"
+  status    PayrollStatus @default(DRAFT)
+  items     PayrollItem[]
+  createdAt DateTime      @default(now())
+
+  @@map("payroll_runs")
+}
+
+model PayrollItem {
+  id           String        @id @default(uuid())
+  payrollRunId String
+  payrollRun   PayrollRun    @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  base         Float
+  bonus        Float         @default(0)
+  penalty      Float         @default(0)
+  total        Float
+  status       PayrollStatus @default(DRAFT)
+  paidAt       DateTime?
+
+  @@unique([payrollRunId, employeeId])
+  @@map("payroll_items")
+}
+
+// ============================================================================
+//  LMS — GRADING, ATTENDANCE, HOMEWORK, BEHAVIOR
+// ============================================================================
+
+model Grade {
+  id        String    @id @default(uuid())
+  studentId String
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject   @relation(fields: [subjectId], references: [id])
+  teacherId String?
+  teacher   User?     @relation("GradeTeacher", fields: [teacherId], references: [id])
+  value     Float
+  type      GradeType @default(DAILY)
+  period    String?   // "1-chorak", "2-yarim yillik"
+  comment   String?
+  date      DateTime  @default(now())
+
+  @@index([studentId])
+  @@index([subjectId])
+  @@map("grades")
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  studentId String
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId   String?
+  class     Class?           @relation(fields: [classId], references: [id])
+  date      DateTime
+  status    AttendanceStatus @default(PRESENT)
+  note      String?
+
+  @@unique([studentId, date])
+  @@index([date])
+  @@map("attendances")
+}
+
+model Homework {
+  id          String   @id @default(uuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  teacherId   String
+  teacher     User     @relation("HomeworkTeacher", fields: [teacherId], references: [id])
+  title       String
+  description String?
+  attachments String[] // fayl yo'llari
+  dueDate     DateTime
+  createdAt   DateTime @default(now())
+
+  submissions HomeworkSubmission[]
+
+  @@index([classId])
+  @@map("homeworks")
+}
+
+model HomeworkSubmission {
+  id          String                   @id @default(uuid())
+  homeworkId  String
+  homework    Homework                 @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  files       String[]
+  comment     String?
+  grade       Float?
+  teacherNote String?
+  status      HomeworkSubmissionStatus @default(ASSIGNED)
+  submittedAt DateTime?
+
+  @@unique([homeworkId, studentId])
+  @@map("homework_submissions")
+}
+
+model BehaviorRecord {
+  id          String       @id @default(uuid())
+  studentId   String
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authorId    String?
+  author      User?        @relation("BehaviorAuthor", fields: [authorId], references: [id])
+  type        BehaviorType
+  points      Int          @default(0)
+  description String
+  date        DateTime     @default(now())
+
+  @@index([studentId])
+  @@map("behavior_records")
+}
+
+// ============================================================================
+//  NOTIFICATIONS & INTEGRATIONS  (Telegram bot, SMS, E-maktab)
+// ============================================================================
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String?
+  user      User?               @relation(fields: [userId], references: [id])
+  channel   NotificationChannel
+  title     String?
+  body      String
+  status    NotificationStatus  @default(QUEUED)
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("notifications")
+}
+
+model TelegramLink {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId    String   @unique
+  username  String?
+  linkedAt  DateTime @default(now())
+
+  @@map("telegram_links")
+}
+
+model EsmaktabSyncLog {
+  id        String   @id @default(uuid())
+  entity    String   // students, grades, attendance
+  direction String   // import | export
+  status    String   // success | failed
+  message   String?
+  createdAt DateTime @default(now())
+
+  @@map("esmaktab_sync_logs")
+}
+
+// ============================================================================
+//  AUDIT
+// ============================================================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String   // CREATE, UPDATE, DELETE, LOGIN
+  entity    String
+  entityId  String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@map("audit_logs")
+}

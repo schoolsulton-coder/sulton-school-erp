@@ -1,0 +1,26 @@
+# dependencies
+**/node_modules/
+
+# builds
+backend/dist/
+frontend/.next/
+frontend/out/
+
+# env
+.env
+**/.env
+**/.env*.local
+
+# logs & misc
+*.log
+.DS_Store
+
+# uploads / data
+uploads/
+
+# secrets / deploy
+deploy_key*
+*.pem
+deploy/certbot/
+# nginx runtime config (serverда tahrirlanadi — git pull tegmasin)
+deploy/nginx/default.conf
