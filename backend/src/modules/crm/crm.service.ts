@@ -416,4 +416,164 @@ export class CrmService {
     }
     return result;
   }
+
+  // ===== Sozlamalar reference (Filial, Psixolog, O'quv yili) =====
+  branches() {
+    return this.prisma.branch.findMany({ orderBy: { name: 'asc' } });
+  }
+  createBranch(name: string) {
+    return this.prisma.branch.create({ data: { name } });
+  }
+  psychologists() {
+    return this.prisma.psychologist.findMany({ orderBy: { fullName: 'asc' } });
+  }
+  createPsychologist(fullName: string) {
+    return this.prisma.psychologist.create({ data: { fullName } });
+  }
+  academicYears() {
+    return this.prisma.academicYear.findMany({ orderBy: { name: 'desc' } });
+  }
+  createAcademicYear(name: string) {
+    return this.prisma.academicYear.create({ data: { name } });
+  }
+
+  // Operatorlar (GAPLASHGAN) — xodim rollari
+  operators() {
+    return this.prisma.user.findMany({
+      where: { role: { slug: { notIn: ['student', 'guardian'] } }, status: 'ACTIVE' },
+      select: { id: true, fullName: true },
+      orderBy: { fullName: 'asc' },
+    });
+  }
+
+  // Forma uchun sinflar (bo'sh joyi bilan)
+  async classesForm(academicYear?: string, branchId?: string) {
+    const classes = await this.prisma.class.findMany({
+      where: {
+        ...(academicYear ? { academicYear } : {}),
+        ...(branchId ? { branchId } : {}),
+      },
+      include: { _count: { select: { students: true } } },
+      orderBy: [{ gradeLevel: 'asc' }, { name: 'asc' }],
+    });
+    return classes.map((c) => ({
+      id: c.id,
+      name: c.name,
+      gradeLevel: c.gradeLevel,
+      language: c.language,
+      capacity: c.capacity,
+      taken: c._count.students,
+      free: Math.max(0, c.capacity - c._count.students),
+    }));
+  }
+
+  // Talaba qidirish (F.I.Sh bo'yicha)
+  searchStudents(q: string) {
+    if (!q || q.length < 2) return [];
+    return this.prisma.student.findMany({
+      where: {
+        OR: [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        class: { select: { name: true } },
+      },
+      take: 20,
+    });
+  }
+
+  // Ota-ona qidirish / so'nggi yozilganlar
+  searchGuardians(q?: string) {
+    return this.prisma.guardian.findMany({
+      where: q
+        ? {
+            OR: [
+              { fullName: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q } },
+            ],
+          }
+        : {},
+      select: { id: true, fullName: true, phone: true, relation: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+  }
+
+  createGuardian(dto: { fullName: string; phone: string; relation?: string }) {
+    return this.prisma.guardian.create({ data: dto });
+  }
+
+  // Yangi o'quvchi (qabul bosqichi — minimal)
+  async quickCreateStudent(dto: {
+    branchId?: string;
+    gender: 'MALE' | 'FEMALE';
+    lastName: string;
+    firstName: string;
+    guardianId?: string;
+  }) {
+    const student = await this.prisma.student.create({
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        gender: dto.gender,
+        branchId: dto.branchId,
+        status: 'ACTIVE',
+        admissionDate: new Date(),
+      },
+    });
+    if (dto.guardianId) {
+      await this.prisma.studentGuardian.create({
+        data: { studentId: student.id, guardianId: dto.guardianId, isPrimary: true },
+      });
+    }
+    return student;
+  }
+
+  // Yangi qabul (admission)
+  async createAdmission(dto: {
+    studentId: string;
+    branchId?: string;
+    academicYear?: string;
+    classId?: string;
+    managerId?: string;
+    psychologistId?: string;
+    stageId?: string;
+    tags?: string[];
+    note?: string;
+  }) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: dto.studentId },
+      include: { guardians: { include: { guardian: true } } },
+    });
+    if (!student) throw new NotFoundException("O'quvchi topilmadi");
+
+    let stageId = dto.stageId;
+    if (!stageId) {
+      const first = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
+      stageId = first!.id;
+    }
+    const primary = student.guardians.find((g) => g.isPrimary)?.guardian ?? student.guardians[0]?.guardian;
+
+    return this.prisma.lead.create({
+      data: {
+        fullName: `${student.lastName} ${student.firstName}`,
+        phone: primary?.phone ?? '',
+        studentId: dto.studentId,
+        branchId: dto.branchId,
+        academicYear: dto.academicYear,
+        classId: dto.classId,
+        managerId: dto.managerId,
+        psychologistId: dto.psychologistId,
+        stageId: stageId!,
+        tags: dto.tags ?? [],
+        note: dto.note,
+        crmUpdatedAt: new Date(),
+      },
+    });
+  }
 }

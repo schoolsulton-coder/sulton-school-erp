@@ -225,6 +225,8 @@ model Student {
 
   classId String?
   class   Class?  @relation(fields: [classId], references: [id])
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
 
   guardians   StudentGuardian[]
   documents   StudentDocument[]
@@ -315,6 +317,16 @@ model Lead {
   visitStatus  VisitStatus @default(PLANNED) // rejadagi/real tashrif
   visitedAt    DateTime? // haqiqatda kelgan vaqt
 
+  // Qabul (admission) ma'lumotlari
+  academicYear   String?
+  classId        String?
+  class          Class?        @relation(fields: [classId], references: [id])
+  branchId       String?
+  branch         Branch?       @relation(fields: [branchId], references: [id])
+  psychologistId String?
+  psychologist   Psychologist? @relation(fields: [psychologistId], references: [id])
+  tags           String[]
+
   stageId   String
   stage     LeadStage @relation(fields: [stageId], references: [id])
   managerId String?
@@ -351,6 +363,37 @@ model LeadActivity {
   @@map("lead_activities")
 }
 
+// Filial (bo'lim)
+model Branch {
+  id        String    @id @default(uuid())
+  name      String
+  students  Student[]
+  classes   Class[]
+  leads     Lead[]
+  createdAt DateTime  @default(now())
+
+  @@map("branches")
+}
+
+// Psixolog (qabul suhbati uchun)
+model Psychologist {
+  id        String   @id @default(uuid())
+  fullName  String
+  leads     Lead[]
+  createdAt DateTime @default(now())
+
+  @@map("psychologists")
+}
+
+// O'quv yili (Sozlamalarда boshqariladi)
+model AcademicYear {
+  id       String  @id @default(uuid())
+  name     String  @unique // "2025-2026"
+  isActive Boolean @default(true)
+
+  @@map("academic_years")
+}
+
 // Qabul rejasi — sinf/filial bo'yicha rejalashtirilgan o'quvchilar soni
 model AdmissionPlan {
   id           String   @id @default(uuid())
@@ -375,12 +418,16 @@ model Class {
   academicYear String  // "2025-2026"
   capacity     Int     @default(30)
   room         String?
+  language     String? // "O'zbek", "Rus", "Ingliz"
+  branchId     String?
+  branch       Branch? @relation(fields: [branchId], references: [id])
 
   students   Student[]
   teachers   ClassTeacher[]
   schedules  Schedule[]
   attendances Attendance[]
   homeworks  Homework[]
+  admissions Lead[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

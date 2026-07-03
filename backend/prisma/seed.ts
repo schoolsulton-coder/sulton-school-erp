@@ -147,11 +147,40 @@ async function main() {
     }
   }
 
-  // 6) Lead bosqichlari (idempotent — faqat bo'sh bo'lsa)
+  // 6) Qabul bosqichlari (raqamli pipeline — idempotent)
   if ((await prisma.leadStage.count()) === 0) {
-    const stages = ['Yangi', "Bog'lanildi", 'Sinov darsi', 'Shartnoma', 'Yopildi'];
+    const stages = [
+      '1. Aniqlashga',
+      '2. Bog\'lanildi',
+      '3. Suhbatga',
+      '4. Yiqildi',
+      '5. Test topshirishga',
+      '6. Ota-ona suhbatiga',
+      '7. Qaror kutilmoqda',
+      '8. Chegirma kelishuvi',
+      '9. Hujjat topshirishga',
+      '10. Shartnoma tuzishga',
+      'Shartnoma tuzildi',
+    ];
     for (let i = 0; i < stages.length; i++) {
       await prisma.leadStage.create({ data: { name: stages[i], order: i } });
+    }
+  }
+
+  // 7) Sozlamalar reference ma'lumotlari (Filial, Psixolog, O'quv yili)
+  if ((await prisma.branch.count()) === 0) {
+    for (const name of ["Birja oldi (Farg'ona)", 'Limonariya', 'Ibn Sino (Maktab)']) {
+      await prisma.branch.create({ data: { name } });
+    }
+  }
+  if ((await prisma.psychologist.count()) === 0) {
+    for (const fullName of ['Damira Babadjanova', 'Manija Abdullayeva', 'Durdona']) {
+      await prisma.psychologist.create({ data: { fullName } });
+    }
+  }
+  if ((await prisma.academicYear.count()) === 0) {
+    for (const name of ['2024-2025', '2025-2026', '2026-2027']) {
+      await prisma.academicYear.create({ data: { name } });
     }
   }
 

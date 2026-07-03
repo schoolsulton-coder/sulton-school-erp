@@ -19,6 +19,7 @@ import {
 import { classesApi } from '@/lib/classes';
 import { studentsApi } from '@/lib/students';
 import { contractsApi, money, type Discount } from '@/lib/contracts';
+import { AdmissionForm } from '@/components/admission-form';
 
 const TABS = [
   { key: 'planned', label: 'Rejadagi tashriflar' },
@@ -279,7 +280,7 @@ function FunnelPanel() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Qabul funneli</h2>
-        <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">+ Yangi murojaat</button>
+        <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">+ Yangi qabul</button>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {stages?.map((stage: Stage) => (
@@ -306,7 +307,7 @@ function FunnelPanel() {
           </div>
         ))}
       </div>
-      {showForm && <NewLeadModal onClose={() => setShowForm(false)} onCreated={() => { setShowForm(false); invalidate(); }} />}
+      {showForm && <AdmissionForm onClose={() => setShowForm(false)} onCreated={() => { setShowForm(false); invalidate(); }} />}
     </div>
   );
 }

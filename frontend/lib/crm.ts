@@ -95,6 +95,41 @@ export interface ProgressRow extends PlanRow {
   percent: number;
 }
 
+// ---- Yangi qabul formasi ----
+export interface Ref {
+  id: string;
+  name: string;
+}
+export interface Psychologist {
+  id: string;
+  fullName: string;
+}
+export interface Operator {
+  id: string;
+  fullName: string;
+}
+export interface ClassForm {
+  id: string;
+  name: string;
+  gradeLevel: number;
+  language?: string | null;
+  capacity: number;
+  taken: number;
+  free: number;
+}
+export interface StudentHit {
+  id: string;
+  firstName: string;
+  lastName: string;
+  class?: { name: string } | null;
+}
+export interface GuardianHit {
+  id: string;
+  fullName: string;
+  phone: string;
+  relation?: string | null;
+}
+
 export const crmApi = {
   // Funnel (Qabul)
   board: () => api.get<Stage[]>('/crm/board').then((r) => r.data),
@@ -137,6 +172,42 @@ export const crmApi = {
     gradeLevel: number;
     plannedCount: number;
   }) => api.post('/crm/admission-plans', data).then((r) => r.data),
+
+  // ---- Sozlamalar reference ----
+  branches: () => api.get<Ref[]>('/crm/branches').then((r) => r.data),
+  createBranch: (name: string) => api.post('/crm/branches', { name }).then((r) => r.data),
+  psychologists: () => api.get<Psychologist[]>('/crm/psychologists').then((r) => r.data),
+  createPsychologist: (name: string) => api.post('/crm/psychologists', { name }).then((r) => r.data),
+  academicYears: () => api.get<Ref[]>('/crm/academic-years').then((r) => r.data),
+  createAcademicYear: (name: string) => api.post('/crm/academic-years', { name }).then((r) => r.data),
+  operators: () => api.get<Operator[]>('/crm/operators').then((r) => r.data),
+
+  // ---- Forma yordamchilari ----
+  classesForm: (academicYear?: string, branchId?: string) =>
+    api.get<ClassForm[]>('/crm/classes-form', { params: { academicYear, branchId } }).then((r) => r.data),
+  searchStudents: (q: string) =>
+    api.get<StudentHit[]>('/crm/students/search', { params: { q } }).then((r) => r.data),
+  searchGuardians: (q?: string) =>
+    api.get<GuardianHit[]>('/crm/guardians/search', { params: { q } }).then((r) => r.data),
+  createGuardian: (data: { fullName: string; phone: string; relation?: string }) =>
+    api.post('/crm/guardians', data).then((r) => r.data),
+  quickStudent: (data: {
+    branchId?: string;
+    gender: 'MALE' | 'FEMALE';
+    lastName: string;
+    firstName: string;
+    guardianId?: string;
+  }) => api.post('/crm/students/quick', data).then((r) => r.data),
+  createAdmission: (data: {
+    studentId: string;
+    branchId?: string;
+    academicYear?: string;
+    classId?: string;
+    managerId?: string;
+    psychologistId?: string;
+    stageId?: string;
+    note?: string;
+  }) => api.post('/crm/admissions', data).then((r) => r.data),
 };
 
 export const WHO_OPTIONS = ['Ota va farzand', 'Ona va farzand', 'Ota', 'Ona', 'Vasiy'];

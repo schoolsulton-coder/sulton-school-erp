@@ -18,6 +18,10 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { ConvertLeadDto } from './dto/convert-lead.dto';
 import { MarkVisitDto } from './dto/mark-visit.dto';
 import { CreatePlanDto } from './dto/create-plan.dto';
+import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { QuickStudentDto } from './dto/quick-student.dto';
+import { CreateGuardianDto } from './dto/create-guardian.dto';
+import { CreateRefDto } from './dto/create-ref.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -167,5 +171,51 @@ export class CrmController {
   @Permissions('crm.delete')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  // ---- Sozlamalar reference (Filial, Psixolog, O'quv yili) ----
+  @Get('branches') @Permissions('crm.view') branches() { return this.service.branches(); }
+  @Post('branches') @Permissions('crm.create') createBranch(@Body() d: CreateRefDto) { return this.service.createBranch(d.name); }
+  @Get('psychologists') @Permissions('crm.view') psychologists() { return this.service.psychologists(); }
+  @Post('psychologists') @Permissions('crm.create') createPsychologist(@Body() d: CreateRefDto) { return this.service.createPsychologist(d.name); }
+  @Get('academic-years') @Permissions('crm.view') academicYears() { return this.service.academicYears(); }
+  @Post('academic-years') @Permissions('crm.create') createAcademicYear(@Body() d: CreateRefDto) { return this.service.createAcademicYear(d.name); }
+  @Get('operators') @Permissions('crm.view') operators() { return this.service.operators(); }
+
+  // ---- Yangi qabul formasi yordamchilari ----
+  @Get('classes-form')
+  @Permissions('crm.view')
+  classesForm(@Query('academicYear') y?: string, @Query('branchId') b?: string) {
+    return this.service.classesForm(y, b);
+  }
+
+  @Get('students/search')
+  @Permissions('crm.view')
+  searchStudents(@Query('q') q: string) {
+    return this.service.searchStudents(q);
+  }
+
+  @Get('guardians/search')
+  @Permissions('crm.view')
+  searchGuardians(@Query('q') q?: string) {
+    return this.service.searchGuardians(q);
+  }
+
+  @Post('guardians')
+  @Permissions('crm.create')
+  createGuardian(@Body() dto: CreateGuardianDto) {
+    return this.service.createGuardian(dto);
+  }
+
+  @Post('students/quick')
+  @Permissions('crm.create')
+  quickStudent(@Body() dto: QuickStudentDto) {
+    return this.service.quickCreateStudent(dto);
+  }
+
+  @Post('admissions')
+  @Permissions('crm.create')
+  createAdmission(@Body() dto: CreateAdmissionDto) {
+    return this.service.createAdmission(dto);
   }
 }
