@@ -23,7 +23,7 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', { login, password });
       setAuth(data.accessToken, data.user);
       const portalRoles = ['student', 'guardian'];
-      router.push(portalRoles.includes(data.user.role) ? '/portal' : '/dashboard');
+      router.push(portalRoles.includes(data.user.role) ? '/portal' : '/crm');
     } catch {
       setError("Login yoki parol noto'g'ri");
     } finally {

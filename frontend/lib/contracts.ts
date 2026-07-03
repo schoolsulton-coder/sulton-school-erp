@@ -27,6 +27,16 @@ export interface Discount {
   value: number;
 }
 
+export interface PaymentRow {
+  id: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  note?: string | null;
+  student?: { firstName: string; lastName: string } | null;
+  contract?: { number: string } | null;
+}
+
 export const contractsApi = {
   list: (status?: string) =>
     api
@@ -48,6 +58,10 @@ export const contractsApi = {
   cancel: (id: string) =>
     api.patch(`/contracts/${id}/cancel`).then((r) => r.data),
 
+  recentPayments: () =>
+    api
+      .get<PaymentRow[]>('/contracts/payments')
+      .then((r) => r.data),
   discounts: () =>
     api.get<Discount[]>('/contracts/discounts').then((r) => r.data),
   createDiscount: (data: { name: string; type: 'PERCENT' | 'FIXED'; value: number }) =>

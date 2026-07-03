@@ -5,6 +5,7 @@ export interface AuthUser {
   id: string;
   fullName: string;
   phone: string;
+  email?: string | null;
   role: string;
   permissions: string[];
 }

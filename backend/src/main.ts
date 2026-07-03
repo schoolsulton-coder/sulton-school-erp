@@ -8,7 +8,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    // Production: aniq FRONTEND_URL. Dev: har qanday localhost porti (3000/3005/...).
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? (process.env.FRONTEND_URL ?? true)
+        : [/^http:\/\/localhost:\d+$/],
     credentials: true,
   });
 

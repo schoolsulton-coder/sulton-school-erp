@@ -83,6 +83,18 @@ export class ContractsService {
     });
   }
 
+  // ===== Barcha to'lovlar (To'lovlar sahifasi) =====
+  recentPayments() {
+    return this.prisma.payment.findMany({
+      include: {
+        student: { select: { firstName: true, lastName: true } },
+        contract: { select: { number: true } },
+      },
+      orderBy: { paidAt: 'desc' },
+      take: 200,
+    });
+  }
+
   // ===== Ro'yxat =====
   async findAll(params: { status?: string; studentId?: string }) {
     const contracts = await this.prisma.contract.findMany({

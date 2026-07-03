@@ -39,6 +39,13 @@ export class ContractsController {
     return this.service.createDiscount(dto);
   }
 
+  // ---- Barcha to'lovlar ----
+  @Get('payments')
+  @Permissions('contracts.view')
+  payments() {
+    return this.service.recentPayments();
+  }
+
   // ---- Shartnomalar ----
   @Get()
   @Permissions('contracts.view')

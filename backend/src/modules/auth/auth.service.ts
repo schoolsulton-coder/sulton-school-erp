@@ -60,6 +60,7 @@ export class AuthService {
         id: user.id,
         fullName: user.fullName,
         phone: user.phone,
+        email: user.email,
         role: user.role.slug,
         permissions,
       },
