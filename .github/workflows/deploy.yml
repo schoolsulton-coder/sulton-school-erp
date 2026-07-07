@@ -60,10 +60,24 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Server sozlanganmi tekshirish
+        id: check
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          if [ -n "$SSH_HOST" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SSH_HOST secret yo'q — VPS deploy o'tkazib yuborildi. Image'lar GHCR'da tayyor. Server qo'shsangiz SSH_HOST/SSH_USER/SSH_KEY secret'larini qo'shing."
+          fi
+
       - name: Owner nomini kichik harflarga (image manzili uchun)
+        if: steps.check.outputs.ready == 'true'
         run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
 
       - name: SSH orqali serverda yangilash
+        if: steps.check.outputs.ready == 'true'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
