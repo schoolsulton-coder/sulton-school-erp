@@ -446,14 +446,62 @@ export class CrmService {
     });
   }
 
-  // Forma uchun sinflar (bo'sh joyi bilan)
+  // Qabul ro'yxati (admissions — sana bo'yicha, barcha ustunlar)
+  async admissionsList(params: {
+    search?: string;
+    academicYear?: string;
+    branchId?: string;
+  }) {
+    const where: any = {};
+    if (params.academicYear) where.academicYear = params.academicYear;
+    if (params.branchId) where.branchId = params.branchId;
+    if (params.search) {
+      where.OR = [
+        { fullName: { contains: params.search, mode: 'insensitive' } },
+        { phone: { contains: params.search } },
+        { note: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+    const data = await this.prisma.lead.findMany({
+      where,
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            _count: { select: { contracts: true } },
+          },
+        },
+        branch: { select: { name: true } },
+        class: { select: { name: true, language: true } },
+        stage: { select: { name: true, order: true } },
+        manager: { select: { fullName: true } },
+        psychologist: { select: { fullName: true } },
+        _count: { select: { activities: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+    return { total: data.length, data };
+  }
+
+  // Barcha bosqichlar (Kanban ustunlari uchun)
+  stagesList() {
+    return this.prisma.leadStage.findMany({ orderBy: { order: 'asc' } });
+  }
+
+  // Forma uchun sinflar (band = faqat shartnomasi bor o'quvchilar)
   async classesForm(academicYear?: string, branchId?: string) {
     const classes = await this.prisma.class.findMany({
       where: {
         ...(academicYear ? { academicYear } : {}),
         ...(branchId ? { branchId } : {}),
       },
-      include: { _count: { select: { students: true } } },
+      include: {
+        // faqat shartnomasi bor o'quvchilar joyni band qiladi
+        students: { where: { contracts: { some: {} } }, select: { id: true } },
+      },
       orderBy: [{ gradeLevel: 'asc' }, { name: 'asc' }],
     });
     return classes.map((c) => ({
@@ -462,8 +510,8 @@ export class CrmService {
       gradeLevel: c.gradeLevel,
       language: c.language,
       capacity: c.capacity,
-      taken: c._count.students,
-      free: Math.max(0, c.capacity - c._count.students),
+      taken: c.students.length,
+      free: Math.max(0, c.capacity - c.students.length),
     }));
   }
 
@@ -504,8 +552,10 @@ export class CrmService {
     });
   }
 
-  createGuardian(dto: { fullName: string; phone: string; relation?: string }) {
-    return this.prisma.guardian.create({ data: dto });
+  createGuardian(dto: { fullName: string; phone?: string; relation?: string }) {
+    return this.prisma.guardian.create({
+      data: { fullName: dto.fullName, phone: dto.phone ?? '', relation: dto.relation },
+    });
   }
 
   // Yangi o'quvchi (qabul bosqichi — minimal)

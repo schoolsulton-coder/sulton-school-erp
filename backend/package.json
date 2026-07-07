@@ -16,6 +16,7 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:demo": "ts-node prisma/demo-seed.ts",
     "prisma:visits": "ts-node prisma/visits-seed.ts",
+    "prisma:classes": "ts-node prisma/classes-seed.ts",
     "prisma:studio": "prisma studio",
     "setup": "prisma migrate dev --name init --skip-seed && npm run prisma:seed && npm run prisma:demo"
   },

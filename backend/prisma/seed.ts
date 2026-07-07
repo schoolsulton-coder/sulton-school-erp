@@ -169,7 +169,7 @@ async function main() {
 
   // 7) Sozlamalar reference ma'lumotlari (Filial, Psixolog, O'quv yili)
   if ((await prisma.branch.count()) === 0) {
-    for (const name of ["Birja oldi (Farg'ona)", 'Limonariya', 'Ibn Sino (Maktab)']) {
+    for (const name of ['Bosh filial']) {
       await prisma.branch.create({ data: { name } });
     }
   }
@@ -179,7 +179,7 @@ async function main() {
     }
   }
   if ((await prisma.academicYear.count()) === 0) {
-    for (const name of ['2024-2025', '2025-2026', '2026-2027']) {
+    for (const name of ['2026-2027']) {
       await prisma.academicYear.create({ data: { name } });
     }
   }

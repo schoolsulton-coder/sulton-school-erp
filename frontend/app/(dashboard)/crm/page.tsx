@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Bell, RefreshCw } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import {
   type YearlyRow,
   type GuardianRow,
   type ProgressRow,
+  type AdmissionRow,
 } from '@/lib/crm';
 import { classesApi } from '@/lib/classes';
 import { studentsApi } from '@/lib/students';
@@ -22,22 +23,16 @@ import { contractsApi, money, type Discount } from '@/lib/contracts';
 import { AdmissionForm } from '@/components/admission-form';
 
 const TABS = [
-  { key: 'planned', label: 'Rejadagi tashriflar' },
-  { key: 'real', label: 'Real tashriflar' },
   { key: 'funnel', label: 'Qabul' },
-  { key: 'classes', label: 'Sinflar' },
-  { key: 'discounts', label: 'Chegirmalar' },
   { key: 'guardians', label: 'Vasiylar' },
   { key: 'students', label: "O'quvchilar" },
-  { key: 'stats', label: 'AmoCRM stats' },
-  { key: 'yearly', label: 'Yillik taqqoslash' },
-  { key: 'plan', label: 'Qabul rejasi' },
+  { key: 'classes', label: 'Sinflar' },
 ];
 
 const inputCls = 'rounded-lg border border-slate-300 px-3 py-2 text-sm';
 
 export default function CrmHubPage() {
-  const [tab, setTab] = useState('planned');
+  const [tab, setTab] = useState('funnel');
   const qc = useQueryClient();
 
   return (
@@ -264,50 +259,188 @@ function GroupBlock({
 
 /* ============================ QABUL (funnel) ============================ */
 
+const stageBadge = (name: string) => {
+  if (/yiqildi/i.test(name)) return 'bg-red-100 text-red-700';
+  if (/shartnoma tuzildi/i.test(name)) return 'bg-green-100 text-green-700';
+  if (/ota-ona/i.test(name)) return 'bg-purple-100 text-purple-700';
+  if (/suhbat/i.test(name)) return 'bg-blue-100 text-brand';
+  if (/test/i.test(name)) return 'bg-indigo-100 text-indigo-700';
+  if (/shartnoma/i.test(name)) return 'bg-teal-100 text-teal-700';
+  if (/qayta/i.test(name)) return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-600';
+};
+const kanbanTop = (name: string) => {
+  if (/yiqildi/i.test(name)) return 'border-t-red-400';
+  if (/qayta/i.test(name)) return 'border-t-amber-400';
+  if (/shartnoma tuzildi/i.test(name)) return 'border-t-green-400';
+  return 'border-t-blue-300';
+};
+
 function FunnelPanel() {
   const qc = useQueryClient();
+  const [view, setView] = useState<'list' | 'kanban'>('list');
+  const [search, setSearch] = useState('');
+  const [branchId, setBranchId] = useState('');
+  const [year, setYear] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const { data: stages } = useQuery({ queryKey: ['crm-board'], queryFn: crmApi.board });
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['crm-board'] });
+
+  const { data: adm } = useQuery({
+    queryKey: ['admissions', search, branchId, year],
+    queryFn: () =>
+      crmApi.admissionsList({
+        search: search || undefined,
+        branchId: branchId || undefined,
+        academicYear: year || undefined,
+      }),
+  });
+  const { data: stages } = useQuery({ queryKey: ['crm-stages'], queryFn: crmApi.stages });
+  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
+  const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
 
   const move = useMutation({
     mutationFn: ({ id, stageId }: { id: string; stageId: string }) => crmApi.moveStage(id, stageId),
-    onSuccess: invalidate,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admissions'] }),
   });
-  const convert = useMutation({ mutationFn: (id: string) => crmApi.convert(id, {}), onSuccess: invalidate });
+
+  const rows = adm?.data ?? [];
+  const oquvchi = (r: AdmissionRow) =>
+    r.student ? `${r.student.lastName} ${r.student.firstName}` : r.fullName;
+
+  const byDate = useMemo(() => {
+    const g: Record<string, AdmissionRow[]> = {};
+    for (const r of rows) {
+      const k = r.createdAt.slice(0, 10);
+      (g[k] ??= []).push(r);
+    }
+    return Object.entries(g).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [rows]);
+
+  const clear = () => { setSearch(''); setBranchId(''); setYear(''); };
+  const refresh = () => qc.invalidateQueries({ queryKey: ['admissions'] });
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Qabul funneli</h2>
-        <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">+ Yangi qabul</button>
-      </div>
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {stages?.map((stage: Stage) => (
-          <div key={stage.id} className="flex w-72 flex-shrink-0 flex-col rounded-xl bg-slate-100 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold">{stage.name}</h3>
-              <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{stage.leads.length}</span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {stage.leads.map((lead: Lead) => (
-                <div key={lead.id} className="rounded-lg bg-white p-3 shadow-sm">
-                  <div className="font-medium">{lead.fullName}</div>
-                  <div className="text-sm text-slate-500">{lead.phone}</div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <select value={lead.stageId} onChange={(e) => move.mutate({ id: lead.id, stageId: e.target.value })} className="flex-1 rounded border border-slate-200 px-1 py-1 text-xs">
-                      {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                    <button onClick={() => convert.mutate(lead.id)} className="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-200">→ O&apos;quvchi</button>
-                  </div>
-                </div>
-              ))}
-              {!stage.leads.length && <p className="py-3 text-center text-xs text-slate-400">Bo&apos;sh</p>}
-            </div>
+      {/* Header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-2xl font-bold">Qabul</h2>
+          <span className="text-slate-400">{adm?.total ?? 0} ta</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-slate-200 p-0.5">
+            <button onClick={() => setView('list')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'list' ? 'bg-brand-dark text-white' : 'text-slate-500'}`}>☰ Ro&apos;yxat</button>
+            <button onClick={() => setView('kanban')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'kanban' ? 'bg-brand-dark text-white' : 'text-slate-500'}`}>▤ Kanban</button>
           </div>
-        ))}
+          <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">+ Yangi qabul</button>
+        </div>
       </div>
-      {showForm && <AdmissionForm onClose={() => setShowForm(false)} onCreated={() => { setShowForm(false); invalidate(); }} />}
+
+      {/* Filtrlar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+        <input placeholder="Ism, gaplashgan, psixolog, izoh…" value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} min-w-[220px] flex-1`} />
+        <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={inputCls}>
+          <option value="">Barcha filiallar</option>
+          {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <select value={year} onChange={(e) => setYear(e.target.value)} className={inputCls}>
+          <option value="">Barcha yillar</option>
+          {years?.map((y) => <option key={y.id} value={y.name}>{y.name}</option>)}
+        </select>
+        <button onClick={clear} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700">Tozalash</button>
+      </div>
+
+      {view === 'list' ? (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-4 py-3">Qabul sanasi</th>
+                <th className="px-4 py-3">O&apos;quvchi</th>
+                <th className="px-4 py-3">Filial</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Bosqich vaqti</th>
+                <th className="px-4 py-3">Sinf</th>
+                <th className="px-4 py-3">Gaplashgan</th>
+                <th className="px-4 py-3">Psixolog</th>
+                <th className="px-4 py-3">Teg</th>
+                <th className="px-4 py-3 text-right">Izoh</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byDate.map(([date, list]) => {
+                const h = fmtDateKey(date);
+                return (
+                  <Fragment key={date}>
+                    <tr className="bg-slate-50/60">
+                      <td colSpan={10} className="px-4 py-2 text-sm font-semibold text-slate-600">
+                        {h.label} <span className="text-slate-400">({h.weekday})</span>
+                        {h.isToday && <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-brand">Bugun</span>}
+                        <span className="ml-2 font-normal text-slate-400">{list.length} ta</span>
+                      </td>
+                    </tr>
+                    {list.map((r) => (
+                      <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
+                        <td className="whitespace-nowrap px-4 py-2 text-slate-500">{fmtShort(r.createdAt)}</td>
+                        <td className="px-4 py-2">
+                          <div className="font-medium">{oquvchi(r)}</div>
+                          {(r.student?._count?.contracts ?? 0) > 0 && <div className="text-xs text-green-600">Shartnoma ochilgan</div>}
+                        </td>
+                        <td className="px-4 py-2">{r.branch?.name ?? '—'}</td>
+                        <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${stageBadge(r.stage?.name ?? '')}`}>{r.stage?.name ?? '—'}</span></td>
+                        <td className="whitespace-nowrap px-4 py-2 text-slate-500">{r.crmUpdatedAt ? fmtShort(r.crmUpdatedAt) : '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-2">{r.class ? `${r.class.name} (${r.class.language ?? '—'})` : '—'}</td>
+                        <td className="px-4 py-2">{r.manager?.fullName ?? '—'}</td>
+                        <td className="px-4 py-2">{r.psychologist?.fullName ?? '—'}</td>
+                        <td className="px-4 py-2">{r.tags?.length ? r.tags.join(', ') : '—'}</td>
+                        <td className="px-4 py-2 text-right">{r._count.activities}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
+              {!rows.length && <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-400">Qabul topilmadi</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {stages?.map((stage) => {
+            const cards = rows.filter((r) => r.stageId === stage.id);
+            return (
+              <div key={stage.id} className={`flex w-72 flex-shrink-0 flex-col rounded-xl border-t-2 bg-slate-50 p-3 ${kanbanTop(stage.name)}`}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{stage.name}</h3>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{cards.length}</span>
+                </div>
+                <div className="flex max-h-[62vh] flex-col gap-2 overflow-y-auto">
+                  {cards.map((r) => (
+                    <div key={r.id} className="rounded-lg bg-white p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-sm font-medium">{oquvchi(r)}</div>
+                        {r._count.activities > 0 && <span className="text-xs text-slate-400">💬{r._count.activities}</span>}
+                      </div>
+                      <div className="text-xs text-slate-500">{r.class ? `${r.class.name} (${r.class.language ?? '—'})` : '—'} · {r.branch?.name ?? '—'}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {r.manager && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-brand">{r.manager.fullName}</span>}
+                        {r.psychologist && <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] text-purple-700">{r.psychologist.fullName}</span>}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-1 text-[11px] text-slate-400">
+                        <span>Qabul {fmtShort(r.createdAt)}</span>
+                        <select value={r.stageId} onChange={(e) => move.mutate({ id: r.id, stageId: e.target.value })} className="max-w-[110px] rounded border border-slate-200 px-1 text-[11px]">
+                          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                  {!cards.length && <p className="py-3 text-center text-xs text-slate-300">Bo&apos;sh</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showForm && <AdmissionForm onClose={() => setShowForm(false)} onCreated={() => { setShowForm(false); refresh(); }} />}
     </div>
   );
 }

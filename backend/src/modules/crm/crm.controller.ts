@@ -213,6 +213,16 @@ export class CrmController {
     return this.service.quickCreateStudent(dto);
   }
 
+  @Get('admissions')
+  @Permissions('crm.view')
+  admissionsList(
+    @Query('search') search?: string,
+    @Query('academicYear') academicYear?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.service.admissionsList({ search, academicYear, branchId });
+  }
+
   @Post('admissions')
   @Permissions('crm.create')
   createAdmission(@Body() dto: CreateAdmissionDto) {

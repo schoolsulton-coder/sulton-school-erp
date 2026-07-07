@@ -130,9 +130,48 @@ export interface GuardianHit {
   relation?: string | null;
 }
 
+export interface StageInfo {
+  id: string;
+  name: string;
+  order: number;
+  color?: string | null;
+}
+
+export interface AdmissionRow {
+  id: string;
+  fullName: string;
+  phone: string;
+  academicYear?: string | null;
+  tags: string[];
+  note?: string | null;
+  createdAt: string;
+  crmUpdatedAt?: string | null;
+  stageId: string;
+  student?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    _count?: { contracts: number };
+  } | null;
+  branch?: { name: string } | null;
+  class?: { name: string; language?: string | null } | null;
+  stage?: { name: string; order: number } | null;
+  manager?: { fullName: string } | null;
+  psychologist?: { fullName: string } | null;
+  _count: { activities: number };
+}
+
+export interface AdmissionsResponse {
+  total: number;
+  data: AdmissionRow[];
+}
+
 export const crmApi = {
   // Funnel (Qabul)
   board: () => api.get<Stage[]>('/crm/board').then((r) => r.data),
+  stages: () => api.get<StageInfo[]>('/crm/stages').then((r) => r.data),
+  admissionsList: (params: { search?: string; academicYear?: string; branchId?: string }) =>
+    api.get<AdmissionsResponse>('/crm/admissions', { params }).then((r) => r.data),
   stats: () => api.get<CrmStats>('/crm/stats').then((r) => r.data),
   createLead: (data: {
     fullName: string;

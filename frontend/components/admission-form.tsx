@@ -7,7 +7,15 @@ import { crmApi, type ClassForm, type StudentHit, type GuardianHit } from '@/lib
 import { api } from '@/lib/api';
 
 const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
-const inp = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
+const inpBase = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
+const inp = `w-full ${inpBase}`;
+
+// Axios/NestJS xatosidan o'qiladigan xabar
+function errMsg(e: any): string {
+  const m = e?.response?.data?.message;
+  if (Array.isArray(m)) return m.join(', ');
+  return m || e?.message || 'Xatolik yuz berdi';
+}
 
 export function AdmissionForm({
   onClose,
@@ -19,7 +27,7 @@ export function AdmissionForm({
   const [view, setView] = useState<'main' | 'student'>('main');
   const [f, setF] = useState({
     branchId: '',
-    academicYear: '',
+    academicYear: '2026-2027',
     classId: '',
     managerId: '',
     psychologistId: '',
@@ -42,6 +50,14 @@ export function AdmissionForm({
     queryFn: () => crmApi.classesForm(f.academicYear || undefined, f.branchId || undefined),
     enabled: !!f.branchId && !!f.academicYear,
   });
+
+  // Standart filial — Bosh filial
+  useEffect(() => {
+    if (!f.branchId && branches?.length) {
+      const bosh = branches.find((b) => b.name === 'Bosh filial') ?? branches[0];
+      setF((prev) => ({ ...prev, branchId: bosh.id }));
+    }
+  }, [branches, f.branchId]);
   const { data: hits } = useQuery({
     queryKey: ['student-search', q],
     queryFn: () => crmApi.searchStudents(q),
@@ -177,6 +193,7 @@ export function AdmissionForm({
                 <textarea value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="Qo'shimcha eslatma. Detail sahifasida tarix bilan istalgancha qo'shiladi." className={`${inp} h-24`} />
               </div>
 
+              {save.isError && <p className="rounded-lg bg-red-50 px-3 py-2 text-right text-xs text-red-600">{errMsg(save.error)}</p>}
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button onClick={onClose} className="text-sm text-slate-500">Bekor</button>
                 <button onClick={() => save.mutate()} disabled={!canSave || save.isPending} className="rounded-lg bg-brand px-6 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
@@ -219,18 +236,26 @@ function NewStudentForm({
     onSuccess: (g: any) => { setGuardian(g); setAddG(null); },
   });
   const save = useMutation({
-    mutationFn: () =>
-      crmApi.quickStudent({
+    mutationFn: async () => {
+      let guardianId = guardian?.id;
+      // Yangi ota-ona kiritilgan bo'lsa — avval uni yaratamiz
+      if (!guardianId && addG?.fullName) {
+        const g: any = await crmApi.createGuardian(addG);
+        guardianId = g.id;
+      }
+      return crmApi.quickStudent({
         branchId,
         gender: f.gender as 'MALE' | 'FEMALE',
         lastName: f.lastName,
         firstName: f.firstName,
-        guardianId: guardian?.id,
-      }),
+        guardianId,
+      });
+    },
     onSuccess: (s: any) => onCreated(s),
   });
 
-  const canSave = f.gender && f.lastName && f.firstName && guardian;
+  const canSave =
+    f.gender && f.lastName && f.firstName && (!!guardian || !!addG?.fullName);
 
   return (
     <>
@@ -278,14 +303,31 @@ function NewStudentForm({
               <button onClick={() => setGuardian(null)} className="text-slate-400 hover:text-red-500"><X size={16} /></button>
             </div>
           ) : addG ? (
-            <div className="space-y-2 rounded-lg border border-slate-200 p-3">
-              <input placeholder="F.I.Sh" value={addG.fullName} onChange={(e) => setAddG({ ...addG, fullName: e.target.value })} className={inp} />
-              <input placeholder="Telefon" value={addG.phone} onChange={(e) => setAddG({ ...addG, phone: e.target.value })} className={inp} />
-              <input placeholder="Kim bo'ladi (ota/ona)" value={addG.relation} onChange={(e) => setAddG({ ...addG, relation: e.target.value })} className={inp} />
-              <div className="flex gap-2">
-                <button onClick={() => setAddG(null)} className="flex-1 rounded-lg border border-slate-300 py-1.5 text-sm">Bekor</button>
-                <button onClick={() => createG.mutate()} disabled={!addG.fullName || !addG.phone} className="flex-1 rounded-lg bg-brand py-1.5 text-sm font-semibold text-white disabled:opacity-50">Qo&apos;shish</button>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Yangi ota-ona</span>
+                <button onClick={() => setAddG(null)} className="text-sm text-brand hover:underline">Bekor</button>
               </div>
+              <div className="flex gap-2">
+                <input placeholder="F.I.Sh" value={addG.fullName} onChange={(e) => setAddG({ ...addG, fullName: e.target.value })} className={`${inpBase} min-w-0 flex-1`} />
+                <select value={addG.relation} onChange={(e) => setAddG({ ...addG, relation: e.target.value })} className={`${inpBase} w-32`}>
+                  <option value="Otasi">Otasi</option>
+                  <option value="Onasi">Onasi</option>
+                  <option value="Vasiysi">Vasiysi</option>
+                  <option value="Boshqa">Boshqa</option>
+                </select>
+              </div>
+              <input placeholder="Telefon (ixtiyoriy)" value={addG.phone} onChange={(e) => setAddG({ ...addG, phone: e.target.value })} className={`${inp} mt-2`} />
+              <div className="mt-2 flex justify-end">
+                <button
+                  onClick={() => createG.mutate()}
+                  disabled={!addG.fullName || createG.isPending}
+                  className="rounded-lg bg-brand px-5 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+                >
+                  {createG.isPending ? '...' : "Qo'shish"}
+                </button>
+              </div>
+              {createG.isError && <p className="mt-2 rounded bg-red-50 px-2 py-1 text-right text-xs text-red-600">{errMsg(createG.error)}</p>}
             </div>
           ) : (
             <>
@@ -302,13 +344,14 @@ function NewStudentForm({
                   {!guardians?.length && <div className="px-3 py-3 text-sm text-slate-400">Topilmadi</div>}
                 </div>
               </div>
-              <button onClick={() => setAddG({ fullName: '', phone: '', relation: 'ota-ona' })} className="mt-2 flex items-center gap-1 text-sm text-brand">
+              <button onClick={() => setAddG({ fullName: '', phone: '', relation: 'Otasi' })} className="mt-2 flex items-center gap-1 text-sm text-brand">
                 <Plus size={14} /> Yangi ota-ona qo&apos;shish
               </button>
             </>
           )}
         </div>
 
+        {save.isError && <p className="rounded-lg bg-red-50 px-3 py-2 text-right text-xs text-red-600">{errMsg(save.error)}</p>}
         <div className="flex items-center justify-end gap-3 pt-2">
           <button onClick={onBack} className="text-sm text-slate-500">Bekor</button>
           <button onClick={() => save.mutate()} disabled={!canSave || save.isPending} className="rounded-lg bg-brand px-6 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
