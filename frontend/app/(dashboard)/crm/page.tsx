@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Bell, RefreshCw } from 'lucide-react';
+import { Bell, RefreshCw, Clock } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   crmApi,
@@ -21,6 +21,7 @@ import { classesApi } from '@/lib/classes';
 import { studentsApi } from '@/lib/students';
 import { contractsApi, money, type Discount } from '@/lib/contracts';
 import { AdmissionForm } from '@/components/admission-form';
+import { AdmissionDetailBody } from '@/components/admission-detail';
 
 const TABS = [
   { key: 'funnel', label: 'Qabul' },
@@ -110,6 +111,12 @@ function fmtShort(iso?: string | null) {
   if (!iso) return '';
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')} ${fmtTime(iso)}`;
+}
+// To'liq: 08.07.2026 12:46 (Kanban kartochka va detail uchun)
+function fmtFull(iso?: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()} ${fmtTime(iso)}`;
 }
 
 function VisitsPanel({ status }: { status: VisitStatus }) {
@@ -260,20 +267,19 @@ function GroupBlock({
 /* ============================ QABUL (funnel) ============================ */
 
 const stageBadge = (name: string) => {
-  if (/yiqildi/i.test(name)) return 'bg-red-100 text-red-700';
-  if (/shartnoma tuzildi/i.test(name)) return 'bg-green-100 text-green-700';
-  if (/ota-ona/i.test(name)) return 'bg-purple-100 text-purple-700';
-  if (/suhbat/i.test(name)) return 'bg-blue-100 text-brand';
-  if (/test/i.test(name)) return 'bg-indigo-100 text-indigo-700';
-  if (/shartnoma/i.test(name)) return 'bg-teal-100 text-teal-700';
-  if (/qayta/i.test(name)) return 'bg-amber-100 text-amber-700';
+  if (/tuzmadi|yiqildi|rad etil/i.test(name)) return 'bg-red-100 text-red-700';   // Shartnoma tuzmadi
+  if (/tuzdi|tuzildi/i.test(name)) return 'bg-green-100 text-green-700';           // Shartnoma tuzdi
+  if (/shartnoma/i.test(name)) return 'bg-teal-100 text-teal-700';                 // Shartnoma tuzishga
+  if (/suhbat/i.test(name)) return 'bg-blue-100 text-brand';                       // Suhbatga chaqirildi
+  if (/yangi/i.test(name)) return 'bg-slate-100 text-slate-600';                   // Yangi
   return 'bg-slate-100 text-slate-600';
 };
 const kanbanTop = (name: string) => {
-  if (/yiqildi/i.test(name)) return 'border-t-red-400';
-  if (/qayta/i.test(name)) return 'border-t-amber-400';
-  if (/shartnoma tuzildi/i.test(name)) return 'border-t-green-400';
-  return 'border-t-blue-300';
+  if (/tuzmadi|yiqildi|rad etil/i.test(name)) return 'border-t-red-400';
+  if (/tuzdi|tuzildi/i.test(name)) return 'border-t-green-400';
+  if (/shartnoma/i.test(name)) return 'border-t-teal-400';
+  if (/suhbat/i.test(name)) return 'border-t-blue-400';
+  return 'border-t-slate-300';
 };
 
 function FunnelPanel() {
@@ -283,6 +289,7 @@ function FunnelPanel() {
   const [branchId, setBranchId] = useState('');
   const [year, setYear] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [detail, setDetail] = useState<AdmissionRow | null>(null);
 
   const { data: adm } = useQuery({
     queryKey: ['admissions', search, branchId, year],
@@ -296,11 +303,6 @@ function FunnelPanel() {
   const { data: stages } = useQuery({ queryKey: ['crm-stages'], queryFn: crmApi.stages });
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
-
-  const move = useMutation({
-    mutationFn: ({ id, stageId }: { id: string; stageId: string }) => crmApi.moveStage(id, stageId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admissions'] }),
-  });
 
   const rows = adm?.data ?? [];
   const oquvchi = (r: AdmissionRow) =>
@@ -379,7 +381,7 @@ function FunnelPanel() {
                       </td>
                     </tr>
                     {list.map((r) => (
-                      <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
+                      <tr key={r.id} onClick={() => setDetail(r)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50">
                         <td className="whitespace-nowrap px-4 py-2 text-slate-500">{fmtShort(r.createdAt)}</td>
                         <td className="px-4 py-2">
                           <div className="font-medium">{oquvchi(r)}</div>
@@ -414,21 +416,29 @@ function FunnelPanel() {
                 </div>
                 <div className="flex max-h-[62vh] flex-col gap-2 overflow-y-auto">
                   {cards.map((r) => (
-                    <div key={r.id} className="rounded-lg bg-white p-3 shadow-sm">
+                    <div
+                      key={r.id}
+                      onClick={() => setDetail(r)}
+                      className="cursor-pointer rounded-lg bg-white p-3 shadow-sm transition hover:shadow-md hover:ring-1 hover:ring-brand/30"
+                    >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="text-sm font-medium">{oquvchi(r)}</div>
-                        {r._count.activities > 0 && <span className="text-xs text-slate-400">💬{r._count.activities}</span>}
+                        <div className="text-sm font-semibold">{oquvchi(r)}</div>
+                        <Clock size={14} className="mt-0.5 flex-shrink-0 text-slate-300" />
                       </div>
-                      <div className="text-xs text-slate-500">{r.class ? `${r.class.name} (${r.class.language ?? '—'})` : '—'} · {r.branch?.name ?? '—'}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{r.class ? `${r.class.name} (${r.class.language ?? '—'})` : '—'} · {r.branch?.name ?? '—'}</div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {r.manager && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-brand">{r.manager.fullName}</span>}
                         {r.psychologist && <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] text-purple-700">{r.psychologist.fullName}</span>}
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-1 text-[11px] text-slate-400">
-                        <span>Qabul {fmtShort(r.createdAt)}</span>
-                        <select value={r.stageId} onChange={(e) => move.mutate({ id: r.id, stageId: e.target.value })} className="max-w-[110px] rounded border border-slate-200 px-1 text-[11px]">
-                          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
+                      <div className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Bosqich</span>
+                          <span className="font-medium text-slate-600">{fmtFull(r.crmUpdatedAt ?? r.createdAt)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Qabul</span>
+                          <span className="text-slate-400">{fmtFull(r.createdAt)}</span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -441,6 +451,13 @@ function FunnelPanel() {
       )}
 
       {showForm && <AdmissionForm onClose={() => setShowForm(false)} onCreated={() => { setShowForm(false); refresh(); }} />}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setDetail(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="h-full w-full max-w-2xl overflow-y-auto bg-slate-50 p-6 shadow-2xl">
+            <AdmissionDetailBody id={detail.id} onClose={() => setDetail(null)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -147,20 +147,14 @@ async function main() {
     }
   }
 
-  // 6) Qabul bosqichlari (raqamli pipeline — idempotent)
+  // 6) Qabul bosqichlari (pipeline — idempotent)
   if ((await prisma.leadStage.count()) === 0) {
     const stages = [
-      '1. Aniqlashga',
-      '2. Bog\'lanildi',
-      '3. Suhbatga',
-      '4. Yiqildi',
-      '5. Test topshirishga',
-      '6. Ota-ona suhbatiga',
-      '7. Qaror kutilmoqda',
-      '8. Chegirma kelishuvi',
-      '9. Hujjat topshirishga',
-      '10. Shartnoma tuzishga',
-      'Shartnoma tuzildi',
+      'Yangi',
+      'Suhbatga chaqirildi',
+      'Shartnoma tuzishga',
+      'Shartnoma tuzdi',
+      'Shartnoma tuzmadi',
     ];
     for (let i = 0; i < stages.length; i++) {
       await prisma.leadStage.create({ data: { name: stages[i], order: i } });

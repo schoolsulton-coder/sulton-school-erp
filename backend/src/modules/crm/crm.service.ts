@@ -126,7 +126,10 @@ export class CrmService {
       include: {
         stage: true,
         manager: { select: { id: true, fullName: true } },
-        student: true,
+        psychologist: true,
+        branch: true,
+        class: true,
+        student: { include: { _count: { select: { contracts: true } } } },
         activities: {
           include: { author: { select: { id: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },
@@ -190,7 +193,13 @@ export class CrmService {
 
   async update(id: string, dto: UpdateLeadDto) {
     await this.findOne(id);
-    return this.prisma.lead.update({ where: { id }, data: dto });
+    const { demoStartDate, ...rest } = dto as any;
+    const data: any = { ...rest, crmUpdatedAt: new Date() };
+    // Demo sanasi: bo'sh bo'lsa null, aks holda Date
+    if (demoStartDate !== undefined) {
+      data.demoStartDate = demoStartDate ? new Date(demoStartDate) : null;
+    }
+    return this.prisma.lead.update({ where: { id }, data });
   }
 
   /** Lead'ni boshqa bosqichga ko'chirish (drag & drop / tugma) */

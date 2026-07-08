@@ -327,6 +327,14 @@ model Lead {
   psychologist   Psychologist? @relation(fields: [psychologistId], references: [id])
   tags           String[]
 
+  // Test / psixolog / ota-ona bahosi (qabul jarayoni)
+  testType               String? // Test turlari
+  testLogicPct           Int? // Mantiq (%) — kamida 30
+  psychologistConclusion String? // Psixolog xulosasi (Qabul qilish mumkin, ...)
+  motherStatus           String? // Onasi statusi (Ma'qul, ...)
+  fatherStatus           String? // Otasi statusi (Ma'qul, ...)
+  demoStartDate          DateTime? // Demo boshlanish sanasi (ixtiyoriy)
+
   stageId   String
   stage     LeadStage @relation(fields: [stageId], references: [id])
   managerId String?

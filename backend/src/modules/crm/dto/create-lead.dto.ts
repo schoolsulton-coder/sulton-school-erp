@@ -57,4 +57,48 @@ export class CreateLeadDto {
   @IsOptional()
   @IsString()
   managerId?: string;
+
+  // ---- Qabul (admission) ----
+  @IsOptional()
+  @IsString()
+  academicYear?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  psychologistId?: string;
+
+  // ---- Test / psixolog / ota-ona bahosi ----
+  @IsOptional()
+  @IsString()
+  testType?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  testLogicPct?: number;
+
+  @IsOptional()
+  @IsString()
+  psychologistConclusion?: string;
+
+  @IsOptional()
+  @IsString()
+  motherStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  fatherStatus?: string;
+
+  @IsOptional()
+  @IsDateString()
+  demoStartDate?: string;
 }

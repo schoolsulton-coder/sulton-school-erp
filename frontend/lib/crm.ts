@@ -166,12 +166,65 @@ export interface AdmissionsResponse {
   data: AdmissionRow[];
 }
 
+// Bitta qabul detali (kartochka ustiga bosganda) — /crm/leads/:id
+export interface AdmissionDetailData {
+  id: string;
+  fullName: string;
+  phone: string;
+  note?: string | null;
+  academicYear?: string | null;
+  tags: string[];
+  stageId: string;
+  createdAt: string;
+  crmUpdatedAt?: string | null;
+  testType?: string | null;
+  testLogicPct?: number | null;
+  psychologistConclusion?: string | null;
+  motherStatus?: string | null;
+  fatherStatus?: string | null;
+  demoStartDate?: string | null;
+  psychologistId?: string | null;
+  classId?: string | null;
+  branchId?: string | null;
+  managerId?: string | null;
+  stage?: { name: string } | null;
+  manager?: { id: string; fullName: string } | null;
+  psychologist?: { id: string; fullName: string } | null;
+  branch?: { id: string; name: string } | null;
+  class?: { id: string; name: string; language?: string | null } | null;
+  student?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    _count?: { contracts: number };
+  } | null;
+}
+
+export interface UpdateAdmission {
+  branchId?: string;
+  classId?: string;
+  academicYear?: string;
+  stageId?: string;
+  managerId?: string;
+  psychologistId?: string;
+  testType?: string;
+  testLogicPct?: number;
+  psychologistConclusion?: string;
+  motherStatus?: string;
+  fatherStatus?: string;
+  demoStartDate?: string;
+}
+
 export const crmApi = {
   // Funnel (Qabul)
   board: () => api.get<Stage[]>('/crm/board').then((r) => r.data),
   stages: () => api.get<StageInfo[]>('/crm/stages').then((r) => r.data),
   admissionsList: (params: { search?: string; academicYear?: string; branchId?: string }) =>
     api.get<AdmissionsResponse>('/crm/admissions', { params }).then((r) => r.data),
+  getAdmission: (id: string) =>
+    api.get<AdmissionDetailData>(`/crm/leads/${id}`).then((r) => r.data),
+  updateAdmission: (id: string, data: UpdateAdmission) =>
+    api.patch(`/crm/leads/${id}`, data).then((r) => r.data),
   stats: () => api.get<CrmStats>('/crm/stats').then((r) => r.data),
   createLead: (data: {
     fullName: string;
