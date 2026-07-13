@@ -151,6 +151,7 @@ export interface AdmissionRow {
     id: string;
     firstName: string;
     lastName: string;
+    gender?: 'MALE' | 'FEMALE' | null;
     _count?: { contracts: number };
   } | null;
   branch?: { name: string } | null;

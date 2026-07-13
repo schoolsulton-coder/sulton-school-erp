@@ -21,6 +21,7 @@ export class StudentsService {
     search?: string;
     classId?: string;
     status?: string;
+    academicYear?: string;
   }) {
     const page = Number(params.page) || 1;
     const limit = Number(params.limit) || 20;
@@ -28,6 +29,8 @@ export class StudentsService {
     const where: any = {};
     if (params.classId) where.classId = params.classId;
     if (params.status) where.status = params.status;
+    // Sinfi shu o'quv yiliga tegishli o'quvchilar (masalan bir yil oldingi)
+    if (params.academicYear) where.class = { academicYear: params.academicYear };
     if (params.search) {
       where.OR = [
         { firstName: { contains: params.search, mode: 'insensitive' } },

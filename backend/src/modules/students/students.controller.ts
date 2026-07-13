@@ -34,8 +34,9 @@ export class StudentsController {
     @Query('search') search?: string,
     @Query('classId') classId?: string,
     @Query('status') status?: string,
+    @Query('academicYear') academicYear?: string,
   ) {
-    return this.service.findAll({ page, limit, search, classId, status });
+    return this.service.findAll({ page, limit, search, classId, status, academicYear });
   }
 
   @Get(':id')

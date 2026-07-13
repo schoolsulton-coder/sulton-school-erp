@@ -87,6 +87,7 @@ export const contractsApi = {
     months: number;
     monthlyAmount: number;
     discountId?: string;
+    discountAmount?: number;
     dueDay?: number;
     type?: 'MONTHLY' | 'YEARLY';
   }) => api.post('/contracts', data).then((r) => r.data),

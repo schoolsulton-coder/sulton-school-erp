@@ -479,6 +479,7 @@ export class CrmService {
             id: true,
             firstName: true,
             lastName: true,
+            gender: true,
             _count: { select: { contracts: true } },
           },
         },

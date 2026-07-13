@@ -56,7 +56,11 @@ export class ContractsService {
 
     const start = new Date(dto.startDate);
     const dueDay = dto.dueDay ?? 5;
-    const monthly = this.applyDiscount(dto.monthlyAmount, discount as DiscountRow | null);
+    // Chegirma: to'g'ridan-to'g'ri summa berilsa oyiga ayriladi, aks holda Discount entity
+    const monthly =
+      dto.discountAmount != null
+        ? Math.max(0, dto.monthlyAmount - dto.discountAmount)
+        : this.applyDiscount(dto.monthlyAmount, discount as DiscountRow | null);
 
     const installments: { dueDate: Date; amount: number }[] = [];
     let endDate = start;
@@ -201,7 +205,11 @@ export class ContractsService {
       where: { id },
       include: {
         student: {
-          include: { guardians: { include: { guardian: true } } },
+          include: {
+            guardians: { include: { guardian: true } },
+            class: { select: { name: true, language: true, academicYear: true } },
+            branch: { select: { name: true } },
+          },
         },
         discount: true,
         installments: { orderBy: { dueDate: 'asc' } },

@@ -32,6 +32,11 @@ export class CreateContractDto {
   discountId?: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number; // to'g'ridan-to'g'ri chegirma summasi (oyiga ayriladi)
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(28)
