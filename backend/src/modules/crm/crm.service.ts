@@ -508,8 +508,17 @@ export class CrmService {
         ...(branchId ? { branchId } : {}),
       },
       include: {
-        // faqat shartnomasi bor o'quvchilar joyni band qiladi
-        students: { where: { contracts: { some: {} } }, select: { id: true } },
+        // Joyni faqat SHARTNOMA tuzilgan qabul band qiladi:
+        // o'quvchisining shartnomasi bor YOKI statusi "Shartnoma tuzdi".
+        admissions: {
+          where: {
+            OR: [
+              { student: { contracts: { some: {} } } },
+              { stage: { name: 'Shartnoma tuzdi' } },
+            ],
+          },
+          select: { id: true },
+        },
       },
       orderBy: [{ gradeLevel: 'asc' }, { name: 'asc' }],
     });
@@ -519,8 +528,8 @@ export class CrmService {
       gradeLevel: c.gradeLevel,
       language: c.language,
       capacity: c.capacity,
-      taken: c.students.length,
-      free: Math.max(0, c.capacity - c.students.length),
+      taken: c.admissions.length,
+      free: Math.max(0, c.capacity - c.admissions.length),
     }));
   }
 

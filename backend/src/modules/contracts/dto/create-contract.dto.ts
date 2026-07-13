@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -35,4 +36,8 @@ export class CreateContractDto {
   @Min(1)
   @Max(28)
   dueDay?: number; // to'lov sanasi (oyning kuni), default 5
+
+  @IsOptional()
+  @IsIn(['MONTHLY', 'YEARLY'])
+  type?: 'MONTHLY' | 'YEARLY'; // Oylik / Yillik
 }

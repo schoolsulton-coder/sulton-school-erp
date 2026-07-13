@@ -46,6 +46,13 @@ export class ContractsController {
     return this.service.recentPayments();
   }
 
+  // ---- Boy ko'rinish (stat plitkalar + qatorlar) ----
+  @Get('overview')
+  @Permissions('contracts.view')
+  overview() {
+    return this.service.overview();
+  }
+
   // ---- Shartnomalar ----
   @Get()
   @Permissions('contracts.view')

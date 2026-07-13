@@ -75,6 +75,7 @@ export class ContractsService {
         startDate: start,
         endDate,
         monthlyAmount: dto.monthlyAmount,
+        type: dto.type ?? 'MONTHLY',
         discountId: dto.discountId,
         status: 'ACTIVE',
         installments: { create: installments },
@@ -125,6 +126,74 @@ export class ContractsService {
         overdueCount: overdue,
       };
     });
+  }
+
+  // ===== Boy ko'rinish: stat plitkalar + qatorlar =====
+  async overview() {
+    const contracts = await this.prisma.contract.findMany({
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            branch: { select: { name: true } },
+            class: { select: { name: true, language: true, academicYear: true } },
+          },
+        },
+        installments: { select: { amount: true, paidAmount: true, status: true } },
+        payments: { select: { amount: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const rows = contracts.map((c) => {
+      const months = Math.max(1, c.installments.length);
+      const payable = c.installments.reduce((s, i) => s + i.amount, 0);
+      const original = Math.round(c.monthlyAmount * months); // asl narx (chegirmasiz)
+      const discount = Math.max(0, original - payable); // chegirma summasi
+      const monthly = Math.round(payable / months);
+      const paymentsSum = c.payments.reduce((s, p) => s + p.amount, 0);
+      const overdue = c.installments.some((i) => i.status === 'OVERDUE');
+      return {
+        id: c.id,
+        number: c.number,
+        createdAt: c.createdAt,
+        student: {
+          firstName: c.student.firstName,
+          lastName: c.student.lastName,
+          class: c.student.class
+            ? { name: c.student.class.name, language: c.student.class.language }
+            : null,
+        },
+        branch: c.student.branch?.name ?? null,
+        academicYear: c.student.class?.academicYear ?? null,
+        type: c.type,
+        status: c.status,
+        overdue,
+        original,
+        discount,
+        payable,
+        monthly,
+        paymentsSum,
+      };
+    });
+
+    const cnt = (fn: (r: (typeof rows)[number]) => boolean) => rows.filter(fn).length;
+    const stats = {
+      total: rows.length,
+      monthly: cnt((r) => r.type === 'MONTHLY'),
+      yearly: cnt((r) => r.type === 'YEARLY'),
+      suspended: cnt((r) => r.status === 'SUSPENDED'),
+      tempSuspended: cnt((r) => r.status === 'TEMP_SUSPENDED'),
+      overdue: cnt((r) => r.overdue),
+      left: cnt((r) => r.status === 'LEFT'),
+      other: cnt((r) => ['OTHER', 'DRAFT', 'COMPLETED', 'CANCELLED'].includes(r.status)),
+      payableSum: rows.reduce((s, r) => s + r.payable, 0),
+      paymentsSum: rows.reduce((s, r) => s + r.paymentsSum, 0),
+    };
+
+    return { stats, rows };
   }
 
   async findOne(id: string) {

@@ -51,9 +51,18 @@ enum VisitStatus {
 
 enum ContractStatus {
   DRAFT
-  ACTIVE
+  ACTIVE // Faol
   COMPLETED
   CANCELLED
+  SUSPENDED // Band
+  TEMP_SUSPENDED // Vaqtincha band
+  LEFT // Ketdi-aniqlashga
+  OTHER // Boshqa
+}
+
+enum ContractType {
+  MONTHLY // Oylik
+  YEARLY // Yillik
 }
 
 enum InstallmentStatus {
@@ -504,6 +513,7 @@ model Contract {
   startDate     DateTime
   endDate       DateTime?
   monthlyAmount Float
+  type          ContractType   @default(MONTHLY)
   discountId    String?
   discount      Discount?      @relation(fields: [discountId], references: [id])
   status        ContractStatus @default(DRAFT)

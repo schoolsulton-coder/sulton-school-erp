@@ -37,7 +37,45 @@ export interface PaymentRow {
   contract?: { number: string } | null;
 }
 
+export interface ContractOverviewRow {
+  id: string;
+  number: string;
+  createdAt: string;
+  student: {
+    firstName: string;
+    lastName: string;
+    class?: { name: string; language?: string | null } | null;
+  };
+  branch?: string | null;
+  academicYear?: string | null;
+  type: 'MONTHLY' | 'YEARLY';
+  status: string;
+  overdue: boolean;
+  original: number;
+  discount: number;
+  payable: number;
+  monthly: number;
+  paymentsSum: number;
+}
+
+export interface ContractsOverview {
+  stats: {
+    total: number;
+    monthly: number;
+    yearly: number;
+    suspended: number;
+    tempSuspended: number;
+    overdue: number;
+    left: number;
+    other: number;
+    payableSum: number;
+    paymentsSum: number;
+  };
+  rows: ContractOverviewRow[];
+}
+
 export const contractsApi = {
+  overview: () => api.get<ContractsOverview>('/contracts/overview').then((r) => r.data),
   list: (status?: string) =>
     api
       .get<ContractListItem[]>('/contracts', { params: { status } })
@@ -50,6 +88,7 @@ export const contractsApi = {
     monthlyAmount: number;
     discountId?: string;
     dueDay?: number;
+    type?: 'MONTHLY' | 'YEARLY';
   }) => api.post('/contracts', data).then((r) => r.data),
   addPayment: (
     id: string,
