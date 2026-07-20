@@ -344,6 +344,43 @@ export class CrmService {
     };
   }
 
+  /** Konversiya kohorti — 30/60/90/120 kun bosqichlari + faol/nofaol */
+  async cohort() {
+    const leads = await this.prisma.lead.findMany({
+      select: {
+        createdAt: true,
+        convertedAt: true,
+        stage: { select: { name: true } },
+      },
+    });
+    const total = leads.length;
+    const DAY = 86400000;
+    const rejected = (n: string) => /tuzmadi|yiqildi|rad|yo'q|bekor|lost/i.test(n);
+    const b: Record<number, number> = { 30: 0, 60: 0, 90: 0, 120: 0 };
+    let converted = 0;
+    let active = 0;
+    let inactive = 0;
+    for (const l of leads) {
+      if (l.convertedAt) {
+        converted++;
+        const days = (l.convertedAt.getTime() - l.createdAt.getTime()) / DAY;
+        for (const d of [30, 60, 90, 120]) if (days <= d) b[d]++;
+      } else if (rejected(l.stage?.name ?? '')) inactive++;
+      else active++;
+    }
+    const pct = (n: number) => (total ? Math.round((n / total) * 1000) / 10 : 0);
+    return {
+      total,
+      converted,
+      convertedPct: pct(converted),
+      active,
+      activePct: pct(active),
+      inactive,
+      inactivePct: pct(inactive),
+      buckets: [30, 60, 90, 120].map((d) => ({ days: d, count: b[d], pct: pct(b[d]) })),
+    };
+  }
+
   // ---- Yillik taqqoslash ----
   async yearly() {
     const leads = await this.prisma.lead.findMany({
@@ -535,22 +572,28 @@ export class CrmService {
   }
 
   // Talaba qidirish (F.I.Sh bo'yicha)
-  searchStudents(q: string) {
-    if (!q || q.length < 2) return [];
+  searchStudents(q?: string, academicYear?: string) {
+    const where: any = {};
+    if (academicYear) where.class = { academicYear };
+    if (q && q.length >= 2) {
+      where.OR = [
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+      ];
+    } else if (!academicYear) {
+      // yil ham, qidiruv ham yo'q — bo'sh
+      return [];
+    }
     return this.prisma.student.findMany({
-      where: {
-        OR: [
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-        ],
-      },
+      where,
       select: {
         id: true,
         firstName: true,
         lastName: true,
-        class: { select: { name: true } },
+        class: { select: { name: true, academicYear: true } },
       },
-      take: 20,
+      orderBy: { lastName: 'asc' },
+      take: 50,
     });
   }
 

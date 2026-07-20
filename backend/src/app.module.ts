@@ -19,6 +19,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { EsmaktabModule } from './modules/esmaktab/esmaktab.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 /**
  * AppModule — barcha ERP/LMS modullarini birlashtiradi.
@@ -51,6 +52,7 @@ import { EsmaktabModule } from './modules/esmaktab/esmaktab.module';
     AttendanceModule,
     PortalModule,
     EsmaktabModule,
+    PaymentsModule,
     // Barcha asosiy modullar ulandi 🎉
     // GradesModule, AttendanceModule, HomeworkModule, BehaviorModule,
     // NotificationsModule, TelegramModule, EsmaktabModule, ReportsModule

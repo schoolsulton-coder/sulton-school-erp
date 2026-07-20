@@ -9,7 +9,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         <button onClick={onMenu} className="rounded-lg p-2 hover:bg-slate-100 md:hidden">
           <Menu size={20} />
         </button>
-        <span className="font-bold text-slate-800">RS — ERP</span>
+        <span className="font-bold text-slate-800">Sulton School ERP</span>
       </div>
     </header>
   );

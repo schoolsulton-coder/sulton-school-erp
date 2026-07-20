@@ -66,6 +66,17 @@ export interface YearlyRow {
   conversionRate: number;
 }
 
+export interface CohortData {
+  total: number;
+  converted: number;
+  convertedPct: number;
+  active: number;
+  activePct: number;
+  inactive: number;
+  inactivePct: number;
+  buckets: { days: number; count: number; pct: number }[];
+}
+
 export interface GuardianRow {
   id: string;
   fullName: string;
@@ -227,6 +238,7 @@ export const crmApi = {
   updateAdmission: (id: string, data: UpdateAdmission) =>
     api.patch(`/crm/leads/${id}`, data).then((r) => r.data),
   stats: () => api.get<CrmStats>('/crm/stats').then((r) => r.data),
+  cohort: () => api.get<CohortData>('/crm/cohort').then((r) => r.data),
   createLead: (data: {
     fullName: string;
     phone: string;
@@ -278,8 +290,10 @@ export const crmApi = {
   // ---- Forma yordamchilari ----
   classesForm: (academicYear?: string, branchId?: string) =>
     api.get<ClassForm[]>('/crm/classes-form', { params: { academicYear, branchId } }).then((r) => r.data),
-  searchStudents: (q: string) =>
-    api.get<StudentHit[]>('/crm/students/search', { params: { q } }).then((r) => r.data),
+  searchStudents: (q: string, academicYear?: string) =>
+    api
+      .get<StudentHit[]>('/crm/students/search', { params: { q, academicYear } })
+      .then((r) => r.data),
   searchGuardians: (q?: string) =>
     api.get<GuardianHit[]>('/crm/guardians/search', { params: { q } }).then((r) => r.data),
   createGuardian: (data: { fullName: string; phone: string; relation?: string }) =>

@@ -18,26 +18,33 @@ export class ClassesService {
       where: academicYear ? { academicYear } : {},
       include: {
         _count: { select: { students: true } },
+        branch: { select: { id: true, name: true } },
         teachers: {
           include: { teacher: { select: { id: true, fullName: true } } },
         },
       },
       orderBy: [{ gradeLevel: 'asc' }, { name: 'asc' }],
     });
-    // sig'im to'lganlik foizi
-    return classes.map((c) => ({
-      ...c,
-      studentCount: c._count.students,
-      fillPercent: c.capacity
-        ? Math.round((c._count.students / c.capacity) * 100)
-        : 0,
-    }));
+    // sig'im, band/bo'sh joy va to'lganlik foizi
+    return classes.map((c) => {
+      const studentCount = c._count.students;
+      const freeSeats = Math.max(c.capacity - studentCount, 0);
+      return {
+        ...c,
+        studentCount,
+        freeSeats,
+        fillPercent: c.capacity
+          ? Math.round((studentCount / c.capacity) * 100)
+          : 0,
+      };
+    });
   }
 
   async findOne(id: string) {
     const cls = await this.prisma.class.findUnique({
       where: { id },
       include: {
+        branch: { select: { id: true, name: true } },
         students: {
           orderBy: { lastName: 'asc' },
           select: {

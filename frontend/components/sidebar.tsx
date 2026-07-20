@@ -14,7 +14,8 @@ import {
   Users,
   Briefcase,
   BarChart3,
-  GraduationCap,
+  Database,
+  BookOpen,
   Settings,
   ChevronsLeft,
   ChevronDown,
@@ -51,13 +52,23 @@ const MENU: Item[] = [
   { href: '/reports', label: 'Hisobotlar', icon: BarChart3, perm: 'reports.view' },
 ];
 
-const LEARNING: Group = {
-  label: "O'rganish",
-  icon: GraduationCap,
+const DATA: Group = {
+  label: "Ma'lumotlar",
+  icon: Database,
   perm: null,
   children: [
     { href: '/students', label: "O'quvchilar", perm: 'students.view' },
+    { href: '/guardians', label: 'Vasiylar', perm: 'students.view' },
     { href: '/classes', label: 'Sinflar', perm: 'classes.view' },
+    { href: '/schedule', label: 'Dars jadvali', perm: 'classes.view' },
+  ],
+};
+
+const STUDY: Group = {
+  label: "O'quv jarayoni",
+  icon: BookOpen,
+  perm: null,
+  children: [
     { href: '/grades', label: 'Baholash', perm: 'grades.view' },
     { href: '/attendance', label: 'Davomat', perm: 'attendance.view' },
     { href: '/homework', label: 'Vazifalar', perm: 'homework.view' },
@@ -108,7 +119,7 @@ export function Sidebar({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
-        {!collapsed && <span className="text-lg font-bold">RS — ERP</span>}
+        {!collapsed && <span className="text-lg font-bold">Sulton School ERP</span>}
         <button
           onClick={onToggleCollapse}
           className="rounded-lg p-1.5 text-white/70 hover:bg-white/10"
@@ -140,7 +151,7 @@ export function Sidebar({
         })}
 
         {/* Guruhlar (submenu) */}
-        {[LEARNING, SETTINGS].map((g) => {
+        {[DATA, STUDY, SETTINGS].map((g) => {
           const kids = visibleChildren(g);
           if (!kids.length) return null;
           const Icon = g.icon;
@@ -151,6 +162,7 @@ export function Sidebar({
               <button
                 onClick={() => (collapsed ? undefined : setOpenGroup(open ? '' : g.label))}
                 title={collapsed ? g.label : undefined}
+                aria-expanded={!collapsed && open}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
                   groupActive ? 'text-white' : 'text-white/75'
                 } hover:bg-white/10 ${collapsed ? 'justify-center' : ''}`}

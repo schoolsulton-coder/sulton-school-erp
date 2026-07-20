@@ -4,13 +4,16 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ScheduleService } from './schedule.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
+import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
+import { CreateNormDto } from './dto/create-norm.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -48,9 +51,34 @@ export class ScheduleController {
     return this.service.create(dto);
   }
 
+  @Patch('schedule/:id')
+  @Permissions('classes.update')
+  update(@Param('id') id: string, @Body() dto: UpdateScheduleDto) {
+    return this.service.update(id, dto);
+  }
+
   @Delete('schedule/:id')
   @Permissions('classes.update')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  // ---- Fan normasi (haftalik soat) ----
+  @Get('classes/:classId/norms')
+  @Permissions('classes.view')
+  norms(@Param('classId') classId: string) {
+    return this.service.norms(classId);
+  }
+
+  @Post('classes/:classId/norms')
+  @Permissions('classes.update')
+  upsertNorm(@Param('classId') classId: string, @Body() dto: CreateNormDto) {
+    return this.service.upsertNorm(classId, dto);
+  }
+
+  @Delete('norms/:id')
+  @Permissions('classes.update')
+  removeNorm(@Param('id') id: string) {
+    return this.service.removeNorm(id);
   }
 }

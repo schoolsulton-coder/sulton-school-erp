@@ -13,7 +13,7 @@ export class CreateClassDto {
   name: string; // "5-A"
 
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(11)
   gradeLevel: number;
 
@@ -30,4 +30,20 @@ export class CreateClassDto {
   @IsOptional()
   @IsString()
   room?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string; // "O'zbek", "Rus", "Ingliz"
+
+  @IsOptional()
+  @IsString()
+  branchId?: string; // Filial
+
+  @IsOptional()
+  @IsString()
+  status?: string; // "Faol", "Nofaol", "Arxiv"
+
+  @IsOptional()
+  @IsString()
+  telegramGroup?: string; // Telegram guruh havolasi
 }

@@ -436,6 +436,8 @@ model Class {
   capacity     Int     @default(30)
   room         String?
   language     String? // "O'zbek", "Rus", "Ingliz"
+  status       String  @default("Faol") // "Faol", "Nofaol", "Arxiv"
+  telegramGroup String? // Telegram guruh havolasi (ixtiyoriy)
   branchId     String?
   branch       Branch? @relation(fields: [branchId], references: [id])
 
@@ -445,6 +447,7 @@ model Class {
   attendances Attendance[]
   homeworks  Homework[]
   admissions Lead[]
+  norms      SubjectNorm[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -471,8 +474,22 @@ model Subject {
   schedules Schedule[]
   grades    Grade[]
   homeworks Homework[]
+  norms     SubjectNorm[]
 
   @@map("subjects")
+}
+
+/// Fan bo'yicha haftalik soat normasi (reja) — sinfga nisbatan
+model SubjectNorm {
+  id          String  @id @default(uuid())
+  classId     String
+  subjectId   String
+  weeklyHours Int     @default(0)
+  class       Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([classId, subjectId])
+  @@map("subject_norms")
 }
 
 model Schedule {
@@ -537,6 +554,7 @@ model ContractInstallment {
   amount     Float
   paidAmount Float             @default(0)
   status     InstallmentStatus @default(PENDING)
+  allocations PaymentAllocation[]
 
   @@index([contractId])
   @@index([status])
@@ -544,19 +562,47 @@ model ContractInstallment {
 }
 
 model Payment {
-  id         String   @id @default(uuid())
-  studentId  String
-  student    Student  @relation(fields: [studentId], references: [id])
-  contractId String?
-  contract   Contract? @relation(fields: [contractId], references: [id])
-  amount     Float
-  method     String   // naqd, plastik, click, payme
-  paidAt     DateTime @default(now())
-  note       String?
+  id          String    @id @default(uuid())
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id])
+  contractId  String?
+  contract    Contract? @relation(fields: [contractId], references: [id])
+  accountId   String?
+  account     Account?  @relation(fields: [accountId], references: [id])
+  amount      Float
+  method      String    // kassa turi: Naqd, Bank, Karta
+  type        String?   // to'lov turi: Click, Payme, Terminal...
+  cardLast4   String?   // karta oxirgi 4 raqami / RRN
+  isRefund    Boolean   @default(false) // qaytarish (−) rejimi
+  paidAt      DateTime  @default(now())
+  note        String?
+  confirmedAt DateTime? // tasdiqlangan sana (null = tasdiqlanmagan)
+  createdById String?   // kim yaratdi (user id)
+  updatedById String?   // kim o'zgartirdi (user id)
+  updateCount Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  allocations PaymentAllocation[]
 
   @@index([studentId])
   @@index([contractId])
+  @@index([accountId])
   @@map("payments")
+}
+
+/// To'lovning aniq oy(installment)larga taqsimlanishi (qo'lda taqsimlash uchun)
+model PaymentAllocation {
+  id            String              @id @default(uuid())
+  paymentId     String
+  payment       Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  installmentId String
+  installment   ContractInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  amount        Float
+
+  @@index([paymentId])
+  @@index([installmentId])
+  @@map("payment_allocations")
 }
 
 // ============================================================================
@@ -568,6 +614,7 @@ model Account {
   name         String        // Asosiy kassa, Bank, ...
   balance      Float         @default(0)
   transactions Transaction[]
+  payments     Payment[]
 
   @@map("accounts")
 }

@@ -52,6 +52,12 @@ export class CrmController {
     return this.service.stats();
   }
 
+  @Get('cohort')
+  @Permissions('crm.view')
+  cohort() {
+    return this.service.cohort();
+  }
+
   // ---- Tashriflar (rejadagi / real) ----
   @Get('visits')
   @Permissions('crm.view')
@@ -191,8 +197,11 @@ export class CrmController {
 
   @Get('students/search')
   @Permissions('crm.view')
-  searchStudents(@Query('q') q: string) {
-    return this.service.searchStudents(q);
+  searchStudents(
+    @Query('q') q: string,
+    @Query('academicYear') academicYear?: string,
+  ) {
+    return this.service.searchStudents(q, academicYear);
   }
 
   @Get('guardians/search')
