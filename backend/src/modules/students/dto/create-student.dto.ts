@@ -34,4 +34,28 @@ export class CreateStudentDto {
   @IsOptional()
   @IsString()
   classId?: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  photo?: string;
+
+  @IsOptional()
+  @IsString()
+  documentType?: string;
+
+  @IsOptional()
+  @IsString()
+  documentSeries?: string;
+
+  @IsOptional()
+  @IsString()
+  prevSchoolType?: string;
+
+  @IsOptional()
+  @IsString()
+  prevSchoolName?: string;
 }

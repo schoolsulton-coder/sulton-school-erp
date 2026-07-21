@@ -22,45 +22,88 @@ export class StudentsService {
     classId?: string;
     status?: string;
     academicYear?: string;
+    branchId?: string;
   }) {
     const page = Number(params.page) || 1;
     const limit = Number(params.limit) || 20;
 
-    const where: any = {};
-    if (params.classId) where.classId = params.classId;
-    if (params.status) where.status = params.status;
-    // Sinfi shu o'quv yiliga tegishli o'quvchilar (masalan bir yil oldingi)
-    if (params.academicYear) where.class = { academicYear: params.academicYear };
+    // status filtridan tashqari asosiy filtr (stat kartochkalar barcha holatni ko'rsatsin)
+    const base: any = {};
+    if (params.classId) base.classId = params.classId;
+    if (params.branchId) base.branchId = params.branchId;
+    if (params.academicYear) base.class = { academicYear: params.academicYear };
     if (params.search) {
-      where.OR = [
+      base.OR = [
         { firstName: { contains: params.search, mode: 'insensitive' } },
         { lastName: { contains: params.search, mode: 'insensitive' } },
       ];
     }
+    const where = { ...base, ...(params.status ? { status: params.status } : {}) };
 
-    const [data, total] = await Promise.all([
+    const [data, total, byStatus] = await Promise.all([
       this.prisma.student.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
-        include: { class: { select: { id: true, name: true } } },
+        include: {
+          class: { select: { id: true, name: true } },
+          branch: { select: { name: true } },
+          guardians: {
+            orderBy: { isPrimary: 'desc' },
+            take: 1,
+            include: { guardian: { select: { fullName: true, phone: true } } },
+          },
+        },
         orderBy: { lastName: 'asc' },
       }),
       this.prisma.student.count({ where }),
+      this.prisma.student.groupBy({
+        by: ['status'],
+        where: base,
+        _count: { _all: true },
+      }),
     ]);
 
-    return { data, total, page, limit, pages: Math.ceil(total / limit) };
+    const cnt = (st: string) => byStatus.find((b) => b.status === st)?._count._all ?? 0;
+    const stats = {
+      total: byStatus.reduce((a, b) => a + b._count._all, 0),
+      active: cnt('ACTIVE'),
+      graduated: cnt('GRADUATED'),
+      expelled: cnt('EXPELLED'),
+      archived: cnt('ARCHIVED'),
+    };
+
+    return { data, total, page, limit, pages: Math.ceil(total / limit), stats };
   }
 
   async findOne(id: string) {
     const student = await this.prisma.student.findUnique({
       where: { id },
       include: {
-        class: true,
+        class: { select: { name: true, language: true, academicYear: true } },
+        branch: { select: { name: true } },
         guardians: { include: { guardian: true } },
         documents: true,
         contracts: {
-          select: { id: true, number: true, status: true, monthlyAmount: true },
+          select: {
+            id: true,
+            number: true,
+            status: true,
+            type: true,
+            startDate: true,
+            monthlyAmount: true,
+          },
+        },
+        lead: {
+          select: {
+            id: true,
+            academicYear: true,
+            source: true,
+            createdAt: true,
+            stage: { select: { name: true } },
+            branch: { select: { name: true } },
+            class: { select: { name: true, language: true } },
+          },
         },
       },
     });

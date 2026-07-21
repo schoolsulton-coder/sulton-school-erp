@@ -8,8 +8,19 @@ export interface StudentListItem {
   lastName: string;
   middleName?: string | null;
   photo?: string | null;
+  gender?: 'MALE' | 'FEMALE' | null;
   status: StudentStatus;
   class?: { id: string; name: string } | null;
+  branch?: { name: string } | null;
+  guardians?: { guardian: { fullName: string; phone: string } }[];
+}
+
+export interface StudentStats {
+  total: number;
+  active: number;
+  graduated: number;
+  expelled: number;
+  archived: number;
 }
 
 export interface Guardian {
@@ -25,6 +36,7 @@ export interface StudentListResponse {
   page: number;
   limit: number;
   pages: number;
+  stats: StudentStats;
 }
 
 export const STATUS_LABEL: Record<StudentStatus, string> = {
@@ -40,21 +52,30 @@ export const STATUS_COLOR: Record<StudentStatus, string> = {
   ARCHIVED: 'bg-slate-100 text-slate-500',
 };
 
+export interface StudentInput {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  birthDate?: string;
+  gender?: 'MALE' | 'FEMALE';
+  address?: string;
+  classId?: string;
+  branchId?: string;
+  photo?: string;
+  documentType?: string;
+  documentSeries?: string;
+  prevSchoolType?: string;
+  prevSchoolName?: string;
+  status?: StudentStatus;
+}
+
 export const studentsApi = {
-  list: (params: { page?: number; search?: string }) =>
+  list: (params: { page?: number; search?: string; classId?: string; status?: string; branchId?: string }) =>
     api
       .get<StudentListResponse>('/students', { params })
       .then((r) => r.data),
   get: (id: string) => api.get(`/students/${id}`).then((r) => r.data),
-  create: (data: {
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    birthDate?: string;
-    gender?: 'MALE' | 'FEMALE';
-    address?: string;
-    classId?: string;
-  }) => api.post('/students', data).then((r) => r.data),
+  create: (data: StudentInput) => api.post('/students', data).then((r) => r.data),
   update: (id: string, data: any) =>
     api.patch(`/students/${id}`, data).then((r) => r.data),
   addGuardian: (

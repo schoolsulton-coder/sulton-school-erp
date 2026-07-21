@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { UpdateGuardianDto } from './dto/update-guardian.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { MoveStageDto } from './dto/move-stage.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -425,6 +426,38 @@ export class CrmService {
       orderBy: { fullName: 'asc' },
       take: 200,
     });
+  }
+
+  async guardian(id: string) {
+    const g = await this.prisma.guardian.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true } },
+        students: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                middleName: true,
+                photo: true,
+                status: true,
+                class: { select: { name: true } },
+                branch: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!g) throw new NotFoundException('Vasiy topilmadi');
+    return g;
+  }
+
+  async updateGuardian(id: string, dto: UpdateGuardianDto) {
+    await this.guardian(id);
+    return this.prisma.guardian.update({ where: { id }, data: { ...dto } });
   }
 
   // ---- Qabul rejasi ----

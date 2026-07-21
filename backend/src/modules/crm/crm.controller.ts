@@ -21,6 +21,7 @@ import { CreatePlanDto } from './dto/create-plan.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { QuickStudentDto } from './dto/quick-student.dto';
 import { CreateGuardianDto } from './dto/create-guardian.dto';
+import { UpdateGuardianDto } from './dto/update-guardian.dto';
 import { CreateRefDto } from './dto/create-ref.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -214,6 +215,18 @@ export class CrmController {
   @Permissions('crm.create')
   createGuardian(@Body() dto: CreateGuardianDto) {
     return this.service.createGuardian(dto);
+  }
+
+  @Get('guardians/:id')
+  @Permissions('crm.view')
+  guardian(@Param('id') id: string) {
+    return this.service.guardian(id);
+  }
+
+  @Patch('guardians/:id')
+  @Permissions('crm.update')
+  updateGuardian(@Param('id') id: string, @Body() dto: UpdateGuardianDto) {
+    return this.service.updateGuardian(id, dto);
   }
 
   @Post('students/quick')

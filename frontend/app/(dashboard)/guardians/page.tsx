@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Users,
@@ -137,8 +138,9 @@ export default function GuardiansPage() {
 }
 
 function GuardianRowItem({ g }: { g: GuardianRow }) {
+  const router = useRouter();
   return (
-    <tr className="border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
+    <tr onClick={() => router.push(`/guardians/${g.id}`)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-3">
           <div className="grid h-9 w-9 place-items-center rounded-full bg-brand/10 text-xs font-bold text-brand">

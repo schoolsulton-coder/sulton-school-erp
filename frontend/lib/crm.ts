@@ -93,6 +93,41 @@ export interface GuardianRow {
   }[];
 }
 
+export interface GuardianChild {
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+    photo?: string | null;
+    status: string;
+    class?: { name: string } | null;
+    branch?: { name: string } | null;
+  };
+  isPrimary: boolean;
+}
+
+export interface GuardianDetail {
+  id: string;
+  fullName: string;
+  phone: string;
+  relation?: string | null;
+  passport?: string | null;
+  telegramUsername?: string | null;
+  user?: { id: string } | null;
+  students: GuardianChild[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuardianUpdateInput {
+  fullName?: string;
+  phone?: string;
+  relation?: string;
+  passport?: string;
+  telegramUsername?: string;
+}
+
 export interface PlanRow {
   id: string;
   academicYear: string;
@@ -265,6 +300,9 @@ export const crmApi = {
   // Yillik / Vasiylar / Reja
   yearly: () => api.get<YearlyRow[]>('/crm/yearly').then((r) => r.data),
   guardians: () => api.get<GuardianRow[]>('/crm/guardians').then((r) => r.data),
+  guardian: (id: string) => api.get<GuardianDetail>(`/crm/guardians/${id}`).then((r) => r.data),
+  updateGuardian: (id: string, data: GuardianUpdateInput) =>
+    api.patch(`/crm/guardians/${id}`, data).then((r) => r.data),
   listPlans: (academicYear?: string) =>
     api.get<PlanRow[]>('/crm/admission-plans', { params: { academicYear } }).then((r) => r.data),
   progress: (academicYear?: string) =>

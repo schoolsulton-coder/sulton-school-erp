@@ -229,6 +229,10 @@ model Student {
   birthDate     DateTime?
   gender        Gender?
   address       String?
+  documentType   String? // Hujjat turi (Tug'ilganlik guvohnomasi, ...)
+  documentSeries String? // Hujjat seriya / raqami
+  prevSchoolType String? // Oldingi maktab turi (Davlat/Xususiy)
+  prevSchoolName String? // Oldingi maktab nomi
   admissionDate DateTime?
   status        StudentStatus @default(ACTIVE)
 
@@ -263,6 +267,7 @@ model Guardian {
   phone    String
   relation String? // ota, ona, vasiy
   passport String?
+  telegramUsername String?
   students StudentGuardian[]
 
   createdAt DateTime @default(now())
