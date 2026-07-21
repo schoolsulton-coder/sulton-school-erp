@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class TelegramService implements OnModuleInit {
   private readonly logger = new Logger(TelegramService.name);
   private bot?: Telegraf;
+  private botUsername?: string;
 
   constructor(private prisma: PrismaService) {}
 
@@ -24,7 +25,13 @@ export class TelegramService implements OnModuleInit {
 
     this.bot.start((ctx: any) =>
       ctx.reply(
-        'Assalomu alaykum! Sulton School bildirishnomalarini olish uchun telefon raqamingizni ulashing.',
+        '🎓 Sulton School — rasmiy bot\n\n' +
+          'Assalomu alaykum! Ushbu bot orqali maktabdan barcha ma’lumotlar sizga yetkaziladi:\n\n' +
+          '🔑 Kabinet login va parol\n' +
+          '💳 To’lovlar va qarzdorlik\n' +
+          '📅 Davomat va baholar\n' +
+          '📢 E’lonlar va bildirishnomalar\n\n' +
+          'Botga ulanish uchun telefon raqamingizni ulashing 👇',
         {
           reply_markup: {
             keyboard: [[{ text: '📱 Telefonni ulashish', request_contact: true }]],
@@ -40,7 +47,11 @@ export class TelegramService implements OnModuleInit {
       const digits = raw.replace(/\D/g, '');
       const user = await this.findUserByPhone(digits);
       if (!user) {
-        return ctx.reply('Bu raqam tizimda topilmadi. Administrator bilan bog‘laning.');
+        return ctx.reply(
+          '❌ Bu raqam tizimda topilmadi.\n\n' +
+            'Avval maktab administratori sizga kabinet ochishi kerak. Iltimos, administrator bilan bog’laning.',
+          { reply_markup: { remove_keyboard: true } },
+        );
       }
       await this.prisma.telegramLink.upsert({
         where: { userId: user.id },
@@ -51,15 +62,37 @@ export class TelegramService implements OnModuleInit {
           username: ctx.from?.username,
         },
       });
-      ctx.reply(`✅ Ulandi! Bildirishnomalar shu yerga keladi, ${user.fullName}.`, {
-        reply_markup: { remove_keyboard: true },
-      });
+
+      const loginUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3005'}/login`;
+      await ctx.reply(
+        `✅ ${user.fullName}, botga muvaffaqiyatli ulandingiz!\n\n` +
+          'Bundan buyon Sulton School’dan barcha bildirishnomalar (to’lovlar, davomat, e’lonlar) shu yerga keladi.\n\n' +
+          `🔑 Kabinet login: ${user.phone}\n` +
+          `🔗 Kirish: ${loginUrl}`,
+        { reply_markup: { remove_keyboard: true } },
+      );
     });
 
-    this.bot
-      .launch()
-      .then(() => this.logger.log('🤖 Telegram bot ishga tushdi'))
-      .catch((e) => this.logger.error('Bot launch xatosi', e));
+    // Token'ni tekshirish va bot @username'ini olish (deep-link uchun).
+    // Eslatma: Telegraf'da launch() promise'i bot TO'XTAGANDA resolve bo'ladi,
+    // shuning uchun username'ni getMe() orqali alohida olamiz.
+    this.bot.telegram
+      .getMe()
+      .then((me) => {
+        this.botUsername = me.username;
+        this.logger.log(`🤖 Telegram bot ulandi: @${me.username}`);
+      })
+      .catch((e) =>
+        this.logger.error('Telegram getMe xatosi — token noto‘g‘ri?', e as Error),
+      );
+
+    // Polling'ni ishga tushirish
+    this.bot.launch().catch((e) => this.logger.error('Bot launch xatosi', e as Error));
+  }
+
+  /** Bot @username (deep-link uchun). Bot o'chiq bo'lsa undefined. */
+  getBotUsername() {
+    return this.botUsername;
   }
 
   /** Raqamni turli formatda moslashtirib qidiradi (oxirgi 9 raqam bo'yicha) */

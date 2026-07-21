@@ -10,10 +10,14 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { AddGuardianDto } from './dto/add-guardian.dto';
 import { CreateAccountDto } from './dto/create-account.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async findAll(params: {
     page?: number;
@@ -210,7 +214,39 @@ export class StudentsService {
       where: { id: guardianId },
       data: { userId: user.id },
     });
-    return { ok: true, userId: user.id, login: phone };
+
+    // Login ma'lumotlarini Telegram bot orqali yuborishga urinish (best-effort)
+    const telegram = await this.notifications.sendGuardianCredentials(guardianId, {
+      login: phone,
+      password: dto.password,
+    });
+
+    return { ok: true, userId: user.id, login: phone, telegram };
+  }
+
+  /**
+   * Mavjud vasiy akkauntiga yangi parol o'rnatib, login ma'lumotlarini Telegram
+   * botga (qayta) yuboradi. Vasiy botga ulangan bo'lsa yetkaziladi.
+   */
+  async resendGuardianCredentials(guardianId: string, dto: CreateAccountDto) {
+    const guardian = await this.prisma.guardian.findUnique({
+      where: { id: guardianId },
+      include: { user: true },
+    });
+    if (!guardian) throw new NotFoundException('Vasiy topilmadi');
+    if (!guardian.user) throw new BadRequestException('Avval login yarating');
+
+    await this.prisma.user.update({
+      where: { id: guardian.user.id },
+      data: { password: await argon2.hash(dto.password) },
+    });
+
+    const telegram = await this.notifications.sendGuardianCredentials(guardianId, {
+      login: guardian.user.phone,
+      password: dto.password,
+    });
+
+    return { ok: true, userId: guardian.user.id, login: guardian.user.phone, telegram };
   }
 
   async remove(id: string) {

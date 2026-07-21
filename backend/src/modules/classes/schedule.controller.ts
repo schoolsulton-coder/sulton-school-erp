@@ -38,6 +38,18 @@ export class ScheduleController {
     return this.service.createSubject(dto);
   }
 
+  @Patch('subjects/:id')
+  @Permissions('classes.update')
+  updateSubject(@Param('id') id: string, @Body() dto: CreateSubjectDto) {
+    return this.service.updateSubject(id, dto);
+  }
+
+  @Delete('subjects/:id')
+  @Permissions('classes.update')
+  removeSubject(@Param('id') id: string) {
+    return this.service.removeSubject(id);
+  }
+
   // ---- Jadval ----
   @Get('classes/:classId/schedule')
   @Permissions('classes.view')

@@ -17,6 +17,7 @@ import {
 import { classesApi, type ClassRow } from '@/lib/classes';
 import { usersApi } from '@/lib/users';
 import { ClassFormModal } from '@/components/class-form';
+import { NormPanel } from '@/components/norm-panel';
 import { normTime, periodIndex, WEEKDAYS } from '@/lib/schedule';
 
 export default function ClassDetailPage() {
@@ -34,6 +35,10 @@ export default function ClassDetailPage() {
   const { data: allUsers } = useQuery({
     queryKey: ['users'],
     queryFn: () => usersApi.list(),
+  });
+  const { data: subjects } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: classesApi.subjects,
   });
   const teacherMap = useMemo(
     () =>
@@ -118,6 +123,9 @@ export default function ClassDetailPage() {
           <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
         </div>
       </div>
+
+      {/* Haftalik fan normasi */}
+      <NormPanel classId={id} subjects={subjects ?? []} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* O'quvchilar */}

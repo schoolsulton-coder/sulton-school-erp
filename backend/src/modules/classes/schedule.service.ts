@@ -35,11 +35,41 @@ export class ScheduleService {
 
   // ---- Fanlar ----
   listSubjects() {
-    return this.prisma.subject.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.subject.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { schedules: true, norms: true } } },
+    });
   }
 
   createSubject(dto: CreateSubjectDto) {
-    return this.prisma.subject.create({ data: dto });
+    return this.prisma.subject.create({ data: { name: dto.name, code: dto.code || null } });
+  }
+
+  async updateSubject(id: string, dto: CreateSubjectDto) {
+    const subject = await this.prisma.subject.findUnique({ where: { id } });
+    if (!subject) throw new NotFoundException('Fan topilmadi');
+    return this.prisma.subject.update({
+      where: { id },
+      data: { name: dto.name, code: dto.code || null },
+    });
+  }
+
+  async removeSubject(id: string) {
+    const subject = await this.prisma.subject.findUnique({ where: { id } });
+    if (!subject) throw new NotFoundException('Fan topilmadi');
+    const [sched, grades, hw] = await Promise.all([
+      this.prisma.schedule.count({ where: { subjectId: id } }),
+      this.prisma.grade.count({ where: { subjectId: id } }),
+      this.prisma.homework.count({ where: { subjectId: id } }),
+    ]);
+    if (sched + grades + hw > 0) {
+      throw new BadRequestException(
+        "Fan dars jadvali yoki baholarda ishlatilmoqda — avval o'chiring",
+      );
+    }
+    // Normalar bog'liq — fan bilan birga o'chiriladi
+    await this.prisma.subjectNorm.deleteMany({ where: { subjectId: id } });
+    return this.prisma.subject.delete({ where: { id } });
   }
 
   // ---- Jadval ----

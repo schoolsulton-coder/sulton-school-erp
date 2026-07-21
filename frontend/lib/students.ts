@@ -69,6 +69,18 @@ export interface StudentInput {
   status?: StudentStatus;
 }
 
+export interface TelegramDelivery {
+  sent: boolean;
+  reason?: string;
+  botLink?: string | null;
+}
+export interface AccountResult {
+  ok: boolean;
+  userId?: string;
+  login: string;
+  telegram?: TelegramDelivery;
+}
+
 export const studentsApi = {
   list: (params: { page?: number; search?: string; classId?: string; status?: string; branchId?: string }) =>
     api
@@ -89,5 +101,7 @@ export const studentsApi = {
   createAccount: (id: string, data: { phone: string; password: string }) =>
     api.post(`/students/${id}/account`, data).then((r) => r.data),
   createGuardianAccount: (guardianId: string, data: { phone?: string; password: string }) =>
-    api.post(`/students/guardians/${guardianId}/account`, data).then((r) => r.data),
+    api.post<AccountResult>(`/students/guardians/${guardianId}/account`, data).then((r) => r.data),
+  resendGuardianCredentials: (guardianId: string, data: { password: string }) =>
+    api.post<AccountResult>(`/students/guardians/${guardianId}/resend-credentials`, data).then((r) => r.data),
 };

@@ -34,6 +34,7 @@ export interface Subject {
   id: string;
   name: string;
   code?: string | null;
+  _count?: { schedules: number; norms: number };
 }
 
 export interface Lesson {
@@ -100,6 +101,12 @@ export const classesApi = {
 
   // fanlar
   subjects: () => api.get<Subject[]>('/subjects').then((r) => r.data),
+  createSubject: (data: { name: string; code?: string }) =>
+    api.post<Subject>('/subjects', data).then((r) => r.data),
+  updateSubject: (id: string, data: { name: string; code?: string }) =>
+    api.patch<Subject>(`/subjects/${id}`, data).then((r) => r.data),
+  removeSubject: (id: string) =>
+    api.delete(`/subjects/${id}`).then((r) => r.data),
 
   // fan normasi (haftalik soat reja)
   norms: (classId: string) =>

@@ -77,6 +77,62 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Vasiyga kabinet login ma'lumotlarini (login, parol, kirish havolasi) Telegram
+   * bot orqali yuboradi. Bot faqat oldindan /start bosib telefonini ulagan
+   * (chatId mavjud) foydalanuvchiga yubora oladi.
+   */
+  async sendGuardianCredentials(
+    guardianId: string,
+    creds: { login: string; password: string },
+  ): Promise<{ sent: boolean; reason?: string; botLink?: string | null }> {
+    try {
+      const g = await this.prisma.guardian.findUnique({
+        where: { id: guardianId },
+        include: { user: { include: { telegramLink: true } } },
+      });
+      if (!g) return { sent: false, reason: 'not_found' };
+
+      // chatId ni aniqlash: 1) vasiy user'ining o'z linki, 2) username bo'yicha
+      let chatId = g.user?.telegramLink?.chatId ?? null;
+      if (!chatId && g.telegramUsername) {
+        const uname = g.telegramUsername.replace(/^@/, '');
+        const link = await this.prisma.telegramLink.findFirst({
+          where: { username: { equals: uname, mode: 'insensitive' } },
+        });
+        chatId = link?.chatId ?? null;
+      }
+
+      const loginUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3005'}/login`;
+      const text =
+        `🔐 Sulton School — shaxsiy kabinet\n\n` +
+        `Hurmatli ${g.fullName}, kabinetga kirish uchun ma'lumotlaringiz:\n\n` +
+        `👤 Login: ${creds.login}\n` +
+        `🔑 Parol: ${creds.password}\n\n` +
+        `🔗 Kirish: ${loginUrl}\n\n` +
+        `⚠️ Parolni hech kimga bermang.`;
+
+      if (!this.telegram.isEnabled()) {
+        return { sent: false, reason: 'bot_disabled', botLink: null };
+      }
+      if (!chatId) {
+        const bot = this.telegram.getBotUsername();
+        return {
+          sent: false,
+          reason: 'not_linked',
+          botLink: bot ? `https://t.me/${bot}` : null,
+        };
+      }
+
+      const ok = await this.telegram.send(chatId, text);
+      await this.record(g.user?.id ?? null, 'TELEGRAM', 'Kabinet logini', text, ok);
+      return { sent: ok, reason: ok ? undefined : 'send_failed' };
+    } catch (e) {
+      this.logger.error('sendGuardianCredentials xatosi', e as Error);
+      return { sent: false, reason: 'error' };
+    }
+  }
+
   listMine(userId: string) {
     return this.prisma.notification.findMany({
       where: { userId },

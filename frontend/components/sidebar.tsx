@@ -82,6 +82,7 @@ const SETTINGS: Group = {
   perm: null,
   children: [
     { href: '/users', label: 'Foydalanuvchilar', perm: 'users.view' },
+    { href: '/settings/subjects', label: 'Fanlar', perm: 'classes.view' },
     { href: '/notifications', label: 'Bildirishnomalar', perm: 'notifications.view' },
     { href: '/esmaktab', label: 'E-maktab', perm: 'reports.view' },
   ],

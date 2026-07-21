@@ -9,7 +9,7 @@ import {
   Eye, EyeOff, Shuffle, ShieldCheck, Clock, Send, Info,
 } from 'lucide-react';
 import { crmApi, type GuardianDetail, type GuardianUpdateInput } from '@/lib/crm';
-import { studentsApi, STATUS_LABEL, STATUS_COLOR, type StudentStatus } from '@/lib/students';
+import { studentsApi, STATUS_LABEL, STATUS_COLOR, type StudentStatus, type TelegramDelivery } from '@/lib/students';
 
 const RELATIONS = ['ota', 'ona', 'vasiy', 'buva', 'buvi', 'amaki', 'xola'];
 const fmtDate = (s?: string) =>
@@ -22,6 +22,7 @@ export default function GuardianDetailPage() {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showResend, setShowResend] = useState(false);
 
   const { data: g, isLoading } = useQuery({
     queryKey: ['guardian', id],
@@ -59,7 +60,11 @@ export default function GuardianDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!g.user && (
+            {g.user ? (
+              <button onClick={() => setShowResend(true)} className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-600 transition hover:bg-sky-100">
+                <Send size={16} /> Telegramga yuborish
+              </button>
+            ) : (
               <button onClick={() => setShowLogin(true)} className="inline-flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-2.5 text-sm font-semibold text-brand transition hover:bg-brand/10">
                 <KeyRound size={16} /> Login yaratish
               </button>
@@ -135,6 +140,7 @@ export default function GuardianDetailPage() {
 
       {showEdit && <EditModal g={g} onClose={() => setShowEdit(false)} />}
       {showLogin && <LoginModal g={g} onClose={() => setShowLogin(false)} />}
+      {showResend && <ResendModal g={g} onClose={() => setShowResend(false)} />}
     </div>
   );
 }
@@ -253,7 +259,7 @@ function LoginModal({ g, onClose }: { g: GuardianDetail; onClose: () => void }) 
   const [telegram, setTelegram] = useState((g.telegramUsername ?? '').replace(/^@/, ''));
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState<{ login: string; password: string; telegram: string } | null>(null);
+  const [done, setDone] = useState<{ login: string; password: string; telegram: string; delivery?: TelegramDelivery } | null>(null);
   const inp = 'w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm outline-none focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20';
 
   const create = useMutation({
@@ -264,8 +270,8 @@ function LoginModal({ g, onClose }: { g: GuardianDetail; onClose: () => void }) 
       }
       return studentsApi.createGuardianAccount(g.id, { phone, password });
     },
-    onSuccess: () => {
-      setDone({ login: phone, password, telegram: telegram.replace(/^@/, '').trim() });
+    onSuccess: (res) => {
+      setDone({ login: phone, password, telegram: telegram.replace(/^@/, '').trim(), delivery: res?.telegram });
       qc.invalidateQueries({ queryKey: ['guardian', g.id] });
       qc.invalidateQueries({ queryKey: ['crm-guardians'] });
     },
@@ -285,6 +291,7 @@ function LoginModal({ g, onClose }: { g: GuardianDetail; onClose: () => void }) 
           <CredRow label="Login" value={done.login} />
           <CredRow label="Parol" value={done.password} />
           {done.telegram && <CredRow label="Telegram" value={`@${done.telegram}`} />}
+          <DeliveryStatus d={done.delivery} />
           <div className="flex justify-end pt-1">
             <button onClick={onClose} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Yopish</button>
           </div>
@@ -350,6 +357,123 @@ function LoginModal({ g, onClose }: { g: GuardianDetail; onClose: () => void }) 
         </div>
       </div>
     </Modal>
+  );
+}
+/* ---------- resend (mavjud akkauntga qayta yuborish) ---------- */
+function ResendModal({ g, onClose }: { g: GuardianDetail; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [password, setPassword] = useState(genPassword());
+  const [show, setShow] = useState(true);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState<{ login: string; password: string; delivery?: TelegramDelivery } | null>(null);
+  const inp = 'w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm outline-none focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20';
+
+  const send = useMutation({
+    mutationFn: () => studentsApi.resendGuardianCredentials(g.id, { password }),
+    onSuccess: (res) => {
+      setDone({ login: res.login, password, delivery: res?.telegram });
+      qc.invalidateQueries({ queryKey: ['guardian', g.id] });
+    },
+    onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
+  });
+
+  if (done)
+    return (
+      <Modal title="Yuborildi" onClose={onClose}>
+        <div className="space-y-3">
+          <DeliveryStatus d={done.delivery} />
+          <CredRow label="Login" value={done.login} />
+          <CredRow label="Yangi parol" value={done.password} />
+          <div className="flex justify-end pt-1">
+            <button onClick={onClose} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Yopish</button>
+          </div>
+        </div>
+      </Modal>
+    );
+
+  return (
+    <Modal title="Login ma'lumotlarini Telegramga yuborish" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 rounded-xl bg-sky-50 p-3 ring-1 ring-sky-100">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-500 text-white"><Send size={18} /></div>
+          <div className="text-sm">
+            <div className="font-semibold text-slate-700">{g.fullName}</div>
+            <div className="text-xs text-slate-500">{g.telegramUsername ? `@${g.telegramUsername.replace(/^@/, '')}` : 'Telegram botga ulangan bo’lishi kerak'}</div>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-500">Login</label>
+          <div className="relative">
+            <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={g.phone} readOnly className={`${inp} pl-9 text-slate-500`} />
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-500">Yangi parol</label>
+            <button type="button" onClick={() => { setPassword(genPassword()); setShow(true); }} className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
+              <Shuffle size={12} /> Yangilash
+            </button>
+          </div>
+          <div className="relative">
+            <input type={show ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`${inp} pr-10`} />
+            <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              {show ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 ring-1 ring-amber-100">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          Yangi parol o&apos;rnatiladi va vasiyning Telegramiga yuboriladi. Vasiy avval botni <b>Start</b> bosib ulagan bo&apos;lishi kerak.
+        </div>
+
+        {error && <p className="text-sm text-rose-500">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100">Bekor qilish</button>
+          <button onClick={() => { setError(''); send.mutate(); }} disabled={send.isPending || password.length < 6} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-50">
+            <Send size={15} /> {send.isPending ? 'Yuborilmoqda...' : 'Yuborish'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeliveryStatus({ d }: { d?: TelegramDelivery }) {
+  if (!d) return null;
+  if (d.sent)
+    return (
+      <div className="flex items-center gap-2 rounded-xl bg-sky-50 p-3 text-sm text-sky-700 ring-1 ring-sky-100">
+        <Send size={15} className="shrink-0" /> Login ma&apos;lumotlari vasiyning Telegramiga yuborildi ✓
+      </div>
+    );
+  if (d.reason === 'not_linked')
+    return (
+      <div className="space-y-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-700 ring-1 ring-amber-100">
+        <div className="flex items-start gap-2">
+          <Info size={15} className="mt-0.5 shrink-0" />
+          <span>Vasiy hali Telegram botni ishga tushirmagan. Botni ochib <b>Start</b> bosib, telefonini ulasin — shundan so&apos;ng ma&apos;lumotlar avtomatik yuboriladi.</span>
+        </div>
+        {d.botLink && (
+          <a href={d.botLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200">
+            <Send size={13} /> Botni ochish
+          </a>
+        )}
+      </div>
+    );
+  if (d.reason === 'bot_disabled')
+    return (
+      <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500 ring-1 ring-slate-100">
+        <Info size={15} className="mt-0.5 shrink-0" /> Telegram bot serverda sozlanmagan — ma&apos;lumotlarni qo&apos;lda yetkazing.
+      </div>
+    );
+  return (
+    <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-600 ring-1 ring-rose-100">
+      <Info size={15} className="mt-0.5 shrink-0" /> Telegramga yuborib bo&apos;lmadi — ma&apos;lumotlarni qo&apos;lda yetkazing.
+    </div>
   );
 }
 function CredRow({ label, value }: { label: string; value: string }) {

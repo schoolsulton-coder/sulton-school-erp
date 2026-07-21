@@ -95,4 +95,13 @@ export class StudentsController {
   ) {
     return this.service.createGuardianAccount(guardianId, dto);
   }
+
+  @Post('guardians/:guardianId/resend-credentials')
+  @Permissions('students.update')
+  resendGuardianCredentials(
+    @Param('guardianId') guardianId: string,
+    @Body() dto: CreateAccountDto,
+  ) {
+    return this.service.resendGuardianCredentials(guardianId, dto);
+  }
 }
