@@ -11,6 +11,7 @@ import {
   X,
   Save,
   Clock,
+  Wand2,
 } from 'lucide-react';
 import {
   classesApi,
@@ -19,8 +20,9 @@ import {
   type Subject,
   type SubjectNormRow,
 } from '@/lib/classes';
-import { usersApi, type ManagedUser } from '@/lib/users';
+import { usersApi, teacherLabel, type ManagedUser } from '@/lib/users';
 import { PERIODS, WEEKDAYS, normTime, periodIndex } from '@/lib/schedule';
+import { DistributeModal } from '@/components/distribute-modal';
 import { NormPanel } from '@/components/norm-panel';
 
 export default function SchedulePage() {
@@ -38,6 +40,8 @@ function ScheduleManager() {
   const [modal, setModal] = useState<{ weekday: number; lesson?: Lesson } | null>(
     null,
   );
+  const [distribute, setDistribute] = useState<{ subjectId?: string; hours?: number } | null>(null);
+  const [toast, setToast] = useState('');
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -130,16 +134,28 @@ function ScheduleManager() {
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setModal({ weekday: 1 })}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
-            >
-              <Plus size={18} /> Dars qo&apos;shish
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDistribute({})}
+                className="inline-flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-2.5 text-sm font-semibold text-brand transition hover:bg-brand/10"
+              >
+                <Wand2 size={18} /> Fanni taqsimlash
+              </button>
+              <button
+                onClick={() => setModal({ weekday: 1 })}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
+              >
+                <Plus size={18} /> Dars qo&apos;shish
+              </button>
+            </div>
           </div>
 
           {/* Haftalik norma (soat reja) */}
-          <NormPanel classId={classId} subjects={subjects ?? []} />
+          <NormPanel
+            classId={classId}
+            subjects={subjects ?? []}
+            onDistribute={(subjectId, hours) => setDistribute({ subjectId, hours })}
+          />
 
           {/* Haftalik grid */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -229,6 +245,31 @@ function ScheduleManager() {
             setModal(null);
           }}
         />
+      )}
+
+      {distribute && classId && (
+        <DistributeModal
+          classId={classId}
+          className={selectedClass?.name ?? ''}
+          subjects={subjects ?? []}
+          teachers={teachers}
+          initialSubjectId={distribute.subjectId}
+          initialHours={distribute.hours}
+          onClose={() => setDistribute(null)}
+          onSaved={(created, skipped) => {
+            setDistribute(null);
+            setToast(
+              `${created} ta dars joylandi` + (skipped ? ` · ${skipped} ta o'tkazib yuborildi` : ''),
+            );
+            setTimeout(() => setToast(''), 4000);
+          }}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-slate-800 px-5 py-3 text-sm font-medium text-white shadow-lg">
+          {toast}
+        </div>
       )}
     </div>
   );
@@ -396,7 +437,7 @@ function LessonModal({
               <option value="">Biriktirilmagan</option>
               {teachers.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.fullName}
+                  {teacherLabel(t)}
                 </option>
               ))}
             </select>

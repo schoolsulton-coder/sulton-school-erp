@@ -9,6 +9,7 @@ import {
   STATUS_COLOR,
   type ManagedUser,
 } from '@/lib/users';
+import { classesApi } from '@/lib/classes';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2';
 
@@ -126,9 +127,13 @@ function UserModal({
     password: '',
     roleId: user?.role.id ?? '',
     status: user?.status ?? 'ACTIVE',
+    subjectId: user?.subject?.id ?? '',
   });
   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: usersApi.roles });
+  const { data: subjects } = useQuery({ queryKey: ['subjects'], queryFn: classesApi.subjects });
   const [error, setError] = useState('');
+
+  const isTeacher = roles?.find((r) => r.id === form.roleId)?.slug === 'teacher';
 
   const save = useMutation({
     mutationFn: () =>
@@ -139,6 +144,7 @@ function UserModal({
             email: form.email || undefined,
             roleId: form.roleId,
             status: form.status as any,
+            subjectId: isTeacher ? form.subjectId || '' : '',
           })
         : usersApi.create({
             fullName: form.fullName,
@@ -146,6 +152,7 @@ function UserModal({
             email: form.email || undefined,
             password: form.password,
             roleId: form.roleId,
+            subjectId: isTeacher ? form.subjectId || undefined : undefined,
           }),
     onSuccess: onDone,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
@@ -169,6 +176,17 @@ function UserModal({
           <option value="">Rol tanlang</option>
           {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
+        {isTeacher && (
+          <div>
+            <select value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })} className={inputCls}>
+              <option value="">Fan tanlang (o&apos;qitadigan)</option>
+              {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            {(subjects?.length ?? 0) === 0 && (
+              <p className="mt-1 text-xs text-slate-400">Fan yo&apos;q — Sozlamalar → Fanlar&apos;dan qo&apos;shing</p>
+            )}
+          </div>
+        )}
         {editing && (
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as any })} className={inputCls}>
             <option value="ACTIVE">Faol</option>

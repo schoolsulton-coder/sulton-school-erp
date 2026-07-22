@@ -25,4 +25,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(['ACTIVE', 'INACTIVE', 'BLOCKED'])
   status?: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
 }

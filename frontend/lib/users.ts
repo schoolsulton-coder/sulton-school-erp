@@ -9,6 +9,7 @@ export interface ManagedUser {
   email?: string | null;
   status: UserStatus;
   role: { id: string; name: string; slug: string };
+  subject?: { id: string; name: string } | null;
 }
 
 export interface Role {
@@ -41,9 +42,12 @@ export const usersApi = {
     email?: string;
     password: string;
     roleId: string;
+    subjectId?: string;
   }) => api.post('/users', data).then((r) => r.data),
-  update: (id: string, data: Partial<ManagedUser> & { roleId?: string }) =>
-    api.patch(`/users/${id}`, data).then((r) => r.data),
+  update: (
+    id: string,
+    data: Partial<ManagedUser> & { roleId?: string; subjectId?: string | null },
+  ) => api.patch(`/users/${id}`, data).then((r) => r.data),
   resetPassword: (id: string, password: string) =>
     api.patch(`/users/${id}/password`, { password }).then((r) => r.data),
   setStatus: (id: string, status: UserStatus) =>
@@ -56,6 +60,12 @@ export const usersApi = {
   updateRolePermissions: (id: string, permissions: string[]) =>
     api.patch(`/roles/${id}/permissions`, { permissions }).then((r) => r.data),
 };
+
+/** Ustoz ko'rinishi: ismdan "(ustoz)" olib tashlanadi va fani qo'shiladi. */
+export function teacherLabel(t: ManagedUser): string {
+  const name = t.fullName.replace(/\s*\(ustoz\)\s*$/i, '').trim();
+  return t.subject?.name ? `${name} — ${t.subject.name}` : name;
+}
 
 // ----- Tarjima yordamchilari -----
 export const GROUP_LABEL: Record<string, string> = {

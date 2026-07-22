@@ -18,6 +18,7 @@ const SAFE_SELECT = {
   status: true,
   createdAt: true,
   role: { select: { id: true, name: true, slug: true } },
+  subject: { select: { id: true, name: true } },
 };
 
 @Injectable()
@@ -58,6 +59,7 @@ export class UsersService {
         phone: dto.phone,
         email: dto.email,
         roleId: dto.roleId,
+        subjectId: dto.subjectId || null,
         password: await argon2.hash(dto.password),
       },
       select: SAFE_SELECT,
@@ -76,7 +78,10 @@ export class UsersService {
     }
     return this.prisma.user.update({
       where: { id },
-      data: dto,
+      data: {
+        ...dto,
+        ...(dto.subjectId !== undefined ? { subjectId: dto.subjectId || null } : {}),
+      },
       select: SAFE_SELECT,
     });
   }

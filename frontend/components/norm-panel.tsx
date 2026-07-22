@@ -2,11 +2,20 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Target, Plus, Trash2 } from 'lucide-react';
+import { Target, Plus, Trash2, Wand2 } from 'lucide-react';
 import { classesApi, type Subject, type SubjectNormRow } from '@/lib/classes';
 
 /** Sinf bo'yicha haftalik fan normasi (reja soati). Schedule va sinf detali sahifalarida ishlatiladi. */
-export function NormPanel({ classId, subjects }: { classId: string; subjects: Subject[] }) {
+export function NormPanel({
+  classId,
+  subjects,
+  onDistribute,
+}: {
+  classId: string;
+  subjects: Subject[];
+  /** berilsa — har normaga "Jadvalga joylash" tugmasi chiqadi (subjectId, qolgan soat) */
+  onDistribute?: (subjectId: string, hours: number) => void;
+}) {
   const qc = useQueryClient();
   const { data: norms } = useQuery({
     queryKey: ['norms', classId],
@@ -103,6 +112,7 @@ export function NormPanel({ classId, subjects }: { classId: string; subjects: Su
                   norm={n}
                   onSet={(h) => setNorm.mutate({ subjectId: n.subjectId, weeklyHours: h })}
                   onRemove={() => removeNorm.mutate(n.id)}
+                  onDistribute={onDistribute}
                 />
               ))}
             </tbody>
@@ -117,10 +127,12 @@ function NormRow({
   norm,
   onSet,
   onRemove,
+  onDistribute,
 }: {
   norm: SubjectNormRow;
   onSet: (h: number) => void;
   onRemove: () => void;
+  onDistribute?: (subjectId: string, hours: number) => void;
 }) {
   const [hours, setHours] = useState(String(norm.weeklyHours));
   const remaining = norm.weeklyHours - norm.placed;
@@ -169,13 +181,24 @@ function NormRow({
         </div>
       </td>
       <td className="py-2 pl-3 text-right">
-        <button
-          onClick={onRemove}
-          className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-rose-500"
-          title="O'chirish"
-        >
-          <Trash2 size={14} />
-        </button>
+        <div className="flex items-center justify-end gap-1">
+          {onDistribute && (
+            <button
+              onClick={() => onDistribute(norm.subjectId, remaining > 0 ? remaining : norm.weeklyHours)}
+              className="inline-flex items-center gap-1 rounded-lg bg-brand/10 px-2 py-1 text-xs font-medium text-brand hover:bg-brand/20"
+              title="Jadvalga joylash"
+            >
+              <Wand2 size={13} /> Joylash
+            </button>
+          )}
+          <button
+            onClick={onRemove}
+            className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-rose-500"
+            title="O'chirish"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </td>
     </tr>
   );

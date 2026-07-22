@@ -13,6 +13,7 @@ import {
   type StudentStatus,
 } from '@/lib/students';
 import { StudentFormModal } from '@/components/student-form';
+import { crmApi } from '@/lib/crm';
 
 const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('uz-UZ') : '—');
 const fmtDateTime = (iso?: string | null) =>
@@ -217,16 +218,7 @@ function GuardiansModal({ studentId, guardians, onClose, onChanged, onLogin }: {
     <Modal title="Vasiylar (ota-ona)" onClose={onClose}>
       <div className="mb-4 space-y-2">
         {guardians.length ? guardians.map((g: { guardian: Guardian & { userId?: string }; isPrimary: boolean }) => (
-          <div key={g.guardian.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-            <div>
-              <div className="text-sm font-medium text-slate-700">{g.guardian.fullName}{g.isPrimary && <span className="ml-1 text-xs text-brand">(asosiy)</span>}</div>
-              <div className="text-xs text-slate-400">{g.guardian.phone} · {g.guardian.relation ?? '—'}</div>
-            </div>
-            <div className="flex items-center gap-2">
-              {g.guardian.userId ? <span className="text-xs font-medium text-emerald-600">✓ login</span> : <button onClick={() => onLogin(g.guardian.id, g.guardian.fullName)} className="text-xs font-medium text-brand hover:underline">login</button>}
-              <button onClick={() => remove.mutate(g.guardian.id)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-300 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={14} /></button>
-            </div>
-          </div>
+          <GuardianItem key={g.guardian.id} g={g} onLogin={onLogin} onChanged={onChanged} onRemove={() => remove.mutate(g.guardian.id)} />
         )) : <p className="text-center text-sm text-slate-400">Vasiy qo&apos;shilmagan</p>}
       </div>
       <form onSubmit={(e) => { e.preventDefault(); add.mutate(); }} className="space-y-2 rounded-xl border border-dashed border-slate-200 p-3">
@@ -242,6 +234,45 @@ function GuardiansModal({ studentId, guardians, onClose, onChanged, onLogin }: {
         <button type="submit" disabled={add.isPending} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"><UserPlus size={15} /> Qo&apos;shish</button>
       </form>
     </Modal>
+  );
+}
+
+function GuardianItem({ g, onLogin, onChanged, onRemove }: { g: { guardian: Guardian & { userId?: string; telegramUsername?: string | null }; isPrimary: boolean }; onLogin: (gid: string, title: string) => void; onChanged: () => void; onRemove: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ fullName: g.guardian.fullName, phone: g.guardian.phone, relation: g.guardian.relation ?? '' });
+  const cls = 'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20';
+  const save = useMutation({
+    mutationFn: () => crmApi.updateGuardian(g.guardian.id, { fullName: form.fullName, phone: form.phone, relation: form.relation || undefined }),
+    onSuccess: () => { setEditing(false); onChanged(); },
+  });
+
+  if (editing)
+    return (
+      <div className="space-y-2 rounded-xl border border-brand/30 bg-brand/[0.03] px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="F.I.SH" className={cls} />
+          <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Telefon" className={cls} />
+        </div>
+        <div className="flex items-center gap-2">
+          <input value={form.relation} onChange={(e) => setForm({ ...form, relation: e.target.value })} placeholder="Kim (ota/ona)" className={cls} />
+          <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark disabled:opacity-60"><Check size={13} /> Saqlash</button>
+          <button onClick={() => setEditing(false)} className="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100">Bekor</button>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+      <div>
+        <div className="text-sm font-medium text-slate-700">{g.guardian.fullName}{g.isPrimary && <span className="ml-1 text-xs text-brand">(asosiy)</span>}</div>
+        <div className="text-xs text-slate-400">{g.guardian.phone} · {g.guardian.relation ?? '—'}</div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {g.guardian.userId ? <span className="text-xs font-medium text-emerald-600">✓ login</span> : <button onClick={() => onLogin(g.guardian.id, g.guardian.fullName)} className="text-xs font-medium text-brand hover:underline">login</button>}
+        <button onClick={() => setEditing(true)} title="Tahrirlash" className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-brand/10 hover:text-brand"><Pencil size={13} /></button>
+        <button onClick={onRemove} title="O'chirish" className="grid h-7 w-7 place-items-center rounded-lg text-slate-300 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={14} /></button>
+      </div>
+    </div>
   );
 }
 

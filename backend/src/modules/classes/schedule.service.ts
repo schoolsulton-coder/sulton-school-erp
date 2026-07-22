@@ -8,6 +8,7 @@ import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateNormDto } from './dto/create-norm.dto';
+import { BulkScheduleDto } from './dto/bulk-schedule.dto';
 
 const WEEKDAYS = [
   '',
@@ -117,10 +118,133 @@ export class ScheduleService {
       );
     }
 
+    // Ustoz shu vaqtda boshqa sinfda band bo'lmasligi kerak
+    if (dto.teacherId) {
+      const teacherBusy = await this.prisma.schedule.findFirst({
+        where: {
+          teacherId: dto.teacherId,
+          weekday: dto.weekday,
+          startTime: { lt: dto.endTime },
+          endTime: { gt: dto.startTime },
+        },
+        include: { class: { select: { name: true } } },
+      });
+      if (teacherBusy) {
+        throw new BadRequestException(
+          `Ustoz bu vaqtda band (${teacherBusy.class.name} sinfida)`,
+        );
+      }
+    }
+
     return this.prisma.schedule.create({
       data: dto,
       include: { subject: true },
     });
+  }
+
+  /**
+   * Sinf va (ixtiyoriy) ustoz bo'yicha band paralar — jadvalga bittada joylashda
+   * bo'sh slotlarni hisoblash uchun.
+   */
+  async availability(classId: string, teacherId?: string) {
+    const classRows = await this.prisma.schedule.findMany({
+      where: { classId },
+      include: { subject: { select: { name: true } } },
+    });
+    // Sinf band slotlarida qaysi ustoz ekanini ko'rsatish uchun ismlarni yechamiz
+    const teacherIds = [
+      ...new Set(classRows.map((r) => r.teacherId).filter(Boolean)),
+    ] as string[];
+    const tUsers = teacherIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: teacherIds } },
+          select: { id: true, fullName: true },
+        })
+      : [];
+    const stripUstoz = (s: string) => s.replace(/\s*\(ustoz\)\s*$/i, '').trim();
+    const tName = new Map(tUsers.map((u) => [u.id, stripUstoz(u.fullName)]));
+    const classBusy = classRows.map((r) => ({
+      weekday: r.weekday,
+      start: normTime(r.startTime),
+      label: r.subject.name,
+      teacher: r.teacherId ? tName.get(r.teacherId) ?? null : null,
+    }));
+
+    let teacherBusy: { weekday: number; start: string; label: string }[] = [];
+    if (teacherId) {
+      const tRows = await this.prisma.schedule.findMany({
+        where: { teacherId },
+        include: {
+          subject: { select: { name: true } },
+          class: { select: { name: true } },
+        },
+      });
+      teacherBusy = tRows.map((r) => ({
+        weekday: r.weekday,
+        start: normTime(r.startTime),
+        label: `${r.class.name} · ${r.subject.name}`,
+      }));
+    }
+    return { classBusy, teacherBusy };
+  }
+
+  /**
+   * Bir fanni bir nechta bo'sh slotga bittada joylash. Har bir slot uchun sinf va
+   * ustoz bandligi qayta tekshiriladi; to'qnashganlari o'tkazib yuboriladi.
+   */
+  async bulkCreate(dto: BulkScheduleDto) {
+    let created = 0;
+    const skipped: { weekday: number; startTime: string; reason: string }[] = [];
+
+    for (const slot of dto.slots) {
+      if (slot.startTime >= slot.endTime) {
+        skipped.push({ ...slot, reason: 'vaqt xato' });
+        continue;
+      }
+
+      const classOverlap = await this.prisma.schedule.findFirst({
+        where: {
+          classId: dto.classId,
+          weekday: slot.weekday,
+          startTime: { lt: slot.endTime },
+          endTime: { gt: slot.startTime },
+        },
+      });
+      if (classOverlap) {
+        skipped.push({ ...slot, reason: 'sinf band' });
+        continue;
+      }
+
+      if (dto.teacherId) {
+        const teacherOverlap = await this.prisma.schedule.findFirst({
+          where: {
+            teacherId: dto.teacherId,
+            weekday: slot.weekday,
+            startTime: { lt: slot.endTime },
+            endTime: { gt: slot.startTime },
+          },
+        });
+        if (teacherOverlap) {
+          skipped.push({ ...slot, reason: 'ustoz band' });
+          continue;
+        }
+      }
+
+      await this.prisma.schedule.create({
+        data: {
+          classId: dto.classId,
+          subjectId: dto.subjectId,
+          teacherId: dto.teacherId || null,
+          weekday: slot.weekday,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          room: dto.room || null,
+        },
+      });
+      created += 1;
+    }
+
+    return { created, skipped };
   }
 
   /** Darsni tahrirlash — vaqt ustma-ustligini o'zidan tashqari tekshiradi */

@@ -159,6 +159,10 @@ model User {
   roleId String
   role   Role   @relation(fields: [roleId], references: [id])
 
+  // Ustoz uchun o'qitadigan fan (ixtiyoriy)
+  subjectId String?
+  subject   Subject? @relation("TeacherSubject", fields: [subjectId], references: [id])
+
   // bog'liqliklar
   employee        Employee?
   studentProfile  Student?         @relation("StudentUser")
@@ -480,6 +484,7 @@ model Subject {
   grades    Grade[]
   homeworks Homework[]
   norms     SubjectNorm[]
+  teachers  User[]        @relation("TeacherSubject")
 
   @@map("subjects")
 }

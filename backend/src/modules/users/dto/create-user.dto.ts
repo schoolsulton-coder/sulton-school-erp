@@ -26,4 +26,8 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   roleId: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
 }

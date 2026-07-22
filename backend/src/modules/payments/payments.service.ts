@@ -42,7 +42,17 @@ export class PaymentsService {
     if (filters.type) where.type = filters.type;
     if (filters.accountId) where.accountId = filters.accountId;
     if (filters.confirmed === 'true') where.confirmedAt = { not: null };
-    if (filters.confirmed === 'false') where.confirmedAt = null;
+    if (filters.confirmed === 'false') {
+      // "Tasdiqlanmagan" = tasdiq KUTAYOTGAN (bank/karta) to'lovlar.
+      // Naqd tasdiq talab qilmaydi — u yerga kirmaydi (stats bilan bir xil).
+      where.confirmedAt = null;
+      where.NOT = {
+        OR: [
+          { method: { contains: 'naqd', mode: 'insensitive' } },
+          { method: { contains: 'nal', mode: 'insensitive' } },
+        ],
+      };
+    }
     if (filters.studentId) where.studentId = filters.studentId;
     if (filters.branchId || filters.academicYear) {
       where.student = {};

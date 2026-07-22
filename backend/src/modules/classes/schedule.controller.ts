@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -14,6 +15,7 @@ import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateNormDto } from './dto/create-norm.dto';
+import { BulkScheduleDto } from './dto/bulk-schedule.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -61,6 +63,21 @@ export class ScheduleController {
   @Permissions('classes.update')
   create(@Body() dto: CreateScheduleDto) {
     return this.service.create(dto);
+  }
+
+  @Get('schedule/availability')
+  @Permissions('classes.view')
+  availability(
+    @Query('classId') classId: string,
+    @Query('teacherId') teacherId?: string,
+  ) {
+    return this.service.availability(classId, teacherId);
+  }
+
+  @Post('schedule/bulk')
+  @Permissions('classes.update')
+  bulkCreate(@Body() dto: BulkScheduleDto) {
+    return this.service.bulkCreate(dto);
   }
 
   @Patch('schedule/:id')

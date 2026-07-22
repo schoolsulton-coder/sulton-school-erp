@@ -61,6 +61,19 @@ export interface SubjectNormRow {
   placed: number; // jadvalga qo'yilgan soat
 }
 
+/** Band slot — jadval to'ldirishda bo'sh paralarni hisoblash uchun */
+export interface BusySlot {
+  weekday: number;
+  start: string; // "08:30"
+  label: string; // band sabab: fan nomi yoki "Sinf · Fan"
+  teacher?: string | null; // sinf band bo'lsa — o'sha darsning ustozi
+}
+
+export interface BulkResult {
+  created: number;
+  skipped: { weekday: number; startTime: string; reason: string }[];
+}
+
 export const classesApi = {
   list: (academicYear?: string) =>
     api
@@ -98,6 +111,22 @@ export const classesApi = {
   ) => api.patch<Lesson>(`/schedule/${id}`, data).then((r) => r.data),
   removeLesson: (id: string) =>
     api.delete(`/schedule/${id}`).then((r) => r.data),
+
+  // bo'sh slotlar (sinf + ustoz) va bittada joylash
+  availability: (classId: string, teacherId?: string) =>
+    api
+      .get<{ classBusy: BusySlot[]; teacherBusy: BusySlot[] }>(
+        '/schedule/availability',
+        { params: { classId, teacherId: teacherId || undefined } },
+      )
+      .then((r) => r.data),
+  bulkAddLessons: (data: {
+    classId: string;
+    subjectId: string;
+    teacherId?: string;
+    room?: string;
+    slots: { weekday: number; startTime: string; endTime: string }[];
+  }) => api.post<BulkResult>('/schedule/bulk', data).then((r) => r.data),
 
   // fanlar
   subjects: () => api.get<Subject[]>('/subjects').then((r) => r.data),
