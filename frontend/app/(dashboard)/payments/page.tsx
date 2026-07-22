@@ -66,13 +66,32 @@ export default function PaymentsPage() {
   const draftCount = Object.values(draft).filter(Boolean).length;
 
   // Tanlanganlardan tasdiqlanadiganlar (bank/karta, tasdiqlanmagan)
-  const confirmable = useMemo(
-    () => rows.filter((p) => selected.has(p.id) && !p.confirmedAt && !isCash(p.method)),
-    [rows, selected],
+  // Tasdiq kutayotgan (naqd emas, tasdiqlanmagan) to'lovlar
+  const pending = useMemo(
+    () => rows.filter((p) => !p.confirmedAt && !isCash(p.method)),
+    [rows],
   );
+  const confirmable = useMemo(
+    () => pending.filter((p) => selected.has(p.id)),
+    [pending, selected],
+  );
+  const allSelected = pending.length > 0 && pending.every((p) => selected.has(p.id));
+  const toggleAll = () =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (allSelected) pending.forEach((p) => n.delete(p.id));
+      else pending.forEach((p) => n.add(p.id));
+      return n;
+    });
+
   const bulkConfirm = useMutation({
     mutationFn: async () => { await Promise.all(confirmable.map((p) => paymentsApi.confirm(p.id))); },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); setSelected(new Set()); notify(`${confirmable.length} ta tasdiqlandi`); },
+  });
+  // Qatordan to'g'ridan-to'g'ri bitta to'lovni tasdiqlash
+  const confirmOne = useMutation({
+    mutationFn: (id: string) => paymentsApi.confirm(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); notify("To'lov tasdiqlandi"); },
   });
 
   const groups = useMemo(() => {
@@ -165,7 +184,9 @@ export default function PaymentsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                <th className="w-10 px-4 py-3"></th>
+                <th className="w-10 px-4 py-3">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={pending.length === 0} title="Tasdiq kutayotganlarni belgilash" className="h-4 w-4 rounded border-slate-300 disabled:opacity-40" />
+                </th>
                 <th className="px-4 py-3">Sana</th>
                 <th className="px-4 py-3">O‘quvchi</th>
                 <th className="px-4 py-3 text-right">Summa</th>
@@ -238,7 +259,14 @@ export default function PaymentsPage() {
                             ) : isCash(p.method) ? (
                               <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-400">Naqd</span>
                             ) : (
-                              <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600 ring-1 ring-amber-200">Tasdiqlashga</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); confirmOne.mutate(p.id); }}
+                                disabled={confirmOne.isPending}
+                                title="To'lovni tasdiqlash"
+                                className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600 ring-1 ring-amber-200 transition hover:bg-emerald-50 hover:text-emerald-600 hover:ring-emerald-200 disabled:opacity-50"
+                              >
+                                <CheckCircle2 size={12} /> Tasdiqlash
+                              </button>
                             )}
                           </div>
                         </td>

@@ -396,6 +396,8 @@ model Branch {
   students  Student[]
   classes   Class[]
   leads     Lead[]
+  suppliers Supplier[]
+  expenses  Expense[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -620,11 +622,13 @@ model PaymentAllocation {
 // ============================================================================
 
 model Account {
-  id           String        @id @default(uuid())
-  name         String        // Asosiy kassa, Bank, ...
-  balance      Float         @default(0)
-  transactions Transaction[]
-  payments     Payment[]
+  id              String           @id @default(uuid())
+  name            String        // Asosiy kassa, Bank, ...
+  balance         Float            @default(0)
+  transactions          Transaction[]
+  payments              Payment[]
+  expensePayments       ExpensePayment[] @relation("ExpenseSomAccount")
+  expenseDollarPayments ExpensePayment[] @relation("ExpenseDollarAccount")
 
   @@map("accounts")
 }
@@ -634,8 +638,83 @@ model FinanceCategory {
   name         String
   type         TransactionType
   transactions Transaction[]
+  expenseLines ExpenseLine[]
 
   @@map("finance_categories")
+}
+
+// ===== Xarajatlar (ta'minotchi hujjatlari) =====
+model Supplier {
+  id        String    @id @default(uuid())
+  name      String
+  phone     String?
+  branchId  String?
+  branch    Branch?   @relation(fields: [branchId], references: [id])
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@map("suppliers")
+}
+
+model Expense {
+  id           String           @id @default(uuid())
+  number       Int              @default(autoincrement())
+  supplierId   String
+  supplier     Supplier         @relation(fields: [supplierId], references: [id])
+  branchId     String
+  branch       Branch           @relation(fields: [branchId], references: [id])
+  department   String?
+  date         DateTime         @default(now())
+  academicYear String?
+  note         String?
+  lines        ExpenseLine[]
+  payments     ExpensePayment[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
+
+  @@index([supplierId])
+  @@index([branchId])
+  @@map("expenses")
+}
+
+model ExpenseLine {
+  id          String           @id @default(uuid())
+  expenseId   String
+  expense     Expense          @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    FinanceCategory? @relation(fields: [categoryId], references: [id])
+  subCategory String?
+  name        String
+  quantity    Float            @default(1)
+  price       Float            @default(0)
+  note        String?
+  createdAt   DateTime         @default(now())
+
+  @@index([expenseId])
+  @@map("expense_lines")
+}
+
+model ExpensePayment {
+  id        String   @id @default(uuid())
+  expenseId String
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  amount    Float    // so'm qismi
+  method    String   // Naqd / Karta / Bank
+  accountId String?
+  account   Account? @relation("ExpenseSomAccount", fields: [accountId], references: [id])
+  // Dollar qismi (ixtiyoriy) — so'mdagi ekvivalenti = dollarAmount * dollarRate
+  dollarAmount    Float?
+  dollarRate      Float?
+  dollarMethod    String?
+  dollarAccountId String?
+  dollarAccount   Account? @relation("ExpenseDollarAccount", fields: [dollarAccountId], references: [id])
+  paidAt    DateTime @default(now())
+  isRefund  Boolean  @default(false)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([expenseId])
+  @@map("expense_payments")
 }
 
 model Transaction {

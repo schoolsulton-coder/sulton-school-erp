@@ -46,6 +46,8 @@ export const financeApi = {
     api.post('/finance/accounts', data).then((r) => r.data),
   categories: (type?: string) =>
     api.get<Category[]>('/finance/categories', { params: { type } }).then((r) => r.data),
+  createCategory: (data: { name: string; type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' }) =>
+    api.post<Category>('/finance/categories', data).then((r) => r.data),
   transactions: (params?: { type?: string; accountId?: string }) =>
     api.get<Transaction[]>('/finance/transactions', { params }).then((r) => r.data),
   createTransaction: (data: {

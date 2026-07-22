@@ -9,6 +9,7 @@ import { CrmModule } from './modules/crm/crm.module';
 import { ClassesModule } from './modules/classes/classes.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
 import { UsersModule } from './modules/users/users.module';
 import { HrModule } from './modules/hr/hr.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
@@ -42,6 +43,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     ClassesModule,
     ContractsModule,
     FinanceModule,
+    ExpensesModule,
     UsersModule,
     HrModule,
     PayrollModule,

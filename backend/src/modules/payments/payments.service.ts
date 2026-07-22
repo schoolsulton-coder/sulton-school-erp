@@ -91,7 +91,9 @@ export class PaymentsService {
           contract: { select: { number: true } },
           account: { select: { id: true, name: true } },
         },
-        orderBy: { paidAt: 'desc' },
+        // Barqaror tartib: teng paidAt bo'lsa ham qator o'rni o'zgarmasin
+        // (tasdiqlash paidAt/createdAt/id ni o'zgartirmaydi)
+        orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
         take: 1000,
       }),
     ]);
