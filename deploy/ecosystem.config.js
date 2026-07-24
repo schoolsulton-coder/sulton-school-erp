@@ -8,7 +8,7 @@ module.exports = {
     {
       name: 'sulton-backend',
       cwd: path.join(root, 'backend'),
-      script: 'dist/main.js',
+      script: 'dist/src/main.js',
       env: { NODE_ENV: 'production' },
       max_memory_restart: '450M',
       autorestart: true,
