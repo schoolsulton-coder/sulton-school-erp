@@ -19,6 +19,7 @@ import { GradesModule } from './modules/grades/grades.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { EsmaktabModule } from './modules/esmaktab/esmaktab.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 
@@ -50,6 +51,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     HomeworkModule,
     BehaviorModule,
     NotificationsModule,
+    WebhooksModule,
     GradesModule,
     AttendanceModule,
     PortalModule,

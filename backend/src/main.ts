@@ -4,7 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody — Meta (Instagram) webhook imzosini tekshirish uchun kerak
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.setGlobalPrefix('api');
   app.enableCors({
