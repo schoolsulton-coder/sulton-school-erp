@@ -1,6 +1,7 @@
 'use client';
 
 import { Menu } from 'lucide-react';
+import { Logo } from './logo';
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   return (
@@ -9,6 +10,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         <button onClick={onMenu} className="rounded-lg p-2 hover:bg-slate-100 md:hidden">
           <Menu size={20} />
         </button>
+        <Logo className="h-6 w-6 text-brand" />
         <span className="font-bold text-slate-800">Sulton School ERP</span>
       </div>
     </header>

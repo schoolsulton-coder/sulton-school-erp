@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { Logo } from './logo';
 import {
   ShieldCheck,
   FileText,
@@ -121,7 +122,10 @@ export function Sidebar({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
-        {!collapsed && <span className="text-lg font-bold">Sulton School ERP</span>}
+        <div className="flex min-w-0 items-center gap-2">
+          <Logo className="h-8 w-8 shrink-0 text-white" />
+          {!collapsed && <span className="truncate text-lg font-bold">Sulton School ERP</span>}
+        </div>
         <button
           onClick={onToggleCollapse}
           className="rounded-lg p-1.5 text-white/70 hover:bg-white/10"

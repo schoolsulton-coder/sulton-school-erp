@@ -1,0 +1,5 @@
+<svg viewBox="0 0 100 122" xmlns="http://www.w3.org/2000/svg" fill="#D51A20">
+  <path d="M26 28 L36 12 L44 23 L50 5 L56 23 L64 12 L74 28 Z" />
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M22 36 H78 V74 C78 96 64 108 50 116 C36 108 22 96 22 74 Z M31 45 H69 V74 C69 92 58 102 50 108 C42 102 31 92 31 74 Z" />
+  <text x="50" y="93" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800">S</text>
+</svg>

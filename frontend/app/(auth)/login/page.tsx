@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,10 +33,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] sm:p-10">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand to-brand-dark p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-10">
         {/* Sarlavha */}
         <div className="mb-7 text-center">
+          <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-brand/10 text-brand">
+            <Logo className="h-10 w-10" />
+          </div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
             Sulton School
           </div>

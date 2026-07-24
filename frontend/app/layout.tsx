@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   title: 'Sulton School — ERP & LMS',
   description: 'Zamonaviy xususiy maktab uchun raqamli boshqaruv platformasi',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -14,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#2563eb',
+  themeColor: '#D51A20',
   width: 'device-width',
   initialScale: 1,
 };

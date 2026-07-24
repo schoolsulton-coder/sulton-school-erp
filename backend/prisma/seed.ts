@@ -5,7 +5,9 @@ const prisma = new PrismaClient();
 
 // 7 rol
 const ROLES = [
+  { slug: 'superadmin', name: 'Superadmin' },
   { slug: 'admin', name: 'Administrator' },
+  { slug: 'akademik', name: "Akademik bo'lim rahbari" },
   { slug: 'sales', name: 'Sotuv menejeri' },
   { slug: 'coordinator', name: 'Koordinator' },
   { slug: 'teacher', name: 'Ustoz' },
@@ -32,8 +34,23 @@ const PERMISSION_GROUPS: Record<string, string[]> = {
   notifications: ['view'],
 };
 
-// Rolga biriktiriladigan ruxsat guruhlari (admin — barchasi)
+// Rolga biriktiriladigan ruxsat guruhlari (superadmin — barchasi)
 const ROLE_PERMISSIONS: Record<string, string[]> = {
+  // Administrator: Qabul (CRM), Shartnoma/To'lov (contracts), O'quvchi+Vasiy (students)
+  admin: [
+    'crm.view', 'crm.create', 'crm.update', 'crm.delete',
+    'contracts.view', 'contracts.create', 'contracts.update', 'contracts.delete',
+    'students.view', 'students.create', 'students.update', 'students.delete',
+  ],
+  // Akademik bo'lim rahbari: Ma'lumotlar (students+classes) + O'quv jarayoni
+  akademik: [
+    'students.view', 'students.create', 'students.update', 'students.delete',
+    'classes.view', 'classes.create', 'classes.update', 'classes.delete',
+    'grades.view', 'grades.create', 'grades.update', 'grades.delete',
+    'attendance.view', 'attendance.create', 'attendance.update', 'attendance.delete',
+    'homework.view', 'homework.create', 'homework.update', 'homework.delete',
+    'behavior.view', 'behavior.create', 'behavior.update', 'behavior.delete',
+  ],
   sales: ['crm.view', 'crm.create', 'crm.update', 'students.view'],
   coordinator: [
     'classes.view',
@@ -94,18 +111,18 @@ async function main() {
   const permissionRows = await prisma.permission.findMany();
   const permMap = new Map(permissionRows.map((p) => [p.slug, p.id]));
 
-  const adminRole = await prisma.role.findUnique({ where: { slug: 'admin' } });
-  // admin — barcha ruxsatlar
+  const superadminRole = await prisma.role.findUnique({ where: { slug: 'superadmin' } });
+  // superadmin — barcha ruxsatlar (hamma oyna ko'rinadi)
   for (const slug of allPermissions) {
     await prisma.rolePermission.upsert({
       where: {
         roleId_permissionId: {
-          roleId: adminRole!.id,
+          roleId: superadminRole!.id,
           permissionId: permMap.get(slug)!,
         },
       },
       update: {},
-      create: { roleId: adminRole!.id, permissionId: permMap.get(slug)! },
+      create: { roleId: superadminRole!.id, permissionId: permMap.get(slug)! },
     });
   }
   // boshqa rollar
@@ -130,12 +147,12 @@ async function main() {
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123';
   await prisma.user.upsert({
     where: { phone: adminPhone },
-    update: {},
+    update: { roleId: superadminRole!.id },
     create: {
       fullName: 'Bosh administrator',
       phone: adminPhone,
       password: await argon2.hash(adminPassword),
-      roleId: adminRole!.id,
+      roleId: superadminRole!.id,
     },
   });
 

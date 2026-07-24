@@ -9,8 +9,8 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: '#2563eb', // taklif PDF dagi ko'k
-          dark: '#1e3a8a',
+          DEFAULT: '#D51A20', // Sulton School qizil
+          dark: '#9E1318', // to'q qizil (sidebar, hover)
           accent: '#f59e0b', // sariq urg'u
         },
       },
