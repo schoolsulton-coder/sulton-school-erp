@@ -21,6 +21,11 @@ sudo -i
 passwd ubuntu                     # chatда ko'ringan parolni ALMASHTIRING
 apt-get update && apt-get install -y ufw
 ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw --force enable
+
+# GitHub Actions avto-deploy uchun deploy public key (root sifatida):
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMecRynboMgnIqwcAuRoFPMPswwgVOktGdHa6y12bsOd github-actions-deploy" >> /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
 ```
 
 ## 2) Swap (3 GB, majburiy)
@@ -97,9 +102,19 @@ Brauzer: **https://erpsultonschool.uz** → login. Kirish: `+998990000000` / `.e
 
 ---
 
-## Yangilash
+## Keyingi deploylar — AVTOMATIK 🤖
+Birinchi (qo'lda) o'rnatishdan so'ng, har `git push origin main` da GitHub Actions
+serverga SSH orqali kirib, avtomat yangilaydi: `git reset --hard` → build → `pm2 restart`.
+Build muvaffaqiyatli bo'lsagina qayta ishga tushadi (buzuq kod prod'ni to'xtatmaydi).
+
+- Workflow: `.github/workflows/deploy.yml` · skript: `deploy/remote-deploy.sh`
+- Secrets (o'rnatilgan): `SSH_HOST`, `SSH_USER=root`, `SSH_PORT=22`, `SSH_KEY`
+- Deploy public key `/root/.ssh/authorized_keys` da (1-qadamda qo'shiladi)
+- Holatni ko'rish: GitHub → **Actions** → *Deploy (VPS)*
+
+### Qo'lda yangilash (kerak bo'lsa)
 ```bash
-cd /opt/sulton-erp && git pull
+cd /opt/sulton-erp && git reset --hard origin/main
 cd backend && npm ci && npx prisma migrate deploy && npm run build
 cd ../frontend && npm ci && npm run build
 cd .. && pm2 restart all
