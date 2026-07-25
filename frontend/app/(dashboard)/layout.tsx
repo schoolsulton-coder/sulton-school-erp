@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
+import { SectionTabs } from '@/components/section-tabs';
 
 export default function DashboardLayout({
   children,
@@ -59,6 +60,7 @@ export default function DashboardLayout({
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar onMenu={() => setMobileOpen(true)} />
+        <SectionTabs />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>

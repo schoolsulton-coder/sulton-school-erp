@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from './logo';
@@ -15,16 +14,13 @@ import {
   Users,
   Briefcase,
   BarChart3,
-  Database,
-  BookOpen,
-  Settings,
   ChevronsLeft,
-  ChevronDown,
   KeyRound,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { SECTIONS, type NavSection } from '@/lib/nav';
 
 interface Item {
   href: string;
@@ -53,43 +49,6 @@ const MENU: Item[] = [
   { href: '/reports', label: 'Hisobotlar', icon: BarChart3, perm: 'reports.view' },
 ];
 
-const DATA: Group = {
-  label: "Ma'lumotlar",
-  icon: Database,
-  perm: null,
-  children: [
-    { href: '/students', label: "O'quvchilar", perm: 'students.view' },
-    { href: '/guardians', label: 'Vasiylar', perm: 'students.view' },
-    { href: '/classes', label: 'Sinflar', perm: 'classes.view' },
-    { href: '/schedule', label: 'Dars jadvali', perm: 'classes.view' },
-  ],
-};
-
-const STUDY: Group = {
-  label: "O'quv jarayoni",
-  icon: BookOpen,
-  perm: null,
-  children: [
-    { href: '/grades', label: 'Baholash', perm: 'grades.view' },
-    { href: '/attendance', label: 'Davomat', perm: 'attendance.view' },
-    { href: '/homework', label: 'Vazifalar', perm: 'homework.view' },
-    { href: '/behavior', label: 'Ahloqiy baho', perm: 'behavior.view' },
-  ],
-};
-
-const SETTINGS: Group = {
-  label: 'Sozlamalar',
-  icon: Settings,
-  perm: null,
-  children: [
-    { href: '/users', label: 'Foydalanuvchilar', perm: 'users.view' },
-    { href: '/settings/subjects', label: 'Fanlar', perm: 'classes.view' },
-    { href: '/settings/categories', label: 'Xarajat kategoriyalari', perm: 'finance.view' },
-    { href: '/notifications', label: 'Bildirishnomalar', perm: 'notifications.view' },
-    { href: '/esmaktab', label: 'E-maktab', perm: 'reports.view' },
-  ],
-};
-
 export function Sidebar({
   collapsed,
   onToggleCollapse,
@@ -104,10 +63,9 @@ export function Sidebar({
   const can = useAuthStore((s) => s.can);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
-  const visibleChildren = (g: Group) => g.children.filter((c) => !c.perm || can(c.perm));
+  const visibleChildren = (g: NavSection) => g.children.filter((c) => !c.perm || can(c.perm));
 
   const onLogout = () => {
     logout();
@@ -156,48 +114,25 @@ export function Sidebar({
           );
         })}
 
-        {/* Guruhlar (submenu) */}
-        {[DATA, STUDY, SETTINGS].map((g) => {
+        {/* Guruhlar — yagona havola (ichiga kirilganda yuqorida tab'lar ochiladi) */}
+        {SECTIONS.map((g) => {
           const kids = visibleChildren(g);
           if (!kids.length) return null;
           const Icon = g.icon;
           const groupActive = kids.some((c) => isActive(c.href));
-          const open = openGroup === g.label || (groupActive && openGroup === null);
           return (
-            <div key={g.label}>
-              <button
-                onClick={() => (collapsed ? undefined : setOpenGroup(open ? '' : g.label))}
-                title={collapsed ? g.label : undefined}
-                aria-expanded={!collapsed && open}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-                  groupActive ? 'text-white' : 'text-white/75'
-                } hover:bg-white/10 ${collapsed ? 'justify-center' : ''}`}
-              >
-                <Icon size={18} className="shrink-0" />
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 truncate text-left">{g.label}</span>
-                    <ChevronDown size={16} className={`transition ${open ? 'rotate-180' : ''}`} />
-                  </>
-                )}
-              </button>
-              {!collapsed && open && (
-                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
-                  {kids.map((c) => (
-                    <Link
-                      key={c.href}
-                      href={c.href}
-                      onClick={onNavigate}
-                      className={`block rounded-lg px-3 py-2 text-sm transition ${
-                        isActive(c.href) ? 'bg-white/15 font-medium text-white' : 'text-white/70 hover:bg-white/10'
-                      }`}
-                    >
-                      {c.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+            <Link
+              key={g.label}
+              href={kids[0].href}
+              onClick={onNavigate}
+              title={collapsed ? g.label : undefined}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                groupActive ? 'bg-white/15 font-semibold' : 'text-white/75 hover:bg-white/10'
+              } ${collapsed ? 'justify-center' : ''}`}
+            >
+              <Icon size={18} className="shrink-0" />
+              {!collapsed && <span className="truncate">{g.label}</span>}
+            </Link>
           );
         })}
       </nav>
