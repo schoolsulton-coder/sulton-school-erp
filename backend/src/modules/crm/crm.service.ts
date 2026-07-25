@@ -607,13 +607,18 @@ export class CrmService {
   // Talaba qidirish (F.I.Sh bo'yicha)
   searchStudents(q?: string, academicYear?: string) {
     const where: any = {};
-    if (academicYear) where.class = { academicYear };
-    if (q && q.length >= 2) {
+    const hasQ = !!q && q.length >= 2;
+    if (hasQ) {
+      // Ism bo'yicha qidirilganda — o'quv yilidan qat'i nazar barcha mos o'quvchilar
+      // (sinf biriktirilmagan yoki boshqa yildagi o'quvchilar ham chiqsin)
       where.OR = [
         { firstName: { contains: q, mode: 'insensitive' } },
         { lastName: { contains: q, mode: 'insensitive' } },
       ];
-    } else if (!academicYear) {
+    } else if (academicYear) {
+      // Qidiruvsiz — faqat o'sha o'quv yilidagi (sinf bo'yicha) o'quvchilar
+      where.class = { academicYear };
+    } else {
       // yil ham, qidiruv ham yo'q — bo'sh
       return [];
     }
