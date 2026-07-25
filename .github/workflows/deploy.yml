@@ -26,6 +26,11 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
+          # .env maxfiy qiymatlari (serverga yoziladi; bo'sh bo'lsa tegilmaydi)
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          META_VERIFY_TOKEN: ${{ secrets.META_VERIFY_TOKEN }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
         run: |
           set -e
           if [ -z "$SSH_HOST" ]; then
@@ -37,5 +42,6 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           PORT="${SSH_PORT:-22}"
           ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh -i ~/.ssh/id_ed25519 -p "$PORT" -o StrictHostKeyChecking=no \
-            "$SSH_USER@$SSH_HOST" 'bash -s' < deploy/remote-deploy.sh
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" \
+            "TELEGRAM_BOT_TOKEN='$TELEGRAM_BOT_TOKEN' META_VERIFY_TOKEN='$META_VERIFY_TOKEN' META_APP_SECRET='$META_APP_SECRET' IG_PAGE_TOKEN='$IG_PAGE_TOKEN' bash -s" \
+            < deploy/remote-deploy.sh
