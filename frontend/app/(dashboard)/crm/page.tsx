@@ -308,6 +308,13 @@ function FunnelPanel() {
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
 
+  // Kanban drag-drop: kartani bosqichdan bosqichga o'tkazish
+  const moveStage = useMutation({
+    mutationFn: ({ id, stageId }: { id: string; stageId: string }) => crmApi.moveStage(id, stageId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admissions'] }),
+  });
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+
   const rows = adm?.data ?? [];
   const oquvchi = (r: AdmissionRow) =>
     r.student ? `${r.student.lastName} ${r.student.firstName}` : r.fullName;
@@ -413,7 +420,19 @@ function FunnelPanel() {
           {stages?.map((stage) => {
             const cards = rows.filter((r) => r.stageId === stage.id);
             return (
-              <div key={stage.id} className={`flex w-72 flex-shrink-0 flex-col rounded-xl border-t-2 bg-slate-50 p-3 ${kanbanTop(stage.name)}`}>
+              <div
+                key={stage.id}
+                onDragOver={(e) => { e.preventDefault(); if (dragOverStage !== stage.id) setDragOverStage(stage.id); }}
+                onDragLeave={() => setDragOverStage((s) => (s === stage.id ? null : s))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverStage(null);
+                  const id = e.dataTransfer.getData('text/plain');
+                  const r = rows.find((x) => x.id === id);
+                  if (r && r.stageId !== stage.id) moveStage.mutate({ id, stageId: stage.id });
+                }}
+                className={`flex w-72 flex-shrink-0 flex-col rounded-xl border-t-2 bg-slate-50 p-3 transition ${kanbanTop(stage.name)} ${dragOverStage === stage.id ? 'bg-brand/[0.04] ring-2 ring-brand/40' : ''}`}
+              >
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-semibold">{stage.name}</h3>
                   <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{cards.length}</span>
@@ -422,8 +441,10 @@ function FunnelPanel() {
                   {cards.map((r) => (
                     <div
                       key={r.id}
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', r.id); e.dataTransfer.effectAllowed = 'move'; }}
                       onClick={() => setDetail(r)}
-                      className="cursor-pointer rounded-lg bg-white p-3 shadow-sm transition hover:shadow-md hover:ring-1 hover:ring-brand/30"
+                      className="cursor-grab rounded-lg bg-white p-3 shadow-sm transition hover:shadow-md hover:ring-1 hover:ring-brand/30 active:cursor-grabbing"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="text-sm font-semibold">{oquvchi(r)}</div>
