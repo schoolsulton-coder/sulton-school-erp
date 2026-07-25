@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InstallmentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 
@@ -16,7 +18,51 @@ const monthLabel = (d: Date) => `${UZ_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(PaymentsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
+
+  /** To'lov qo'shilganda vasiyga Telegram xabar (best-effort) */
+  private async notifyGuardianPayment(payment: {
+    id: string;
+    studentId: string;
+    amount: number;
+    method: string;
+    paidAt: Date;
+    isRefund: boolean;
+  }) {
+    try {
+      const student = await this.prisma.student.findUnique({
+        where: { id: payment.studentId },
+        select: { firstName: true, lastName: true },
+      });
+      if (!student) return;
+      const allocs = await this.prisma.paymentAllocation.findMany({
+        where: { paymentId: payment.id },
+        include: { installment: { select: { dueDate: true } } },
+      });
+      const fmt = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n));
+      const d = payment.paidAt;
+      const dateStr = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+
+      const title = payment.isRefund ? '↩️ To\'lov qaytarildi' : '💳 To\'lov qabul qilindi';
+      let body = `👦 ${student.lastName} ${student.firstName}\n💰 ${fmt(payment.amount)} so'm`;
+      if (allocs.length) {
+        const lines = allocs
+          .sort((a, b) => a.installment.dueDate.getTime() - b.installment.dueDate.getTime())
+          .map((a) => `   • ${monthLabel(a.installment.dueDate)}: ${fmt(a.amount)} so'm`);
+        body += `\n📅 Oy(lar):\n${lines.join('\n')}`;
+      }
+      body += `\n🏦 ${payment.method} · ${dateStr}`;
+
+      await this.notifications.notifyGuardians(payment.studentId, title, body);
+    } catch (e) {
+      this.logger.error("To'lov bildirishnomasi xatosi", e as Error);
+    }
+  }
 
   // ===== Ro'yxat + statistika + filtrlar =====
   async list(filters: {
@@ -178,9 +224,9 @@ export class PaymentsService {
     if (!studentId)
       throw new BadRequestException('studentId yoki contractId kerak');
 
-    return this.prisma.$transaction(
+    const payment = await this.prisma.$transaction(
       async (tx) => {
-        const payment = await tx.payment.create({
+        const created = await tx.payment.create({
           data: {
             studentId,
             contractId: dto.contractId || null,
@@ -202,7 +248,7 @@ export class PaymentsService {
           const rows = dto.allocations
             .filter((a) => a.amount > 0)
             .map((a) => ({
-              paymentId: payment.id,
+              paymentId: created.id,
               installmentId: a.installmentId,
               amount: a.amount,
             }));
@@ -210,18 +256,22 @@ export class PaymentsService {
         }
 
         if (dto.contractId) await this.recompute(tx, dto.contractId);
-        if (payment.accountId) {
+        if (created.accountId) {
           await tx.account.update({
-            where: { id: payment.accountId },
+            where: { id: created.accountId },
             data: {
-              balance: { increment: payment.isRefund ? -payment.amount : payment.amount },
+              balance: { increment: created.isRefund ? -created.amount : created.amount },
             },
           });
         }
-        return payment;
+        return created;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    // Vasiyga Telegram xabar (best-effort — to'lovni bloklamaydi)
+    await this.notifyGuardianPayment(payment);
+    return payment;
   }
 
   // ===== Tahrirlash =====
