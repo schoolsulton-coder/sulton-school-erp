@@ -42,52 +42,64 @@ export class CrmService implements OnModuleInit {
       return { ok: false, reason: 'not_configured', imported: 0, skipped: 0 };
     }
     try {
-      const res = await fetch(
-        `${url}/rest/v1/${table}?select=id,created_at,name,phone,grade,lang&order=id.asc`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } },
-      );
-      if (!res.ok) {
-        this.logger.error(`Supabase sync xatosi: HTTP ${res.status}`);
-        return { ok: false, reason: `http_${res.status}`, imported: 0, skipped: 0 };
-      }
-      const rows: any[] = await res.json();
       const first = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
       if (!first) return { ok: false, reason: 'no_stage', imported: 0, skipped: 0 };
 
+      // Cursor: oxirgi import qilingan sayt id'si (externalId "website:N" dan).
+      // Faqat undan katta id'larni olamiz — barcha yangilar (o'sib boruvchi id) kiradi,
+      // eski 1000 qayta o'qilmaydi (N+1 yo'q) va ko'lam cheklovi bartaraf etiladi.
+      const imported0 = await this.prisma.lead.findMany({
+        where: { externalId: { startsWith: 'website:' } },
+        select: { externalId: true },
+      });
+      let cursor = 0;
+      for (const l of imported0) {
+        const n = parseInt((l.externalId || '').split(':')[1] || '', 10);
+        if (!Number.isNaN(n) && n > cursor) cursor = n;
+      }
+
       let imported = 0;
       let skipped = 0;
-      for (const r of rows) {
-        const externalId = `website:${r.id}`;
-        const exists = await this.prisma.lead.findFirst({
-          where: { externalId },
-          select: { id: true },
-        });
-        if (exists) {
-          skipped += 1;
-          continue;
+      const PAGE = 1000;
+      for (let page = 0; page < 100; page++) {
+        const res = await fetch(
+          `${url}/rest/v1/${table}?select=id,created_at,name,phone,grade,lang&id=gt.${cursor}&order=id.asc&limit=${PAGE}`,
+          { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+        );
+        if (!res.ok) {
+          this.logger.error(`Supabase sync xatosi: HTTP ${res.status}`);
+          return { ok: false, reason: `http_${res.status}`, imported, skipped };
         }
-        const g = parseInt(String(r.grade ?? ''), 10);
-        try {
-          await this.prisma.lead.create({
-            data: {
-              fullName: (r.name ?? '').toString().trim() || 'Nomsiz',
-              phone: (r.phone ?? '').toString().trim(),
-              source: 'Sayt (sultonschool.uz)',
-              gradeLevel: Number.isNaN(g) ? null : g,
-              note: [r.grade, r.lang].filter(Boolean).join(' · ') || null,
-              externalId,
-              stageId: first.id,
-              createdAt: r.created_at ? new Date(r.created_at) : undefined,
-              crmUpdatedAt: new Date(),
-            },
-          });
-          imported += 1;
-        } catch {
-          // takror (unique) yoki xato qator — o'tkazib yuboramiz
-          skipped += 1;
+        const rows: any[] = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) break;
+
+        for (const r of rows) {
+          const g = parseInt(String(r.grade ?? ''), 10);
+          try {
+            await this.prisma.lead.create({
+              data: {
+                fullName: (r.name ?? '').toString().trim() || 'Nomsiz',
+                phone: (r.phone ?? '').toString().trim(),
+                source: 'Sayt (sultonschool.uz)',
+                gradeLevel: Number.isNaN(g) ? null : g,
+                note: [r.grade, r.lang].filter(Boolean).join(' · ') || null,
+                externalId: `website:${r.id}`,
+                stageId: first.id,
+                createdAt: r.created_at ? new Date(r.created_at) : undefined,
+                crmUpdatedAt: new Date(),
+              },
+            });
+            imported += 1;
+          } catch {
+            // takror (unique) yoki xato qator — o'tkazib yuboramiz
+            skipped += 1;
+          }
+          const idNum = Number(r.id);
+          if (Number.isFinite(idNum) && idNum > cursor) cursor = idNum;
         }
+        if (rows.length < PAGE) break; // oxirgi (to'liq bo'lmagan) sahifa
       }
-      return { ok: true, imported, skipped, total: rows.length };
+      return { ok: true, imported, skipped };
     } catch (e) {
       this.logger.error('Supabase sync xatosi', e as Error);
       return { ok: false, reason: 'error', imported: 0, skipped: 0 };
