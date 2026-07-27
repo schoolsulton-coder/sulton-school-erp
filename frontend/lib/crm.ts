@@ -187,6 +187,7 @@ export interface AdmissionRow {
   id: string;
   fullName: string;
   phone: string;
+  source?: string | null;
   academicYear?: string | null;
   tags: string[];
   note?: string | null;
@@ -266,6 +267,10 @@ export const crmApi = {
   // Funnel (Qabul)
   board: () => api.get<Stage[]>('/crm/board').then((r) => r.data),
   stages: () => api.get<StageInfo[]>('/crm/stages').then((r) => r.data),
+  syncWebsite: () =>
+    api
+      .post<{ ok: boolean; reason?: string; imported: number; skipped: number }>('/crm/sync-website')
+      .then((r) => r.data),
   admissionsList: (params: { search?: string; academicYear?: string; branchId?: string }) =>
     api.get<AdmissionsResponse>('/crm/admissions', { params }).then((r) => r.data),
   getAdmission: (id: string) =>
@@ -352,7 +357,18 @@ export const crmApi = {
     psychologistId?: string;
     stageId?: string;
     note?: string;
+    source?: string;
   }) => api.post('/crm/admissions', data).then((r) => r.data),
 };
+
+// Lead manbalari (qaerdan kelgan)
+export const LEAD_SOURCES = [
+  'Jonli tashrif',
+  'Telegram',
+  'Instagram',
+  'Reklama',
+  'Tanish orqali',
+  'Sayt (sultonschool.uz)',
+];
 
 export const WHO_OPTIONS = ['Ota va farzand', 'Ona va farzand', 'Ota', 'Ona', 'Vasiy'];

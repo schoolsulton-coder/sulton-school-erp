@@ -26,6 +26,8 @@ set_env TELEGRAM_BOT_TOKEN "${TELEGRAM_BOT_TOKEN:-}"
 set_env META_VERIFY_TOKEN "${META_VERIFY_TOKEN:-}"
 set_env META_APP_SECRET "${META_APP_SECRET:-}"
 set_env IG_PAGE_TOKEN "${IG_PAGE_TOKEN:-}"
+set_env SUPABASE_URL "${SUPABASE_URL:-}"
+set_env SUPABASE_SECRET_KEY "${SUPABASE_SECRET_KEY:-}"
 
 echo "==> Backend"
 cd "$APP_DIR/backend"

@@ -14,4 +14,5 @@ export class CreateAdmissionDto {
 
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsString() source?: string;
 }

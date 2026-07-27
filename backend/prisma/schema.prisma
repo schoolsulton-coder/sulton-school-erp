@@ -319,10 +319,11 @@ model LeadStage {
 }
 
 model Lead {
-  id         String @id @default(uuid())
+  id         String  @id @default(uuid())
   fullName   String
   phone      String
-  source     String? // Instagram, tavsiya, reklama, ...
+  source     String? // Instagram, tavsiya, reklama, sayt, ...
+  externalId String? @unique // sayt (Supabase) yozuvi id — takror import oldini oladi
   childAge   Int?
   note       String?
 

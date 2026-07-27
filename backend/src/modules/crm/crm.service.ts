@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
@@ -13,8 +15,84 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { ConvertLeadDto } from './dto/convert-lead.dto';
 
 @Injectable()
-export class CrmService {
+export class CrmService implements OnModuleInit {
+  private readonly logger = new Logger(CrmService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  onModuleInit() {
+    // Sayt (Supabase) sozlangan bo'lsa — har 5 daqiqada avtomat sync
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY) {
+      this.logger.log('🌐 Sayt (Supabase) sync yoqildi — har 5 daqiqada');
+      setInterval(() => {
+        this.syncWebsite().catch(() => undefined);
+      }, 5 * 60 * 1000);
+    }
+  }
+
+  /**
+   * sultonschool.uz saytida (Supabase `applications` jadvali) ro'yxatdan
+   * o'tganlarni Qabulga (lead) qo'shadi. externalId orqali takror import bo'lmaydi.
+   */
+  async syncWebsite() {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SECRET_KEY;
+    const table = process.env.SUPABASE_APPLICATIONS_TABLE || 'applications';
+    if (!url || !key) {
+      return { ok: false, reason: 'not_configured', imported: 0, skipped: 0 };
+    }
+    try {
+      const res = await fetch(
+        `${url}/rest/v1/${table}?select=id,created_at,name,phone,grade,lang&order=id.asc`,
+        { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+      );
+      if (!res.ok) {
+        this.logger.error(`Supabase sync xatosi: HTTP ${res.status}`);
+        return { ok: false, reason: `http_${res.status}`, imported: 0, skipped: 0 };
+      }
+      const rows: any[] = await res.json();
+      const first = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
+      if (!first) return { ok: false, reason: 'no_stage', imported: 0, skipped: 0 };
+
+      let imported = 0;
+      let skipped = 0;
+      for (const r of rows) {
+        const externalId = `website:${r.id}`;
+        const exists = await this.prisma.lead.findFirst({
+          where: { externalId },
+          select: { id: true },
+        });
+        if (exists) {
+          skipped += 1;
+          continue;
+        }
+        const g = parseInt(String(r.grade ?? ''), 10);
+        try {
+          await this.prisma.lead.create({
+            data: {
+              fullName: (r.name ?? '').toString().trim() || 'Nomsiz',
+              phone: (r.phone ?? '').toString().trim(),
+              source: 'Sayt (sultonschool.uz)',
+              gradeLevel: Number.isNaN(g) ? null : g,
+              note: [r.grade, r.lang].filter(Boolean).join(' · ') || null,
+              externalId,
+              stageId: first.id,
+              createdAt: r.created_at ? new Date(r.created_at) : undefined,
+              crmUpdatedAt: new Date(),
+            },
+          });
+          imported += 1;
+        } catch {
+          // takror (unique) yoki xato qator — o'tkazib yuboramiz
+          skipped += 1;
+        }
+      }
+      return { ok: true, imported, skipped, total: rows.length };
+    } catch (e) {
+      this.logger.error('Supabase sync xatosi', e as Error);
+      return { ok: false, reason: 'error', imported: 0, skipped: 0 };
+    }
+  }
 
   // ---- Bosqichlar (funnel ustunlari) ----
   listStages() {
@@ -695,6 +773,7 @@ export class CrmService {
     stageId?: string;
     tags?: string[];
     note?: string;
+    source?: string;
   }) {
     const student = await this.prisma.student.findUnique({
       where: { id: dto.studentId },
@@ -722,6 +801,7 @@ export class CrmService {
         stageId: stageId!,
         tags: dto.tags ?? [],
         note: dto.note,
+        source: dto.source || null,
         crmUpdatedAt: new Date(),
       },
     });

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { X, Plus, Phone } from 'lucide-react';
-import { crmApi, type ClassForm, type StudentHit, type GuardianHit } from '@/lib/crm';
+import { crmApi, LEAD_SOURCES, type ClassForm, type StudentHit, type GuardianHit } from '@/lib/crm';
 import { api } from '@/lib/api';
 
 const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
@@ -32,6 +32,7 @@ export function AdmissionForm({
     managerId: '',
     psychologistId: '',
     stageId: '',
+    source: 'Jonli tashrif',
     note: '',
   });
   const [student, setStudent] = useState<{ id: string; label: string } | null>(null);
@@ -79,6 +80,7 @@ export function AdmissionForm({
         managerId: f.managerId || undefined,
         psychologistId: f.psychologistId || undefined,
         stageId: f.stageId || undefined,
+        source: f.source || undefined,
         note: f.note || undefined,
       }),
     onSuccess: onCreated,
@@ -154,6 +156,12 @@ export function AdmissionForm({
                   <label className={lbl}>Boshlang&apos;ich status</label>
                   <select value={f.stageId} onChange={(e) => setF({ ...f, stageId: e.target.value })} className={inp}>
                     {stages?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Manba (qaerdan)</label>
+                  <select value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })} className={inp}>
+                    {LEAD_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>

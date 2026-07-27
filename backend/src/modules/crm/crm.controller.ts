@@ -41,6 +41,13 @@ export class CrmController {
     return this.service.listStages();
   }
 
+  // Saytdan (Supabase) ro'yxatdan o'tganlarni Qabulga import
+  @Post('sync-website')
+  @Permissions('crm.create')
+  syncWebsite() {
+    return this.service.syncWebsite();
+  }
+
   @Get('board')
   @Permissions('crm.view')
   board(@Query('managerId') managerId?: string) {

@@ -315,6 +315,17 @@ function FunnelPanel() {
   });
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
+  const [syncMsg, setSyncMsg] = useState('');
+  const syncWebsite = useMutation({
+    mutationFn: () => crmApi.syncWebsite(),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['admissions'] });
+      setSyncMsg(res.ok ? `Saytdan: ${res.imported} ta yangi qo'shildi (${res.skipped} ta mavjud)` : `Sync xato: ${res.reason}`);
+      setTimeout(() => setSyncMsg(''), 5000);
+    },
+    onError: () => { setSyncMsg('Sync amalga oshmadi'); setTimeout(() => setSyncMsg(''), 5000); },
+  });
+
   const rows = adm?.data ?? [];
   const oquvchi = (r: AdmissionRow) =>
     r.student ? `${r.student.lastName} ${r.student.firstName}` : r.fullName;
@@ -344,9 +355,15 @@ function FunnelPanel() {
             <button onClick={() => setView('list')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'list' ? 'bg-brand-dark text-white' : 'text-slate-500'}`}>☰ Ro&apos;yxat</button>
             <button onClick={() => setView('kanban')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'kanban' ? 'bg-brand-dark text-white' : 'text-slate-500'}`}>▤ Kanban</button>
           </div>
+          <button onClick={() => syncWebsite.mutate()} disabled={syncWebsite.isPending} title="Saytda (sultonschool.uz) ro'yxatdan o'tganlarni import qilish" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+            <RefreshCw size={15} className={syncWebsite.isPending ? 'animate-spin' : ''} /> Saytdan sync
+          </button>
           <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">+ Yangi qabul</button>
         </div>
       </div>
+      {syncMsg && (
+        <div className="mb-3 rounded-lg bg-brand/10 px-3 py-2 text-sm font-medium text-brand">{syncMsg}</div>
+      )}
 
       {/* Filtrlar */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
@@ -396,6 +413,7 @@ function FunnelPanel() {
                         <td className="whitespace-nowrap px-4 py-2 text-slate-500">{fmtShort(r.createdAt)}</td>
                         <td className="px-4 py-2">
                           <div className="font-medium">{oquvchi(r)}</div>
+                          {r.source && <div className="text-xs text-amber-600">{r.source}</div>}
                           {(r.student?._count?.contracts ?? 0) > 0 && <div className="text-xs text-green-600">Shartnoma ochilgan</div>}
                         </td>
                         <td className="px-4 py-2">{r.branch?.name ?? '—'}</td>
@@ -452,6 +470,7 @@ function FunnelPanel() {
                       </div>
                       <div className="mt-0.5 text-xs text-slate-500">{r.class ? `${r.class.name} (${r.class.language ?? '—'})` : '—'} · {r.branch?.name ?? '—'}</div>
                       <div className="mt-2 flex flex-wrap gap-1">
+                        {r.source && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">{r.source}</span>}
                         {r.manager && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-brand">{r.manager.fullName}</span>}
                         {r.psychologist && <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] text-purple-700">{r.psychologist.fullName}</span>}
                       </div>
