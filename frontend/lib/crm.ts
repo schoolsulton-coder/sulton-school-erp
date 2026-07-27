@@ -292,8 +292,10 @@ export const crmApi = {
   }) => api.post<Lead>('/crm/leads', data).then((r) => r.data),
   moveStage: (id: string, stageId: string) =>
     api.patch(`/crm/leads/${id}/stage`, { stageId }).then((r) => r.data),
-  convert: (id: string, data: { firstName?: string; lastName?: string }) =>
-    api.post(`/crm/leads/${id}/convert`, data).then((r) => r.data),
+  convert: (
+    id: string,
+    data: { firstName?: string; lastName?: string; classId?: string; branchId?: string },
+  ) => api.post<{ id: string }>(`/crm/leads/${id}/convert`, data).then((r) => r.data),
   remove: (id: string) => api.delete(`/crm/leads/${id}`).then((r) => r.data),
 
   // Tashriflar (rejadagi / real)

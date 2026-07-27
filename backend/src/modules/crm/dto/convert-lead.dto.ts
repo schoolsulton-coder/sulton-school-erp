@@ -17,6 +17,10 @@ export class ConvertLeadDto {
   @IsString()
   classId?: string;
 
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
   // vasiy (ota-ona) — berilmasa lead.fullName/phone ishlatiladi
   @IsOptional()
   @IsString()

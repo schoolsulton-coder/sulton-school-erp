@@ -101,11 +101,16 @@ function NewContractInner() {
       academicYear: lead.academicYear ?? '',
       classId: lead.classId ?? '',
       studentId: lead.student?.id ?? '',
-      studentLabel: lead.student ? `${lead.student.lastName} ${lead.student.firstName}` : '',
+      studentLabel: lead.student ? `${lead.student.lastName} ${lead.student.firstName}` : lead.fullName,
       ...(yd?.start ? { startDate: yd.start } : {}),
       ...(yd?.end ? { endDate: yd.end } : {}),
     });
   }, [lead]); // eslint-disable-line
+
+  // Qabuldan kelgan (leadId) — o'quvchisi bo'lmasa saqlashda avtomat yaratiladi
+  const fromLead = !!leadId;
+  const leadSubject = fromLead && !!lead && !lead.student; // saytdan kelgan, o'quvchisi yo'q lead
+  const subjectReady = !!f.studentId || (fromLead && !!lead);
   const { data: adm } = useQuery({
     queryKey: ['admissions', '', f.branchId, f.academicYear],
     queryFn: () => crmApi.admissionsList({ branchId: f.branchId || undefined, academicYear: f.academicYear || undefined }),
@@ -154,13 +159,20 @@ function NewContractInner() {
     }
   }, [student]); // eslint-disable-line
 
+  // Qabuldan kelgan (o'quvchisiz) lead — maktab nomini filialdan oldindan to'ldiramiz
+  useEffect(() => {
+    if (!leadSubject || f.schoolName || !f.branchId) return;
+    const bn = branches?.find((b) => b.id === f.branchId)?.name;
+    if (bn) set({ schoolName: bn });
+  }, [leadSubject, f.branchId, branches, f.schoolName]); // eslint-disable-line
+
   const done = useMemo(
     () => ({
       branchId: !!f.branchId, academicYear: !!f.academicYear, mode: !!f.mode,
-      studentId: !!f.studentId, contractType: !!f.contractType, classId: !!f.classId,
+      studentId: subjectReady, contractType: !!f.contractType, classId: !!f.classId,
       narx: !!f.narx, schoolType: !!f.schoolType, schoolName: !!f.schoolName,
     }),
-    [f],
+    [f, subjectReady],
   );
   const TOTAL = 9;
   const months = monthsBetween(f.startDate, f.endDate);
@@ -170,28 +182,26 @@ function NewContractInner() {
   const canSave = filled === TOTAL;
 
   const save = useMutation({
-    mutationFn: () =>
-      contractsApi.create({
-        studentId: f.studentId,
+    mutationFn: () => {
+      const base = {
         startDate: f.startDate,
         months,
         monthlyAmount: Number(f.narx) || 0,
         discountAmount: f.chegirma !== '' ? Number(f.chegirma) : undefined,
-        type: f.contractType === 'Yillik' ? 'YEARLY' : 'MONTHLY',
-      }),
-    onSuccess: async () => {
-      // Qabul kartasidan kelingan bo'lsa — lead'ni "Shartnoma tuzdi" bosqichiga o'tkazamiz
+        type: (f.contractType === 'Yillik' ? 'YEARLY' : 'MONTHLY') as 'MONTHLY' | 'YEARLY',
+      };
+      // Qabuldan kelgan bo'lsa — ATOMIK endpoint: o'quvchi (kerak bo'lsa) + shartnoma
+      // + lead'ni "Shartnoma tuzdi"ga o'tkazish, hammasi bitta tranzaksiyada.
       if (leadId) {
-        try {
-          const stages = await crmApi.stages();
-          const done = stages.find((s) => /tuzdi|tuzildi/i.test(s.name));
-          if (done) await crmApi.moveStage(leadId, done.id);
-        } catch {
-          /* shartnoma yaratildi; bosqich ko'chirish muvaffaqiyatsiz bo'lsa jim o'tamiz */
-        }
+        return contractsApi.createFromLead(leadId, {
+          ...base,
+          classId: f.classId || undefined,
+          branchId: f.branchId || undefined,
+        });
       }
-      router.push('/contracts');
+      return contractsApi.create({ studentId: f.studentId, ...base });
     },
+    onSuccess: () => router.push('/contracts'),
   });
 
   const cls = classes?.find((c: ClassForm) => c.id === f.classId);
@@ -252,21 +262,24 @@ function NewContractInner() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className={lbl}>O&apos;quvchi turi <span className="text-red-500">*</span></label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => set({ mode: 'existing', studentId: '', studentLabel: '', classId: '' })}
-                    className={`flex items-center justify-center gap-2 rounded-lg border py-3 text-sm font-medium ${f.mode === 'existing' ? 'border-brand bg-brand text-white' : 'border-slate-300 text-slate-600'}`}>
-                    <User size={16} /> Mavjud talaba
-                  </button>
-                  <button type="button" onClick={() => set({ mode: 'new', studentId: '', studentLabel: '', classId: '' })}
-                    className={`flex items-center justify-center gap-2 rounded-lg border py-3 text-sm font-medium ${f.mode === 'new' ? 'border-brand bg-brand text-white' : 'border-slate-300 text-slate-600'}`}>
-                    <Plus size={16} /> Yangi talaba
-                  </button>
+              {/* Qabuldan kelganda o'quvchi turi qat'iy (lead'ga bog'langan) — tanlov ko'rsatilmaydi */}
+              {!fromLead && (
+                <div>
+                  <label className={lbl}>O&apos;quvchi turi <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => set({ mode: 'existing', studentId: '', studentLabel: '', classId: '' })}
+                      className={`flex items-center justify-center gap-2 rounded-lg border py-3 text-sm font-medium ${f.mode === 'existing' ? 'border-brand bg-brand text-white' : 'border-slate-300 text-slate-600'}`}>
+                      <User size={16} /> Mavjud talaba
+                    </button>
+                    <button type="button" onClick={() => set({ mode: 'new', studentId: '', studentLabel: '', classId: '' })}
+                      className={`flex items-center justify-center gap-2 rounded-lg border py-3 text-sm font-medium ${f.mode === 'new' ? 'border-brand bg-brand text-white' : 'border-slate-300 text-slate-600'}`}>
+                      <Plus size={16} /> Yangi talaba
+                    </button>
+                  </div>
+                  {f.mode === 'new' && <p className="mt-2 text-xs text-slate-500">Admission sheet&apos;dan &quot;Shartnoma tuzishga&quot; statusidagi nomzodlar ko&apos;rsatiladi.</p>}
+                  {f.mode === 'existing' && <p className="mt-2 text-xs text-slate-500">{py || '—'} o&apos;quv yilida o&apos;qigan talabalar ko&apos;rsatiladi.</p>}
                 </div>
-                {f.mode === 'new' && <p className="mt-2 text-xs text-slate-500">Admission sheet&apos;dan &quot;Shartnoma tuzishga&quot; statusidagi nomzodlar ko&apos;rsatiladi.</p>}
-                {f.mode === 'existing' && <p className="mt-2 text-xs text-slate-500">{py || '—'} o&apos;quv yilida o&apos;qigan talabalar ko&apos;rsatiladi.</p>}
-              </div>
+              )}
             </div>
           </div>
 
@@ -286,7 +299,7 @@ function NewContractInner() {
                     <div className="font-medium text-slate-800">{f.studentLabel || `${student?.lastName ?? ''} ${student?.firstName ?? ''}`}</div>
                     <div className="text-xs text-slate-500">{fmtD(student?.birthDate)}{student?.gender ? ` · ${genderTxt(student.gender)}` : ''}</div>
                   </div>
-                  <button onClick={() => set({ studentId: '', studentLabel: '', classId: '' })} className="ml-auto text-sm text-brand hover:underline">O&apos;zgartirish</button>
+                  {!fromLead && <button onClick={() => set({ studentId: '', studentLabel: '', classId: '' })} className="ml-auto text-sm text-brand hover:underline">O&apos;zgartirish</button>}
                 </div>
                 {student?.class && (student.contracts?.length ?? 0) > 0 && (
                   <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-slate-600">
@@ -298,8 +311,22 @@ function NewContractInner() {
               </div>
             )}
 
+            {/* Qabuldan kelgan (saytdan) — o'quvchisi hali yo'q lead */}
+            {leadSubject && (
+              <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50/60 p-3">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
+                  {(lead?.fullName ?? '').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-800">{lead?.fullName}</div>
+                  <div className="text-xs text-slate-500">Qabuldan{lead?.phone ? ` · ${lead.phone}` : ''}</div>
+                </div>
+                <span className="ml-auto rounded bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">Saqlashda o&apos;quvchi yaratiladi</span>
+              </div>
+            )}
+
             {/* Ro'yxat / tanlash (talaba tanlanmagan bo'lsa) */}
-            {f.mode === 'new' && !f.studentId && (
+            {f.mode === 'new' && !f.studentId && !fromLead && (
               <div>
                 <p className="mb-2 text-sm text-slate-500">Shartnoma tuzmagan talabalar (eng oxirgilari birinchi)</p>
                 <div className="relative mb-2">
@@ -339,8 +366,8 @@ function NewContractInner() {
             )}
           </div>
 
-          {/* Talaba tanlangach — qolgan bo'limlar */}
-          {f.studentId && (
+          {/* Talaba tanlangach (yoki Qabuldan kelgan lead) — qolgan bo'limlar */}
+          {subjectReady && (
             <>
               {/* SHARTNOMA TURI */}
               <div className={card}>
@@ -462,7 +489,7 @@ function NewContractInner() {
               <Check size={16} /> {save.isPending ? 'Saqlanmoqda…' : 'Shartnomani saqlash'}
             </button>
             <Link href="/contracts" className="mt-2 block py-2 text-center text-sm text-slate-500 hover:text-slate-700">Bekor qilish</Link>
-            {save.isError && <p className="mt-2 rounded bg-red-50 px-2 py-1 text-center text-xs text-red-600">Saqlashda xatolik.</p>}
+            {save.isError && <p className="mt-2 rounded bg-red-50 px-2 py-1 text-center text-xs text-red-600">{(save.error as any)?.response?.data?.message ?? 'Saqlashda xatolik.'}</p>}
           </div>
         </div>
       </div>

@@ -416,7 +416,16 @@ function FunnelPanel() {
                         <td className="px-4 py-2">
                           <div className="font-medium">{oquvchi(r)}</div>
                           {r.source && <div className="text-xs text-amber-600">{r.source}</div>}
-                          {(r.student?._count?.contracts ?? 0) > 0 && <div className="text-xs text-green-600">Shartnoma ochilgan</div>}
+                          {(r.student?._count?.contracts ?? 0) > 0 ? (
+                            <div className="text-xs text-green-600">Shartnoma ochilgan</div>
+                          ) : /tuzishga/i.test(r.stage?.name ?? '') ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/contracts/new?leadId=${r.id}`); }}
+                              className="mt-1 inline-flex items-center gap-1 rounded-md bg-brand px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-brand-dark"
+                            >
+                              <FileSignature size={12} /> Shartnoma tuzish
+                            </button>
+                          ) : null}
                         </td>
                         <td className="px-4 py-2">{r.branch?.name ?? '—'}</td>
                         <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${stageBadge(r.stage?.name ?? '')}`}>{r.stage?.name ?? '—'}</span></td>
@@ -488,9 +497,7 @@ function FunnelPanel() {
                         </div>
                       </div>
                       {isContractStage && (
-                        !r.student ? (
-                          <div className="mt-2 rounded-md bg-slate-100 py-1.5 text-center text-[11px] text-slate-400">O&apos;quvchi biriktirilmagan</div>
-                        ) : (r.student._count?.contracts ?? 0) > 0 ? (
+                        (r.student?._count?.contracts ?? 0) > 0 ? (
                           <div className="mt-2 rounded-md bg-green-50 py-1.5 text-center text-[11px] font-medium text-green-700">✓ Shartnoma ochilgan</div>
                         ) : (
                           <button

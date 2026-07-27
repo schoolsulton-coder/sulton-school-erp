@@ -11,6 +11,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { UpdateInstallmentDto } from './dto/update-installment.dto';
+import { CreateFromLeadDto } from './dto/create-from-lead.dto';
 import { renderContractHtml } from './contract-template';
 
 type DiscountRow = { type: 'PERCENT' | 'FIXED'; value: number; name: string };
@@ -90,6 +91,116 @@ export class ContractsService {
       },
       include: { installments: { orderBy: { dueDate: 'asc' } } },
     });
+  }
+
+  // ===== Qabul (lead) kartasidan shartnoma tuzish — ATOMIK =====
+  // O'quvchisi bo'lmagan lead shu tranzaksiya ichida o'quvchiga aylantiriladi,
+  // shartnoma yaratiladi va lead "Shartnoma tuzdi" bosqichiga o'tkaziladi.
+  async createFromLead(leadId: string, dto: CreateFromLeadDto) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      include: { student: { select: { id: true } } },
+    });
+    if (!lead) throw new NotFoundException('Murojaat topilmadi');
+
+    const start = new Date(dto.startDate);
+    const dueDay = dto.dueDay ?? 5;
+    const monthly =
+      dto.discountAmount != null
+        ? Math.max(0, dto.monthlyAmount - dto.discountAmount)
+        : dto.monthlyAmount;
+
+    const installments: { dueDate: Date; amount: number }[] = [];
+    let endDate = start;
+    for (let i = 0; i < dto.months; i++) {
+      const due = new Date(start.getFullYear(), start.getMonth() + i, dueDay);
+      endDate = due;
+      installments.push({ dueDate: due, amount: monthly });
+    }
+
+    const number = await this.nextNumber(start.getFullYear());
+    const stages = await this.prisma.leadStage.findMany();
+    const doneStage = stages.find((s) => /tuzdi|tuzildi/i.test(s.name));
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        let studentId = lead.student?.id;
+
+        if (!studentId) {
+          // Lead -> o'quvchi (convert logikasi shu yerda, atomik)
+          const parts = lead.fullName.trim().split(/\s+/);
+          const firstName = parts[0] || lead.fullName;
+          const lastName = parts.slice(1).join(' ') || firstName;
+          const student = await tx.student.create({
+            data: {
+              firstName,
+              lastName,
+              classId: dto.classId || null,
+              branchId: dto.branchId || null,
+              admissionDate: new Date(),
+              status: 'ACTIVE',
+            },
+          });
+          const guardian = await tx.guardian.create({
+            data: {
+              fullName: lead.fullName,
+              phone: lead.phone,
+              relation: 'ota-ona',
+            },
+          });
+          await tx.studentGuardian.create({
+            data: { studentId: student.id, guardianId: guardian.id, isPrimary: true },
+          });
+          studentId = student.id;
+        } else {
+          // Mavjud o'quvchi — takroriy shartnoma yaratilmasin
+          // (eskirgan ko'rinish / ikki tab / "Orqaga" tugmasi orqali qayta yuborish).
+          const existing = await tx.contract.count({ where: { studentId } });
+          if (existing > 0) {
+            throw new BadRequestException(
+              "Bu o'quvchi uchun shartnoma allaqachon tuzilgan.",
+            );
+          }
+          // tanlangan sinf/filialni yangilash
+          if (dto.classId || dto.branchId) {
+            await tx.student.update({
+              where: { id: studentId },
+              data: {
+                ...(dto.classId ? { classId: dto.classId } : {}),
+                ...(dto.branchId ? { branchId: dto.branchId } : {}),
+              },
+            });
+          }
+        }
+
+        const contract = await tx.contract.create({
+          data: {
+            number,
+            studentId,
+            startDate: start,
+            endDate,
+            monthlyAmount: dto.monthlyAmount,
+            type: dto.type ?? 'MONTHLY',
+            status: 'ACTIVE',
+            installments: { create: installments },
+          },
+          include: { installments: { orderBy: { dueDate: 'asc' } } },
+        });
+
+        // Lead'ni o'quvchiga bog'lash + "Shartnoma tuzdi" bosqichiga o'tkazish
+        await tx.lead.update({
+          where: { id: leadId },
+          data: {
+            studentId,
+            ...(lead.student?.id ? {} : { convertedAt: new Date() }),
+            ...(doneStage ? { stageId: doneStage.id } : {}),
+          },
+        });
+
+        return contract;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   // ===== Barcha to'lovlar (To'lovlar sahifasi) =====

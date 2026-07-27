@@ -91,6 +91,19 @@ export const contractsApi = {
     dueDay?: number;
     type?: 'MONTHLY' | 'YEARLY';
   }) => api.post('/contracts', data).then((r) => r.data),
+  createFromLead: (
+    leadId: string,
+    data: {
+      startDate: string;
+      months: number;
+      monthlyAmount: number;
+      discountAmount?: number;
+      dueDay?: number;
+      type?: 'MONTHLY' | 'YEARLY';
+      classId?: string;
+      branchId?: string;
+    },
+  ) => api.post(`/contracts/from-lead/${leadId}`, data).then((r) => r.data),
   addPayment: (
     id: string,
     data: { amount: number; method: string; note?: string },

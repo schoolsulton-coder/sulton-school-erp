@@ -385,6 +385,7 @@ export class CrmService implements OnModuleInit {
           firstName: firstName!,
           lastName: lastName || firstName!,
           classId: dto.classId,
+          branchId: dto.branchId,
           admissionDate: new Date(),
           status: 'ACTIVE',
         },

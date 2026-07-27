@@ -18,6 +18,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { UpdateInstallmentDto } from './dto/update-installment.dto';
+import { CreateFromLeadDto } from './dto/create-from-lead.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -76,6 +77,15 @@ export class ContractsController {
   @Permissions('contracts.create')
   create(@Body() dto: CreateContractDto) {
     return this.service.create(dto);
+  }
+
+  @Post('from-lead/:leadId')
+  @Permissions('contracts.create')
+  createFromLead(
+    @Param('leadId') leadId: string,
+    @Body() dto: CreateFromLeadDto,
+  ) {
+    return this.service.createFromLead(leadId, dto);
   }
 
   @Post(':id/payments')
