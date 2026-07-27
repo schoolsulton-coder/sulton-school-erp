@@ -45,6 +45,28 @@ export class CrmService implements OnModuleInit {
       const first = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
       if (!first) return { ok: false, reason: 'no_stage', imported: 0, skipped: 0 };
 
+      // Avtomat: filial (Bosh filial), aktual o'quv yili, grade -> mos sinf
+      let branch = await this.prisma.branch.findFirst({ where: { name: 'Bosh filial' } });
+      if (!branch) branch = await this.prisma.branch.findFirst({ orderBy: { createdAt: 'asc' } });
+      const year = await this.prisma.academicYear.findFirst({
+        where: { isActive: true },
+        orderBy: { name: 'desc' },
+      });
+      const classes = year
+        ? await this.prisma.class.findMany({
+            where: {
+              status: 'Faol',
+              academicYear: year.name,
+              ...(branch ? { branchId: branch.id } : {}),
+            },
+            select: { id: true, gradeLevel: true },
+            orderBy: { name: 'asc' },
+          })
+        : [];
+      // Har grade uchun birinchi mos sinf (5 -> 5-A ...)
+      const classByGrade = new Map<number, string>();
+      for (const c of classes) if (!classByGrade.has(c.gradeLevel)) classByGrade.set(c.gradeLevel, c.id);
+
       // Cursor: oxirgi import qilingan sayt id'si (externalId "website:N" dan).
       // Faqat undan katta id'larni olamiz — barcha yangilar (o'sib boruvchi id) kiradi,
       // eski 1000 qayta o'qilmaydi (N+1 yo'q) va ko'lam cheklovi bartaraf etiladi.
@@ -82,6 +104,9 @@ export class CrmService implements OnModuleInit {
                 phone: (r.phone ?? '').toString().trim(),
                 source: 'Sayt (sultonschool.uz)',
                 gradeLevel: Number.isNaN(g) ? null : g,
+                branchId: branch?.id ?? null,
+                academicYear: year?.name ?? null,
+                classId: Number.isNaN(g) ? null : (classByGrade.get(g) ?? null),
                 note: [r.grade, r.lang].filter(Boolean).join(' · ') || null,
                 externalId: `website:${r.id}`,
                 stageId: first.id,
