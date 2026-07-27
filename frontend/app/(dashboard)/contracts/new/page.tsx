@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Check, User, Plus, Search, Info, X } from 'lucide-react';
 import { contractsApi } from '@/lib/contracts';
@@ -46,7 +46,18 @@ const yearDates = (ay: string) => {
 };
 
 export default function NewContractPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-slate-400">Yuklanmoqda…</div>}>
+      <NewContractInner />
+    </Suspense>
+  );
+}
+
+function NewContractInner() {
   const router = useRouter();
+  const params = useSearchParams();
+  const leadId = params.get('leadId'); // Qabul kartasidan "Shartnoma tuzish" bosilganda
+  const prefilled = useRef(false);
   const [talabaSearch, setTalabaSearch] = useState('');
   const [gradeHint, setGradeHint] = useState(true);
   const [f, setF] = useState({
@@ -73,6 +84,28 @@ export default function NewContractPage() {
     queryFn: () => crmApi.classesForm(f.academicYear || undefined, f.branchId || undefined),
     enabled: !!f.branchId && !!f.academicYear,
   });
+
+  // Qabul kartasidan kelgan lead — filial/yil/sinf/talabani oldindan to'ldirish
+  const { data: lead } = useQuery({
+    queryKey: ['admission', leadId],
+    queryFn: () => crmApi.getAdmission(leadId!),
+    enabled: !!leadId,
+  });
+  useEffect(() => {
+    if (!lead || prefilled.current) return;
+    prefilled.current = true;
+    const yd = lead.academicYear ? yearDates(lead.academicYear) : null;
+    set({
+      mode: 'new',
+      branchId: lead.branchId ?? '',
+      academicYear: lead.academicYear ?? '',
+      classId: lead.classId ?? '',
+      studentId: lead.student?.id ?? '',
+      studentLabel: lead.student ? `${lead.student.lastName} ${lead.student.firstName}` : '',
+      ...(yd?.start ? { startDate: yd.start } : {}),
+      ...(yd?.end ? { endDate: yd.end } : {}),
+    });
+  }, [lead]); // eslint-disable-line
   const { data: adm } = useQuery({
     queryKey: ['admissions', '', f.branchId, f.academicYear],
     queryFn: () => crmApi.admissionsList({ branchId: f.branchId || undefined, academicYear: f.academicYear || undefined }),
@@ -146,7 +179,19 @@ export default function NewContractPage() {
         discountAmount: f.chegirma !== '' ? Number(f.chegirma) : undefined,
         type: f.contractType === 'Yillik' ? 'YEARLY' : 'MONTHLY',
       }),
-    onSuccess: () => router.push('/contracts'),
+    onSuccess: async () => {
+      // Qabul kartasidan kelingan bo'lsa — lead'ni "Shartnoma tuzdi" bosqichiga o'tkazamiz
+      if (leadId) {
+        try {
+          const stages = await crmApi.stages();
+          const done = stages.find((s) => /tuzdi|tuzildi/i.test(s.name));
+          if (done) await crmApi.moveStage(leadId, done.id);
+        } catch {
+          /* shartnoma yaratildi; bosqich ko'chirish muvaffaqiyatsiz bo'lsa jim o'tamiz */
+        }
+      }
+      router.push('/contracts');
+    },
   });
 
   const cls = classes?.find((c: ClassForm) => c.id === f.classId);

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -15,6 +16,8 @@ import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateDiscountDto } from './dto/create-discount.dto';
+import { UpdateContractDto } from './dto/update-contract.dto';
+import { UpdateInstallmentDto } from './dto/update-installment.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -85,6 +88,38 @@ export class ContractsController {
   @Permissions('contracts.update')
   cancel(@Param('id') id: string) {
     return this.service.cancel(id);
+  }
+
+  // ---- Tahrirlash / o'chirish ----
+  @Patch(':id')
+  @Permissions('contracts.update')
+  update(@Param('id') id: string, @Body() dto: UpdateContractDto) {
+    return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('contracts.delete')
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
+
+  @Patch(':id/installments/:instId')
+  @Permissions('contracts.update')
+  updateInstallment(
+    @Param('id') id: string,
+    @Param('instId') instId: string,
+    @Body() dto: UpdateInstallmentDto,
+  ) {
+    return this.service.updateInstallment(id, instId, dto);
+  }
+
+  @Delete(':id/installments/:instId')
+  @Permissions('contracts.delete')
+  removeInstallment(
+    @Param('id') id: string,
+    @Param('instId') instId: string,
+  ) {
+    return this.service.removeInstallment(id, instId);
   }
 
   @Post('mark-overdue')

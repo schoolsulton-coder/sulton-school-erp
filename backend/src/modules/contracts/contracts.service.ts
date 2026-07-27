@@ -1,12 +1,16 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateDiscountDto } from './dto/create-discount.dto';
+import { UpdateContractDto } from './dto/update-contract.dto';
+import { UpdateInstallmentDto } from './dto/update-installment.dto';
 import { renderContractHtml } from './contract-template';
 
 type DiscountRow = { type: 'PERCENT' | 'FIXED'; value: number; name: string };
@@ -207,8 +211,16 @@ export class ContractsService {
         student: {
           include: {
             guardians: { include: { guardian: true } },
-            class: { select: { name: true, language: true, academicYear: true } },
-            branch: { select: { name: true } },
+            class: {
+              select: {
+                id: true,
+                name: true,
+                language: true,
+                academicYear: true,
+                gradeLevel: true,
+              },
+            },
+            branch: { select: { id: true, name: true } },
           },
         },
         discount: true,
@@ -291,6 +303,163 @@ export class ContractsService {
       where: { id },
       data: { status: 'CANCELLED' },
     });
+  }
+
+  // ===== Shartnoma statusini oylarga qarab avtomat moslash (ACTIVE <-> COMPLETED) =====
+  // Qo'lda qo'yilgan boshqa statuslarga (SUSPENDED, LEFT, CANCELLED, ...) tegilmaydi.
+  private async syncContractStatus(contractId: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.prisma;
+    const contract = await db.contract.findUnique({
+      where: { id: contractId },
+      select: { status: true, installments: { select: { status: true } } },
+    });
+    if (!contract || !contract.installments.length) return;
+    const allPaid = contract.installments.every((i) => i.status === 'PAID');
+    if (allPaid && contract.status === 'ACTIVE') {
+      await db.contract.update({ where: { id: contractId }, data: { status: 'COMPLETED' } });
+    } else if (!allPaid && contract.status === 'COMPLETED') {
+      await db.contract.update({ where: { id: contractId }, data: { status: 'ACTIVE' } });
+    }
+  }
+
+  // ===== Shartnomani tahrirlash (status, tur, sinf, sanalar, oylik narx) =====
+  async update(id: string, dto: UpdateContractDto) {
+    const contract = await this.prisma.contract.findUnique({ where: { id } });
+    if (!contract) throw new NotFoundException('Shartnoma topilmadi');
+
+    // O'quvchi darajasidagi o'zgarishlar (sinf / filial belgilash)
+    const studentData: any = {};
+    if (dto.classId !== undefined) studentData.classId = dto.classId || null;
+    if (dto.branchId !== undefined) studentData.branchId = dto.branchId || null;
+
+    // Shartnoma darajasidagi o'zgarishlar
+    const data: any = {};
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.type !== undefined) data.type = dto.type;
+    if (dto.monthlyAmount !== undefined) data.monthlyAmount = dto.monthlyAmount;
+    if (dto.startDate !== undefined) data.startDate = new Date(dto.startDate);
+    if (dto.endDate !== undefined)
+      data.endDate = dto.endDate ? new Date(dto.endDate) : null;
+
+    // O'quvchi va shartnoma o'zgarishlari — atomik (bittasi tushib qolmasin)
+    await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(studentData).length) {
+        await tx.student.update({
+          where: { id: contract.studentId },
+          data: studentData,
+        });
+      }
+      if (Object.keys(data).length) {
+        await tx.contract.update({ where: { id }, data });
+      }
+    });
+
+    return this.findOne(id);
+  }
+
+  // ===== Shartnomani o'chirish (installment + to'lov + taqsimotlari bilan) =====
+  async remove(id: string) {
+    const contract = await this.prisma.contract.findUnique({ where: { id } });
+    if (!contract) throw new NotFoundException('Shartnoma topilmadi');
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        // Balansga ta'sir qiluvchi qatorlarni AYNAN shu tranzaksiya ichida o'qiymiz
+        // (aks holda o'qish bilan o'chirish orasida yangi to'lov tushsa — balans buziladi).
+        const payments = await tx.payment.findMany({
+          where: { contractId: id },
+          select: {
+            accountId: true,
+            amount: true,
+            isRefund: true,
+            confirmedAt: true,
+          },
+        });
+
+        // Tasdiqlangan to'lov bo'lsa — o'chirishni bloklaymiz (tekshiruvni buzmaslik uchun)
+        if (payments.some((p) => p.confirmedAt)) {
+          throw new BadRequestException(
+            "Shartnomada tasdiqlangan to'lov(lar) mavjud. Avval ularning tasdig'ini bekor qiling.",
+          );
+        }
+
+        // Har bir to'lov uchun kassa (account) balansini teskari qaytarish
+        for (const p of payments) {
+          if (p.accountId) {
+            await tx.account.update({
+              where: { id: p.accountId },
+              data: { balance: { increment: p.isRefund ? p.amount : -p.amount } },
+            });
+          }
+        }
+        // To'lovlar o'chirilganda taqsimotlari (allocations) cascade bilan ketadi;
+        // shartnoma o'chirilganda installment'lar cascade bilan ketadi.
+        await tx.payment.deleteMany({ where: { contractId: id } });
+        await tx.contract.delete({ where: { id } });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    return { ok: true };
+  }
+
+  // ===== Bitta oy (installment) summasini tahrirlash =====
+  async updateInstallment(
+    id: string,
+    instId: string,
+    dto: UpdateInstallmentDto,
+  ) {
+    const inst = await this.prisma.contractInstallment.findFirst({
+      where: { id: instId, contractId: id },
+    });
+    if (!inst) throw new NotFoundException('Oy topilmadi');
+
+    // To'langan summadan past qilib bo'lmaydi (aks holda salbiy qarz / yo'qolgan pul)
+    if (dto.amount != null && dto.amount < inst.paidAmount) {
+      throw new BadRequestException(
+        `Summani to'langan summadan (${inst.paidAmount}) past qilib bo'lmaydi. Avval to'lovni bekor qiling.`,
+      );
+    }
+
+    const amount = dto.amount ?? inst.amount;
+    const dueDate = dto.dueDate ? new Date(dto.dueDate) : inst.dueDate;
+    const paid = inst.paidAmount;
+
+    // to'langan summa + muddatga qarab statusni qayta hisoblash
+    // (recompute bilan bir xil: PAID > OVERDUE > PARTIAL > PENDING)
+    let status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
+    if (amount > 0 && paid >= amount) status = 'PAID';
+    else if (dueDate < new Date()) status = 'OVERDUE';
+    else if (paid > 0) status = 'PARTIAL';
+    else status = 'PENDING';
+
+    await this.prisma.contractInstallment.update({
+      where: { id: instId },
+      data: { amount, dueDate, status },
+    });
+    await this.syncContractStatus(id);
+    return this.findOne(id);
+  }
+
+  // ===== Bitta oyni (installment) o'chirish =====
+  async removeInstallment(id: string, instId: string) {
+    const inst = await this.prisma.contractInstallment.findFirst({
+      where: { id: instId, contractId: id },
+    });
+    if (!inst) throw new NotFoundException('Oy topilmadi');
+
+    // To'lov qilingan / taqsimlangan oyni o'chirib bo'lmaydi (pul yo'qolmasligi uchun)
+    const allocCount = await this.prisma.paymentAllocation.count({
+      where: { installmentId: instId },
+    });
+    if (inst.paidAmount > 0 || allocCount > 0) {
+      throw new BadRequestException(
+        "To'lov qilingan oyni o'chirib bo'lmaydi. Avval shu oyga tegishli to'lovni bekor qiling.",
+      );
+    }
+
+    await this.prisma.contractInstallment.delete({ where: { id: instId } });
+    await this.syncContractStatus(id);
+    return this.findOne(id);
   }
 
   // ===== PDF =====

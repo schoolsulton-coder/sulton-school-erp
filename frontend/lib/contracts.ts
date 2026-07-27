@@ -98,6 +98,30 @@ export const contractsApi = {
   cancel: (id: string) =>
     api.patch(`/contracts/${id}/cancel`).then((r) => r.data),
 
+  update: (
+    id: string,
+    data: {
+      status?: string;
+      type?: 'MONTHLY' | 'YEARLY';
+      classId?: string;
+      branchId?: string;
+      startDate?: string;
+      endDate?: string;
+      monthlyAmount?: number;
+    },
+  ) => api.patch(`/contracts/${id}`, data).then((r) => r.data),
+  remove: (id: string) => api.delete(`/contracts/${id}`).then((r) => r.data),
+  updateInstallment: (
+    id: string,
+    instId: string,
+    data: { amount?: number; dueDate?: string },
+  ) =>
+    api
+      .patch(`/contracts/${id}/installments/${instId}`, data)
+      .then((r) => r.data),
+  removeInstallment: (id: string, instId: string) =>
+    api.delete(`/contracts/${id}/installments/${instId}`).then((r) => r.data),
+
   recentPayments: () =>
     api
       .get<PaymentRow[]>('/contracts/payments')

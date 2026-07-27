@@ -1,7 +1,8 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { Bell, RefreshCw, Clock, CalendarClock, Search, Download, Plus, BarChart3 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Bell, RefreshCw, Clock, CalendarClock, Search, Download, Plus, BarChart3, FileSignature } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   crmApi,
@@ -288,6 +289,7 @@ const kanbanTop = (name: string) => {
 
 function FunnelPanel() {
   const qc = useQueryClient();
+  const router = useRouter();
   const [view, setView] = useState<'list' | 'kanban'>('list');
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -437,6 +439,7 @@ function FunnelPanel() {
         <div className="flex gap-4 overflow-x-auto pb-4">
           {stages?.map((stage) => {
             const cards = rows.filter((r) => r.stageId === stage.id);
+            const isContractStage = /tuzishga/i.test(stage.name); // "Shartnoma tuzishga"
             return (
               <div
                 key={stage.id}
@@ -484,6 +487,20 @@ function FunnelPanel() {
                           <span className="text-slate-400">{fmtFull(r.createdAt)}</span>
                         </div>
                       </div>
+                      {isContractStage && (
+                        !r.student ? (
+                          <div className="mt-2 rounded-md bg-slate-100 py-1.5 text-center text-[11px] text-slate-400">O&apos;quvchi biriktirilmagan</div>
+                        ) : (r.student._count?.contracts ?? 0) > 0 ? (
+                          <div className="mt-2 rounded-md bg-green-50 py-1.5 text-center text-[11px] font-medium text-green-700">✓ Shartnoma ochilgan</div>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); router.push(`/contracts/new?leadId=${r.id}`); }}
+                            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-brand py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-dark"
+                          >
+                            <FileSignature size={13} /> Shartnoma tuzish
+                          </button>
+                        )
+                      )}
                     </div>
                   ))}
                   {!cards.length && <p className="py-3 text-center text-xs text-slate-300">Bo&apos;sh</p>}

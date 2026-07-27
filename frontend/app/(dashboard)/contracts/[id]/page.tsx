@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, FileText, Pencil, Trash2, Plus, X } from 'lucide-react';
 import { contractsApi } from '@/lib/contracts';
+import { crmApi, type ClassForm } from '@/lib/crm';
 
 const num = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
 const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -40,9 +41,24 @@ const INST_STATUS: Record<string, { label: string; cls: string }> = {
 export default function ContractDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const router = useRouter();
   const [payOpen, setPayOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editInst, setEditInst] = useState<any | null>(null);
 
   const { data: c } = useQuery({ queryKey: ['contract', id], queryFn: () => contractsApi.get(id) as Promise<any> });
+
+  const del = useMutation({
+    mutationFn: () => contractsApi.remove(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contracts-overview'] }); router.push('/contracts'); },
+    onError: (e: any) => alert(e?.response?.data?.message ?? "Shartnomani o'chirib bo'lmadi."),
+  });
+  const delInst = useMutation({
+    mutationFn: (instId: string) => contractsApi.removeInstallment(id, instId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contract', id] }),
+    onError: (e: any) => alert(e?.response?.data?.message ?? "Oyni o'chirib bo'lmadi."),
+  });
+
   if (!c) return <div className="p-8 text-slate-400">Yuklanmoqda…</div>;
 
   const inst: any[] = c.installments ?? [];
@@ -84,8 +100,15 @@ export default function ContractDetailPage() {
             <div className="mt-1 font-medium text-slate-700">{fmtDate(c.startDate)} — {fmtDate(c.endDate)}</div>
             <div className="mt-3 flex flex-wrap justify-end gap-1.5">
               <button onClick={() => contractsApi.openPdf(id, c.number)} title="PDF" className="rounded-lg border border-slate-200 p-2 text-brand hover:bg-slate-50"><FileText size={16} /></button>
-              <button title="Tahrirlash" className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><Pencil size={16} /></button>
-              <button title="O'chirish" className="rounded-lg border border-red-200 p-2 text-red-500 hover:bg-red-50"><Trash2 size={16} /></button>
+              <button onClick={() => setEditOpen(true)} title="Tahrirlash" className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><Pencil size={16} /></button>
+              <button
+                onClick={() => { if (confirm(`${c.number} shartnomasini o'chirasizmi? Barcha oylar va to'lovlar ham o'chadi. Bu amalni qaytarib bo'lmaydi.`)) del.mutate(); }}
+                disabled={del.isPending}
+                title="O'chirish"
+                className="rounded-lg border border-red-200 p-2 text-red-500 hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
           </div>
         </div>
@@ -157,8 +180,16 @@ export default function ContractDetailPage() {
                     <td className="px-3 py-2 text-right font-medium text-red-600">{num(qoldiq)}</td>
                     <td className="px-3 py-2"><span className={`rounded-full border px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span></td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center justify-center gap-1 text-slate-300">
-                        <Pencil size={14} /><Trash2 size={14} />
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => setEditInst(i)} title="Tahrirlash" className="text-slate-400 hover:text-brand"><Pencil size={14} /></button>
+                        <button
+                          onClick={() => { if (confirm(`${UZ_MONTHS[d.getMonth()]} ${d.getFullYear()} oyini o'chirasizmi?`)) delInst.mutate(i.id); }}
+                          disabled={delInst.isPending}
+                          title="O'chirish"
+                          className="text-slate-400 hover:text-red-500 disabled:opacity-50"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -232,6 +263,18 @@ export default function ContractDetailPage() {
       {payOpen && (
         <PaymentModal contractId={id} onClose={() => setPayOpen(false)} onPaid={() => { setPayOpen(false); qc.invalidateQueries({ queryKey: ['contract', id] }); }} />
       )}
+      {editOpen && (
+        <EditContractModal contract={c} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); qc.invalidateQueries({ queryKey: ['contract', id] }); }} />
+      )}
+      {editInst && (
+        <EditInstallmentModal
+          contractId={id}
+          inst={editInst}
+          monthlyBase={monthlyBase}
+          onClose={() => setEditInst(null)}
+          onSaved={() => { setEditInst(null); qc.invalidateQueries({ queryKey: ['contract', id] }); }}
+        />
+      )}
     </div>
   );
 }
@@ -267,6 +310,168 @@ function PaymentModal({ contractId, onClose, onPaid }: { contractId: string; onC
         <button type="submit" disabled={pay.isPending} className="w-full rounded-lg bg-brand py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
           {pay.isPending ? 'Saqlanmoqda...' : "To'lovni saqlash"}
         </button>
+      </form>
+    </div>
+  );
+}
+
+const CONTRACT_STATUS_OPTS = [
+  { v: 'ACTIVE', l: 'Faol' },
+  { v: 'SUSPENDED', l: 'Band' },
+  { v: 'TEMP_SUSPENDED', l: 'Vaqtincha band' },
+  { v: 'LEFT', l: 'Ketdi-aniqlashga' },
+  { v: 'DRAFT', l: 'Qoralama' },
+  { v: 'COMPLETED', l: 'Yakunlangan' },
+  { v: 'CANCELLED', l: 'Bekor qilingan' },
+  { v: 'OTHER', l: 'Boshqa' },
+];
+
+function EditContractModal({ contract, onClose, onSaved }: { contract: any; onClose: () => void; onSaved: () => void }) {
+  const s = contract.student;
+  const [f, setF] = useState({
+    status: contract.status ?? 'ACTIVE',
+    type: (contract.type ?? 'MONTHLY') as 'MONTHLY' | 'YEARLY',
+    branchId: s?.branchId ?? '',
+    academicYear: s?.class?.academicYear ?? '',
+    classId: s?.classId ?? '',
+    startDate: contract.startDate ? String(contract.startDate).slice(0, 10) : '',
+    endDate: contract.endDate ? String(contract.endDate).slice(0, 10) : '',
+    monthlyAmount: contract.monthlyAmount != null ? String(contract.monthlyAmount) : '',
+  });
+
+  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
+  const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
+  const { data: classes } = useQuery({
+    queryKey: ['classes-form', f.branchId, f.academicYear],
+    queryFn: () => crmApi.classesForm(f.academicYear || undefined, f.branchId || undefined),
+    enabled: !!f.branchId && !!f.academicYear,
+  });
+
+  const save = useMutation({
+    mutationFn: () =>
+      contractsApi.update(contract.id, {
+        status: f.status,
+        type: f.type,
+        branchId: f.branchId || undefined,
+        classId: f.classId || undefined,
+        startDate: f.startDate || undefined,
+        endDate: f.endDate || undefined,
+        monthlyAmount: f.monthlyAmount !== '' ? Number(f.monthlyAmount) : undefined,
+      }),
+    onSuccess: onSaved,
+  });
+
+  const inp = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
+  const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">Shartnomani tahrirlash</h2>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={lbl}>Status</label>
+            <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} className={inp}>
+              {CONTRACT_STATUS_OPTS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>Turi</label>
+            <select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value as 'MONTHLY' | 'YEARLY' })} className={inp}>
+              <option value="MONTHLY">Oylik</option>
+              <option value="YEARLY">Yillik</option>
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>Filial</label>
+            <select value={f.branchId} onChange={(e) => setF({ ...f, branchId: e.target.value, classId: '' })} className={inp}>
+              <option value="">—</option>
+              {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>O&apos;quv yili</label>
+            <select value={f.academicYear} onChange={(e) => setF({ ...f, academicYear: e.target.value, classId: '' })} className={inp}>
+              <option value="">—</option>
+              {years?.map((y) => <option key={y.id} value={y.name}>{y.name}</option>)}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={lbl}>Sinf</label>
+            <select value={f.classId} onChange={(e) => setF({ ...f, classId: e.target.value })} className={inp} disabled={!f.branchId || !f.academicYear}>
+              <option value="">{!f.branchId || !f.academicYear ? 'Avval filial va yil tanlang' : '—'}</option>
+              {classes?.map((cl: ClassForm) => (
+                <option key={cl.id} value={cl.id}>{cl.name}{cl.language ? ` (${cl.language})` : ''} — bo&apos;sh: {cl.free} ({cl.taken}/{cl.capacity})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>Boshlanish sana</label>
+            <input type="date" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} className={inp} />
+          </div>
+          <div>
+            <label className={lbl}>Tugash sana</label>
+            <input type="date" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} className={inp} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={lbl}>Oylik narx (asosiy, so&apos;m)</label>
+            <input type="number" min={0} value={f.monthlyAmount} onChange={(e) => setF({ ...f, monthlyAmount: e.target.value })} className={inp} />
+            <p className="mt-1 text-xs text-slate-400">Bu &quot;Narx&quot; ustuni uchun. Har oyning to&apos;lanadigan summasi &quot;Shartnoma summalari&quot;da alohida tahrirlanadi.</p>
+          </div>
+        </div>
+
+        {save.isError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">Saqlashda xatolik. Qayta urinib ko&apos;ring.</p>}
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Bekor</button>
+          <button type="submit" disabled={save.isPending} className="flex-1 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+            {save.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function EditInstallmentModal({ contractId, inst, monthlyBase, onClose, onSaved }: { contractId: string; inst: any; monthlyBase: number; onClose: () => void; onSaved: () => void }) {
+  const d = new Date(inst.dueDate);
+  const [amount, setAmount] = useState(String(inst.amount ?? ''));
+  const discount = Math.max(0, monthlyBase - Number(amount || 0));
+
+  const save = useMutation({
+    mutationFn: () => contractsApi.updateInstallment(contractId, inst.id, { amount: Number(amount) || 0 }),
+    onSuccess: onSaved,
+  });
+
+  const inp = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
+  const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">{UZ_MONTHS[d.getMonth()]} {d.getFullYear()}</h2>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
+        </div>
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+          <div className="flex justify-between"><span>Asosiy narx</span><span className="font-medium text-slate-700">{num(monthlyBase)}</span></div>
+          <div className="flex justify-between"><span>To&apos;langan</span><span className="font-medium text-green-600">{num(inst.paidAmount)}</span></div>
+        </div>
+        <div>
+          <label className={lbl}>To&apos;lanadigan summa (so&apos;m)</label>
+          <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inp} required autoFocus />
+          {discount > 0 && <p className="mt-1 text-xs text-red-500">Chegirma: −{num(discount)} so&apos;m</p>}
+        </div>
+        {save.isError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{(save.error as any)?.response?.data?.message ?? 'Saqlashda xatolik.'}</p>}
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Bekor</button>
+          <button type="submit" disabled={save.isPending} className="flex-1 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+            {save.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
+          </button>
+        </div>
       </form>
     </div>
   );
