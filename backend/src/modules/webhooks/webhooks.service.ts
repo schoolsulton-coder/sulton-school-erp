@@ -109,12 +109,16 @@ export class WebhooksService {
     this.logger.log(`Instagram'dan yangi lead: ${displayHandle}`);
   }
 
-  /** IG profil (ism/username) — IG_PAGE_TOKEN sozlangan bo'lsa */
+  /**
+   * IG foydalanuvchi profili (ism/username) — IG_PAGE_TOKEN sozlangan bo'lsa.
+   * Instagram Login (IGAA...) tokeni graph.instagram.com bilan ishlaydi.
+   * Xato bo'lsa null qaytadi — lead baribir yaratiladi (faqat @username bo'lmaydi).
+   */
   private async fetchProfile(igUserId: string): Promise<{ name?: string; username?: string } | null> {
     const token = process.env.IG_PAGE_TOKEN;
     if (!token) return null;
     try {
-      const url = `https://graph.facebook.com/v21.0/${igUserId}?fields=name,username&access_token=${token}`;
+      const url = `https://graph.instagram.com/v21.0/${igUserId}?fields=name,username&access_token=${token}`;
       const res = await fetch(url);
       if (!res.ok) return null;
       return (await res.json()) as { name?: string; username?: string };
