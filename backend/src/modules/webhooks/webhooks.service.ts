@@ -12,22 +12,39 @@ export class WebhooksService {
 
   constructor(private prisma: PrismaService) {}
 
-  /** X-Hub-Signature-256 (HMAC-SHA256, app secret) ni tekshiradi */
+  /**
+   * X-Hub-Signature-256 (HMAC-SHA256, app secret) ni tekshiradi.
+   * Instagram Login turidagi app webhook'ni Instagram app secret bilan imzolaydi,
+   * Facebook Login turi esa Facebook app secret bilan — shu sabab ikkalasini ham
+   * qabul qilamiz (qaysi biri mos kelsa — o'tadi).
+   */
   verifySignature(rawBody: Buffer | undefined, signature?: string): boolean {
-    const secret = process.env.META_APP_SECRET;
-    if (!secret) {
+    const secrets = [
+      process.env.META_APP_SECRET,
+      process.env.IG_APP_SECRET,
+    ].filter((s): s is string => !!s);
+
+    if (secrets.length === 0) {
       // Secret sozlanmagan — dastlabki sinov uchun o'tkazamiz (loglar bilan)
-      this.logger.warn('META_APP_SECRET yo‘q — imzo tekshirilmadi');
+      this.logger.warn('META_APP_SECRET/IG_APP_SECRET yo‘q — imzo tekshirilmadi');
       return true;
     }
     if (!rawBody || !signature) return false;
-    const expected =
-      'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-    try {
-      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-    } catch {
-      return false;
+
+    for (const secret of secrets) {
+      const expected =
+        'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+      // timingSafeEqual uzunlik mos kelmasa xato beradi — oldindan tekshiramiz
+      if (signature.length !== expected.length) continue;
+      try {
+        if (crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+          return true;
+        }
+      } catch {
+        // keyingi secretni sinaymiz
+      }
     }
+    return false;
   }
 
   /** Instagram webhook body'sini qayta ishlaydi */
