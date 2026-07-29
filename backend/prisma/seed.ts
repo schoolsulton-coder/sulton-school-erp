@@ -177,6 +177,12 @@ async function main() {
       await prisma.leadStage.create({ data: { name: stages[i], order: i } });
     }
   }
+  // "Tasdiqlanmagan" — Instagram/Sayt leadlar shu yerga tushadi (idempotent, order -1)
+  if (!(await prisma.leadStage.findFirst({ where: { name: 'Tasdiqlanmagan' } }))) {
+    await prisma.leadStage.create({
+      data: { name: 'Tasdiqlanmagan', order: -1, color: '#f59e0b' },
+    });
+  }
 
   // 7) Sozlamalar reference ma'lumotlari (Filial, Psixolog, O'quv yili)
   if ((await prisma.branch.count()) === 0) {

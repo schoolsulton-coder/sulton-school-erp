@@ -42,7 +42,8 @@ export class CrmService implements OnModuleInit {
       return { ok: false, reason: 'not_configured', imported: 0, skipped: 0 };
     }
     try {
-      const first = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
+      // Saytdan kelgan leadlar "Tasdiqlanmagan" bosqichiga tushadi
+      const first = await this.unconfirmedStage();
       if (!first) return { ok: false, reason: 'no_stage', imported: 0, skipped: 0 };
 
       // Avtomat: filial (Bosh filial), aktual o'quv yili, grade -> mos sinf
@@ -250,19 +251,58 @@ export class CrmService implements OnModuleInit {
           include: { author: { select: { id: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },
         },
+        messages: { orderBy: { createdAt: 'asc' } },
       },
     });
     if (!lead) throw new NotFoundException('Murojaat (lead) topilmadi');
     return lead;
   }
 
+  // ---- Bosqich yordamchilari ----
+  /** "Yangi" (yoki birinchi ijobiy tartibli) bosqich — qo'lda qo'shilgan leadlar uchun */
+  private async yangiStage() {
+    return (
+      (await this.prisma.leadStage.findFirst({
+        where: { order: { gte: 0 } },
+        orderBy: { order: 'asc' },
+      })) ?? (await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } }))
+    );
+  }
+
+  /** "Tasdiqlanmagan" bosqichi (Instagram/Sayt leadlar) — topilmasa birinchi bosqich */
+  private async unconfirmedStage() {
+    return (
+      (await this.prisma.leadStage.findFirst({
+        where: { name: { contains: 'Tasdiq', mode: 'insensitive' } },
+      })) ?? (await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } }))
+    );
+  }
+
+  /** "Tasdiqlanmagan"dan chiqishda vasiy(ism+tel)+talaba(ism) to'ldirilganini tekshiradi */
+  private assertCanLeaveUnconfirmed(
+    currentStageName: string | null | undefined,
+    targetStageName: string | null | undefined,
+    vals: { fullName?: string | null; guardianName?: string | null; phone?: string | null },
+  ) {
+    if (!/tasdiq/i.test(currentStageName ?? '')) return; // hozir Tasdiqlanmaganda emas
+    if (/tasdiq/i.test(targetStageName ?? '')) return; // hali ham Tasdiqlanmaganga
+    const missing: string[] = [];
+    if (!vals.fullName?.trim()) missing.push('Talaba ismi');
+    if (!vals.guardianName?.trim()) missing.push('Vasiy ismi');
+    if (!vals.phone?.trim()) missing.push('Vasiy telefoni');
+    if (missing.length) {
+      throw new BadRequestException(
+        `Keyingi bosqichga o'tkazish uchun avval to'ldiring: ${missing.join(', ')}`,
+      );
+    }
+  }
+
   // ---- CRUD ----
   async create(dto: CreateLeadDto) {
     let stageId = dto.stageId;
     if (!stageId) {
-      const first = await this.prisma.leadStage.findFirst({
-        orderBy: { order: 'asc' },
-      });
+      // Qo'lda qo'shilgan lead — "Yangi" bosqichiga (Tasdiqlanmaganga emas)
+      const first = await this.yangiStage();
       if (!first)
         throw new BadRequestException(
           'Lead bosqichlari sozlanmagan (seed ishga tushiring)',
@@ -274,6 +314,7 @@ export class CrmService implements OnModuleInit {
       data: {
         fullName: dto.fullName,
         phone: dto.phone,
+        guardianName: dto.guardianName,
         source: dto.source,
         childAge: dto.childAge,
         note: dto.note,
@@ -308,7 +349,19 @@ export class CrmService implements OnModuleInit {
   }
 
   async update(id: string, dto: UpdateLeadDto) {
-    await this.findOne(id);
+    const lead = await this.findOne(id); // stage bilan
+    // Status (bosqich) o'zgartirilsa — "Tasdiqlanmagan" gate'ini tekshiramiz
+    // (shu PATCH ichida to'ldirilgan qiymatlarni hisobga olib)
+    if (dto.stageId && dto.stageId !== lead.stageId) {
+      const target = await this.prisma.leadStage.findUnique({
+        where: { id: dto.stageId },
+      });
+      this.assertCanLeaveUnconfirmed(lead.stage?.name, target?.name, {
+        fullName: dto.fullName ?? lead.fullName,
+        guardianName: dto.guardianName ?? lead.guardianName,
+        phone: dto.phone ?? lead.phone,
+      });
+    }
     const { demoStartDate, ...rest } = dto as any;
     const data: any = { ...rest, crmUpdatedAt: new Date() };
     // Demo sanasi: bo'sh bo'lsa null, aks holda Date
@@ -320,14 +373,20 @@ export class CrmService implements OnModuleInit {
 
   /** Lead'ni boshqa bosqichga ko'chirish (drag & drop / tugma) */
   async moveStage(id: string, dto: MoveStageDto) {
-    await this.findOne(id);
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: { stage: true },
+    });
+    if (!lead) throw new NotFoundException('Murojaat (lead) topilmadi');
     const stage = await this.prisma.leadStage.findUnique({
       where: { id: dto.stageId },
     });
     if (!stage) throw new NotFoundException('Bosqich topilmadi');
+    // "Tasdiqlanmagan"dan chiqishda vasiy+talaba to'ldirilgan bo'lishi shart
+    this.assertCanLeaveUnconfirmed(lead.stage?.name, stage.name, lead);
     return this.prisma.lead.update({
       where: { id },
-      data: { stageId: dto.stageId },
+      data: { stageId: dto.stageId, crmUpdatedAt: new Date() },
       include: { stage: true },
     });
   }
@@ -391,10 +450,10 @@ export class CrmService implements OnModuleInit {
         },
       });
 
-      // Vasiy (ota-ona) — lead ma'lumotidan
+      // Vasiy (ota-ona) — lead ma'lumotidan (vasiy ismi alohida bo'lsa — o'sha)
       const guardian = await tx.guardian.create({
         data: {
-          fullName: dto.guardianName ?? lead.fullName,
+          fullName: dto.guardianName ?? lead.guardianName ?? lead.fullName,
           phone: lead.phone,
           relation: dto.guardianRelation ?? 'ota-ona',
         },
@@ -821,7 +880,8 @@ export class CrmService implements OnModuleInit {
 
     let stageId = dto.stageId;
     if (!stageId) {
-      const first = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
+      // Qo'lda yangi qabul — "Yangi" bosqichiga (Tasdiqlanmaganga emas)
+      const first = await this.yangiStage();
       stageId = first!.id;
     }
     const primary = student.guardians.find((g) => g.isPrimary)?.guardian ?? student.guardians[0]?.guardian;

@@ -64,49 +64,75 @@ export class WebhooksService {
   }
 
   private async createOrAppendLead(senderId: string, text: string) {
-    const handle = `ig:${senderId}`;
-    // (ixtiyoriy) Graph API orqali ism/username olish
-    const profile = await this.fetchProfile(senderId);
-    const displayHandle = profile?.username ? `@${profile.username}` : handle;
-    const fullName = profile?.name || profile?.username || 'Instagram foydalanuvchisi';
+    const externalId = `ig:${senderId}`;
+    const msg = text.slice(0, 4000);
+    const phone = this.extractPhone(text); // xabardan telefon (bo'lmasa null)
 
-    // Dedup: shu foydalanuvchidan ochiq lead bo'lsa — xabarni qo'shamiz
-    const existing = await this.prisma.lead.findFirst({
-      where: {
-        source: 'Instagram Direct',
-        phone: { in: [handle, displayHandle] },
-        convertedAt: null,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Dedup: aynan shu Instagram foydalanuvchisi bo'yicha (externalId — unique)
+    const existing = await this.prisma.lead.findUnique({ where: { externalId } });
     if (existing) {
-      await this.prisma.lead.update({
-        where: { id: existing.id },
-        data: {
-          note: `${existing.note ? existing.note + '\n' : ''}${text}`.slice(0, 4000),
-          crmUpdatedAt: new Date(),
-        },
-      });
-      this.logger.log(`Instagram lead yangilandi: ${displayHandle}`);
+      await this.prisma.$transaction([
+        this.prisma.leadMessage.create({
+          data: { leadId: existing.id, direction: 'IN', text: msg },
+        }),
+        this.prisma.lead.update({
+          where: { id: existing.id },
+          data: {
+            crmUpdatedAt: new Date(),
+            // telefon topilsa va hali bo'sh bo'lsa — vasiy telefoniga yozamiz
+            ...(phone && !existing.phone ? { phone } : {}),
+          },
+        }),
+      ]);
+      this.logger.log(`Instagram lead yangilandi: ${externalId}`);
       return;
     }
 
-    const stage = await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } });
+    // (ixtiyoriy) Graph API orqali ism/username olish
+    const profile = await this.fetchProfile(senderId);
+    const username = profile?.username ?? null;
+    const igName = profile?.name || profile?.username || 'Instagram foydalanuvchisi';
+
+    // Yangi Instagram lead — "Tasdiqlanmagan" bosqichiga tushadi
+    const stage = await this.unconfirmedStage();
     if (!stage) {
       this.logger.error('Lead bosqichlari yo‘q — seed ishga tushiring');
       return;
     }
     await this.prisma.lead.create({
       data: {
-        fullName,
-        phone: displayHandle,
+        fullName: igName, // talaba ismi (operator suhbat davomida to'g'rilaydi)
+        phone: phone ?? '', // vasiy telefoni (xabardan topilsa)
+        igUsername: username,
         source: 'Instagram Direct',
-        note: text.slice(0, 4000),
+        externalId,
         stageId: stage.id,
         crmUpdatedAt: new Date(),
+        messages: { create: { direction: 'IN', text: msg } },
       },
     });
-    this.logger.log(`Instagram'dan yangi lead: ${displayHandle}`);
+    this.logger.log(`Instagram'dan yangi lead: ${username ? '@' + username : externalId}`);
+  }
+
+  /** "Tasdiqlanmagan" bosqichi (IG/Sayt leadlar shu yerga) — topilmasa birinchi bosqich */
+  private async unconfirmedStage() {
+    return (
+      (await this.prisma.leadStage.findFirst({
+        where: { name: { contains: 'Tasdiq', mode: 'insensitive' } },
+      })) ??
+      (await this.prisma.leadStage.findFirst({ orderBy: { order: 'asc' } }))
+    );
+  }
+
+  /** Xabar matnidan O'zbek telefon raqamini ajratadi (+998XXXXXXXXX yoki 9 xonali) */
+  private extractPhone(text: string): string | null {
+    const matches = text.match(/[+(]?\d[\d\s()\-]{6,}/g) || [];
+    for (const m of matches) {
+      const digits = m.replace(/\D/g, '');
+      if (digits.length === 12 && digits.startsWith('998')) return '+' + digits;
+      if (digits.length === 9) return '+998' + digits; // mahalliy 9 xonali
+    }
+    return null;
   }
 
   /**

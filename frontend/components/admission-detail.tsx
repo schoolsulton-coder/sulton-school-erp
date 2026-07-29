@@ -23,6 +23,15 @@ function toDateInput(iso?: string | null) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// ISO → "dd.mm HH:MM" (suhbat xabari vaqti)
+function fmtTime(iso?: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export function AdmissionDetailBody({
   id,
   onClose,
@@ -33,7 +42,13 @@ export function AdmissionDetailBody({
   const qc = useQueryClient();
   const router = useRouter();
 
-  const { data: d, isLoading } = useQuery({ queryKey: ['admission', id], queryFn: () => crmApi.getAdmission(id) });
+  const { data: d, isLoading } = useQuery({
+    queryKey: ['admission', id],
+    queryFn: () => crmApi.getAdmission(id),
+    // Instagram leadlarida suhbatni avtomat yangilab turamiz
+    refetchInterval: (q) =>
+      /instagram/i.test(q.state.data?.source ?? '') ? 8000 : false,
+  });
   const { data: stages } = useQuery({ queryKey: ['crm-stages'], queryFn: crmApi.stages });
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
@@ -44,6 +59,9 @@ export function AdmissionDetailBody({
   const [editing, setEditing] = useState(false);
 
   const [f, setF] = useState({
+    fullName: '',
+    guardianName: '',
+    phone: '',
     branchId: '',
     classId: '',
     academicYear: '',
@@ -58,9 +76,13 @@ export function AdmissionDetailBody({
     demoStartDate: '',
   });
 
+  // Tahrirlash paytida polling (avtomat yangilanish) forma qiymatlarini bosib ketmasin
   useEffect(() => {
-    if (!d) return;
+    if (!d || editing) return;
     setF({
+      fullName: d.fullName ?? '',
+      guardianName: d.guardianName ?? '',
+      phone: d.phone ?? '',
       branchId: d.branchId ?? '',
       classId: d.classId ?? '',
       academicYear: d.academicYear ?? '',
@@ -74,7 +96,7 @@ export function AdmissionDetailBody({
       fatherStatus: d.fatherStatus ?? '',
       demoStartDate: toDateInput(d.demoStartDate),
     });
-  }, [d]);
+  }, [d, editing]);
 
   // SINF ro'yxati — tanlangan filial + o'quv yili bo'yicha (sig'im bilan)
   const { data: classes } = useQuery({
@@ -86,6 +108,9 @@ export function AdmissionDetailBody({
   const save = useMutation({
     mutationFn: () =>
       crmApi.updateAdmission(id, {
+        fullName: f.fullName.trim() || undefined,
+        guardianName: f.guardianName.trim() || undefined,
+        phone: f.phone.trim() || undefined,
         branchId: f.branchId || undefined,
         classId: f.classId || undefined,
         academicYear: f.academicYear || undefined,
@@ -170,10 +195,51 @@ export function AdmissionDetailBody({
           </div>
         </div>
         {saved && <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">✓ Saqlandi</p>}
-        {save.isError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">Saqlashda xatolik. Qayta urinib ko&apos;ring.</p>}
+        {save.isError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{(save.error as any)?.response?.data?.message ?? "Saqlashda xatolik. Qayta urinib ko'ring."}</p>}
       </div>
 
+      {/* INSTAGRAM SUHBATI — o'qish uchun, avtomat yangilanadi */}
+      {d.messages && d.messages.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Instagram yozishmalari
+            {d.igUsername && <span className="font-normal lowercase text-brand">@{d.igUsername}</span>}
+          </h3>
+          <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg bg-slate-50 p-3">
+            {d.messages.map((m) => (
+              <div key={m.id} className={`flex ${m.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.direction === 'OUT' ? 'bg-brand text-white' : 'bg-white text-slate-700 shadow-sm'}`}>
+                  <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                  <div className={`mt-1 text-[10px] ${m.direction === 'OUT' ? 'text-white/70' : 'text-slate-400'}`}>{fmtTime(m.createdAt)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">Avtomat yangilanadi · javob berish Instagram orqali</p>
+        </div>
+      )}
+
       <fieldset disabled={!editing} className="m-0 min-w-0 space-y-5 border-0 p-0">
+      {/* VASIY VA TALABA — keyingi bosqichga o'tish uchun shart */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Vasiy va talaba ma&apos;lumotlari</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className={lbl}>Talaba ismi</label>
+            <input value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} className={inp} placeholder="O'quvchi F.I.Sh." />
+          </div>
+          <div>
+            <label className={lbl}>Vasiy ismi</label>
+            <input value={f.guardianName} onChange={(e) => setF({ ...f, guardianName: e.target.value })} className={inp} placeholder="Ota-ona F.I.Sh." />
+          </div>
+          <div>
+            <label className={lbl}>Vasiy telefoni</label>
+            <input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className={inp} placeholder="+998 ..." />
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">&quot;Tasdiqlanmagan&quot;dan keyingi bosqichga o&apos;tkazish uchun uchalasi ham to&apos;ldirilishi shart.</p>
+      </div>
+
       {/* Asosiy qabul maydonlari */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

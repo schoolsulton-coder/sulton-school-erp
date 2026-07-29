@@ -214,14 +214,25 @@ export interface AdmissionsResponse {
   data: AdmissionRow[];
 }
 
+export interface LeadMessage {
+  id: string;
+  direction: 'IN' | 'OUT';
+  text: string;
+  createdAt: string;
+}
+
 // Bitta qabul detali (kartochka ustiga bosganda) — /crm/leads/:id
 export interface AdmissionDetailData {
   id: string;
   fullName: string;
   phone: string;
+  guardianName?: string | null;
+  igUsername?: string | null;
+  source?: string | null;
   note?: string | null;
   academicYear?: string | null;
   tags: string[];
+  messages?: LeadMessage[];
   stageId: string;
   createdAt: string;
   crmUpdatedAt?: string | null;
@@ -249,6 +260,9 @@ export interface AdmissionDetailData {
 }
 
 export interface UpdateAdmission {
+  fullName?: string;
+  phone?: string;
+  guardianName?: string;
   branchId?: string;
   classId?: string;
   academicYear?: string;

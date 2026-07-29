@@ -314,6 +314,7 @@ function FunnelPanel() {
   const moveStage = useMutation({
     mutationFn: ({ id, stageId }: { id: string; stageId: string }) => crmApi.moveStage(id, stageId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admissions'] }),
+    onError: (e: any) => alert(e?.response?.data?.message ?? "Bosqichni o'zgartirib bo'lmadi."),
   });
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 

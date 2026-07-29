@@ -319,13 +319,15 @@ model LeadStage {
 }
 
 model Lead {
-  id         String  @id @default(uuid())
-  fullName   String
-  phone      String
-  source     String? // Instagram, tavsiya, reklama, sayt, ...
-  externalId String? @unique // sayt (Supabase) yozuvi id — takror import oldini oladi
-  childAge   Int?
-  note       String?
+  id           String  @id @default(uuid())
+  fullName     String // talaba (o'quvchi) ismi
+  phone        String // vasiy telefoni
+  guardianName String? // vasiy (ota-ona) ismi
+  igUsername   String? // Instagram @username (ko'rsatish uchun)
+  source       String? // Instagram, tavsiya, reklama, sayt, ...
+  externalId   String? @unique // sayt (Supabase) / ig:<id> — takror oldini oladi
+  childAge     Int?
+  note         String?
 
   // Tashrif (qabul) ma'lumotlari
   scheduledAt  DateTime? // belgilangan tashrif vaqti
@@ -365,6 +367,7 @@ model Lead {
   convertedAt DateTime?
 
   activities LeadActivity[]
+  messages   LeadMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -372,6 +375,19 @@ model Lead {
   @@index([stageId])
   @@index([managerId])
   @@map("leads")
+}
+
+// Instagram Direct / boshqa suhbat xabarlari (lead ichida ko'rsatiladi)
+model LeadMessage {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  direction String // 'IN' (mijozdan) | 'OUT' (bizdan)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+  @@map("lead_messages")
 }
 
 model LeadActivity {

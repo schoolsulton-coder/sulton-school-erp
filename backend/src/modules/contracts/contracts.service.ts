@@ -99,9 +99,21 @@ export class ContractsService {
   async createFromLead(leadId: string, dto: CreateFromLeadDto) {
     const lead = await this.prisma.lead.findUnique({
       where: { id: leadId },
-      include: { student: { select: { id: true } } },
+      include: { student: { select: { id: true } }, stage: true },
     });
     if (!lead) throw new NotFoundException('Murojaat topilmadi');
+
+    // "Tasdiqlanmagan" lead'dan to'g'ridan-to'g'ri shartnoma tuzib bo'lmaydi —
+    // avval vasiy(ism+tel) va talaba ismi to'ldirilishi shart (server tomonida ham kafolat)
+    if (/tasdiq/i.test(lead.stage?.name ?? '')) {
+      const missing: string[] = [];
+      if (!lead.fullName?.trim()) missing.push('Talaba ismi');
+      if (!lead.guardianName?.trim()) missing.push('Vasiy ismi');
+      if (!lead.phone?.trim()) missing.push('Vasiy telefoni');
+      if (missing.length) {
+        throw new BadRequestException(`Avval to'ldiring: ${missing.join(', ')}`);
+      }
+    }
 
     const start = new Date(dto.startDate);
     const dueDay = dto.dueDay ?? 5;
@@ -143,7 +155,7 @@ export class ContractsService {
           });
           const guardian = await tx.guardian.create({
             data: {
-              fullName: lead.fullName,
+              fullName: lead.guardianName ?? lead.fullName,
               phone: lead.phone,
               relation: 'ota-ona',
             },

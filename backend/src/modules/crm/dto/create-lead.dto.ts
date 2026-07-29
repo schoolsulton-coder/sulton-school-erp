@@ -19,6 +19,10 @@ export class CreateLeadDto {
 
   @IsOptional()
   @IsString()
+  guardianName?: string; // vasiy (ota-ona) ismi
+
+  @IsOptional()
+  @IsString()
   source?: string; // Instagram, tavsiya, reklama...
 
   @IsOptional()
