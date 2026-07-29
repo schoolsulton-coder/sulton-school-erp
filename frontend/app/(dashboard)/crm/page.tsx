@@ -328,6 +328,23 @@ function FunnelPanel() {
     },
     onError: () => { setSyncMsg('Sync amalga oshmadi'); setTimeout(() => setSyncMsg(''), 5000); },
   });
+  const syncInstagram = useMutation({
+    mutationFn: () => crmApi.syncInstagram(),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['admissions'] });
+      setSyncMsg(
+        res.ok
+          ? `Instagram: ${res.imported} ta yangi, ${res.messages} ta xabar (${res.skipped} ta mavjud)`
+          : res.reason === 'access_blocked'
+            ? 'Instagram: API hali bloklangan — appni "Опубликовать" qiling (Development rejimda ishlamaydi)'
+            : res.reason === 'not_configured'
+              ? 'Instagram: token sozlanmagan'
+              : `Instagram sync xato: ${res.reason}`,
+      );
+      setTimeout(() => setSyncMsg(''), 7000);
+    },
+    onError: () => { setSyncMsg('Instagram sync amalga oshmadi'); setTimeout(() => setSyncMsg(''), 5000); },
+  });
 
   const rows = adm?.data ?? [];
   const oquvchi = (r: AdmissionRow) =>
@@ -360,6 +377,9 @@ function FunnelPanel() {
           </div>
           <button onClick={() => syncWebsite.mutate()} disabled={syncWebsite.isPending} title="Saytda (sultonschool.uz) ro'yxatdan o'tganlarni import qilish" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw size={15} className={syncWebsite.isPending ? 'animate-spin' : ''} /> Saytdan sync
+          </button>
+          <button onClick={() => syncInstagram.mutate()} disabled={syncInstagram.isPending} title="Instagram Direct suhbatlarini Qabulga import qilish" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+            <RefreshCw size={15} className={syncInstagram.isPending ? 'animate-spin' : ''} /> Instagramdan sync
           </button>
           <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">+ Yangi qabul</button>
         </div>

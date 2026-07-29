@@ -285,6 +285,10 @@ export const crmApi = {
     api
       .post<{ ok: boolean; reason?: string; imported: number; skipped: number }>('/crm/sync-website')
       .then((r) => r.data),
+  syncInstagram: () =>
+    api
+      .post<{ ok: boolean; reason?: string; imported: number; skipped: number; messages: number }>('/crm/sync-instagram')
+      .then((r) => r.data),
   admissionsList: (params: { search?: string; academicYear?: string; branchId?: string }) =>
     api.get<AdmissionsResponse>('/crm/admissions', { params }).then((r) => r.data),
   getAdmission: (id: string) =>

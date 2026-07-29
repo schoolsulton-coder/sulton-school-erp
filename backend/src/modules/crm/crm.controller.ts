@@ -48,6 +48,13 @@ export class CrmController {
     return this.service.syncWebsite();
   }
 
+  // Instagram Direct suhbatlarini Qabulga import (Meta API)
+  @Post('sync-instagram')
+  @Permissions('crm.create')
+  syncInstagram() {
+    return this.service.syncInstagram();
+  }
+
   @Get('board')
   @Permissions('crm.view')
   board(@Query('managerId') managerId?: string) {

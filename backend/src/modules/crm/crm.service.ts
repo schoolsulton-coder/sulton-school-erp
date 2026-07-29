@@ -132,6 +132,173 @@ export class CrmService implements OnModuleInit {
     }
   }
 
+  /** Xabar matnidan O'zbek telefon raqamini ajratadi (+998XXXXXXXXX / 9 xonali) */
+  private extractPhone(text: string): string | null {
+    const matches = text.match(/[+(]?\d[\d\s()\-]{6,}/g) || [];
+    for (const m of matches) {
+      const digits = m.replace(/\D/g, '');
+      if (digits.length === 12 && digits.startsWith('998')) return '+' + digits;
+      if (digits.length === 9) return '+998' + digits;
+    }
+    return null;
+  }
+
+  /**
+   * Instagram Direct suhbatlarini Meta API orqali Qabulga (lead) tortadi.
+   * Sayt sync kabi — mavjudlarni qoldiradi (externalId ig:<id> dedup),
+   * xabarlar mid bo'yicha takrorlanmaydi. App "Опубликовано" bo'lishi shart
+   * (aks holda Meta "API access blocked" qaytaradi).
+   */
+  async syncInstagram() {
+    const token = process.env.IG_PAGE_TOKEN;
+    if (!token) {
+      return { ok: false, reason: 'not_configured', imported: 0, skipped: 0, messages: 0 };
+    }
+    const BASE = 'https://graph.instagram.com/v21.0';
+    const blocked = (b: any) =>
+      typeof b?.error?.message === 'string' &&
+      /access blocked|not been approved|permission/i.test(b.error.message);
+    try {
+      const stage = await this.unconfirmedStage();
+      if (!stage) return { ok: false, reason: 'no_stage', imported: 0, skipped: 0, messages: 0 };
+
+      // Bizning IG account id — o'z xabarlarimizni (OUT) ajratish uchun
+      const meRes = await fetch(`${BASE}/me?fields=user_id,username&access_token=${token}`);
+      const me: any = await meRes.json().catch(() => ({}));
+      if (!meRes.ok) {
+        return {
+          ok: false,
+          reason: blocked(me) ? 'access_blocked' : `http_${meRes.status}`,
+          imported: 0,
+          skipped: 0,
+          messages: 0,
+        };
+      }
+      const myId = String(me.user_id ?? me.id ?? '');
+      if (!myId) {
+        this.logger.error("Instagram sync: hisob id aniqlanmadi (me.user_id yo'q)");
+        return { ok: false, reason: 'no_account_id', imported: 0, skipped: 0, messages: 0 };
+      }
+
+      let imported = 0;
+      let skipped = 0;
+      let messages = 0;
+      let next: string | null =
+        `${BASE}/me/conversations?platform=instagram` +
+        `&fields=participants{id,username},messages.limit(50){id,from{id,username},message,created_time}` +
+        `&limit=50&access_token=${token}`;
+
+      for (let page = 0; page < 50 && next; page++) {
+        const res = await fetch(next);
+        const body: any = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          return {
+            ok: false,
+            reason: blocked(body) ? 'access_blocked' : `http_${res.status}`,
+            imported,
+            skipped,
+            messages,
+          };
+        }
+        const convs: any[] = Array.isArray(body?.data) ? body.data : [];
+        for (const conv of convs) {
+          const parts: any[] = conv?.participants?.data ?? [];
+          // Suhbatdoshimiz — o'zimiz (myId) bo'lmagan, id'si bor ishtirokchi
+          const other = parts.find((p) => p?.id && String(p.id) !== myId);
+          if (!other?.id) {
+            skipped += 1; // faqat o'zimiz / id yo'q — o'tkazamiz
+            continue;
+          }
+          const externalId = `ig:${other.id}`;
+          const username: string | null = other.username ?? null;
+
+          let lead = await this.prisma.lead.findUnique({ where: { externalId } });
+          if (!lead) {
+            try {
+              lead = await this.prisma.lead.create({
+                data: {
+                  fullName: username || 'Instagram foydalanuvchisi',
+                  phone: '',
+                  igUsername: username,
+                  source: 'Instagram Direct',
+                  externalId,
+                  stageId: stage.id,
+                  crmUpdatedAt: new Date(),
+                },
+              });
+              imported += 1;
+            } catch (e: any) {
+              // Parallel sync (poyga) — allaqachon yaratilgan bo'lsa qayta o'qiymiz
+              if (e?.code === 'P2002') {
+                lead = await this.prisma.lead.findUnique({ where: { externalId } });
+                skipped += 1;
+              } else {
+                throw e;
+              }
+            }
+          } else {
+            skipped += 1;
+            if (username && !lead.igUsername) {
+              await this.prisma.lead.update({
+                where: { id: lead.id },
+                data: { igUsername: username },
+              });
+            }
+          }
+          if (!lead) continue; // yaratish muvaffaqiyatsiz — xavfsiz o'tkazamiz
+
+          // Xabarlar — sahifalab olamiz (har suhbatga ko'proq tarix), mid bo'yicha dedup
+          let foundPhone: string | null = null;
+          let msgs: any[] = conv?.messages?.data ?? [];
+          let msgNext: string | null = conv?.messages?.paging?.next ?? null;
+          for (let mp = 0; mp < 10; mp++) {
+            for (const m of msgs) {
+              const text = (m?.message ?? '').toString();
+              if (!text.trim()) continue; // media/bo'sh xabar — o'tkazamiz
+              const direction = String(m?.from?.id) === myId ? 'OUT' : 'IN';
+              if (direction === 'IN' && !foundPhone) foundPhone = this.extractPhone(text);
+              try {
+                await this.prisma.leadMessage.create({
+                  data: {
+                    leadId: lead.id,
+                    direction,
+                    text: text.slice(0, 4000),
+                    externalId: m?.id ? String(m.id) : null,
+                    createdAt: m?.created_time ? new Date(m.created_time) : undefined,
+                  },
+                });
+                messages += 1;
+              } catch (e: any) {
+                // faqat takror (unique mid, P2002) jim; boshqa xatolarni loglaymiz
+                if (e?.code !== 'P2002') {
+                  this.logger.warn(`IG xabar saqlashda xato: ${e?.message ?? e}`);
+                }
+              }
+            }
+            if (!msgNext) break;
+            const mr = await fetch(msgNext);
+            const mb: any = await mr.json().catch(() => ({}));
+            if (!mr.ok) break;
+            msgs = Array.isArray(mb?.data) ? mb.data : [];
+            msgNext = mb?.paging?.next ?? null;
+          }
+          // Vasiy telefoni bo'sh bo'lsa va xabardan topilgan bo'lsa — yozamiz
+          if (foundPhone && !lead.phone) {
+            await this.prisma.lead.update({
+              where: { id: lead.id },
+              data: { phone: foundPhone },
+            });
+          }
+        }
+        next = body?.paging?.next ?? null;
+      }
+      return { ok: true, imported, skipped, messages };
+    } catch (e) {
+      this.logger.error('Instagram sync xatosi', e as Error);
+      return { ok: false, reason: 'error', imported: 0, skipped: 0, messages: 0 };
+    }
+  }
+
   // ---- Bosqichlar (funnel ustunlari) ----
   listStages() {
     return this.prisma.leadStage.findMany({ orderBy: { order: 'asc' } });

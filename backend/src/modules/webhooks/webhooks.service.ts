@@ -58,60 +58,81 @@ export class WebhooksService {
         if (!msg || msg.is_echo || !msg.text) continue;
         const senderId: string = ev.sender?.id;
         if (!senderId) continue;
-        await this.createOrAppendLead(senderId, msg.text);
+        await this.createOrAppendLead(senderId, msg.text, msg.mid);
       }
     }
   }
 
-  private async createOrAppendLead(senderId: string, text: string) {
+  private async createOrAppendLead(senderId: string, text: string, mid?: string) {
     const externalId = `ig:${senderId}`;
     const msg = text.slice(0, 4000);
     const phone = this.extractPhone(text); // xabardan telefon (bo'lmasa null)
 
-    // Dedup: aynan shu Instagram foydalanuvchisi bo'yicha (externalId — unique)
-    const existing = await this.prisma.lead.findUnique({ where: { externalId } });
-    if (existing) {
-      await this.prisma.$transaction([
-        this.prisma.leadMessage.create({
-          data: { leadId: existing.id, direction: 'IN', text: msg },
-        }),
-        this.prisma.lead.update({
-          where: { id: existing.id },
-          data: {
-            crmUpdatedAt: new Date(),
-            // telefon topilsa va hali bo'sh bo'lsa — vasiy telefoniga yozamiz
-            ...(phone && !existing.phone ? { phone } : {}),
-          },
-        }),
-      ]);
-      this.logger.log(`Instagram lead yangilandi: ${externalId}`);
-      return;
+    // Bir xil xabar (mid) qayta kelsa — o'tkazamiz (Meta ba'zan qayta yuboradi)
+    if (mid) {
+      const dup = await this.prisma.leadMessage.findUnique({
+        where: { externalId: mid },
+      });
+      if (dup) {
+        this.logger.log(`Instagram xabar allaqachon mavjud (mid): ${mid}`);
+        return;
+      }
     }
 
-    // (ixtiyoriy) Graph API orqali ism/username olish
-    const profile = await this.fetchProfile(senderId);
-    const username = profile?.username ?? null;
-    const igName = profile?.name || profile?.username || 'Instagram foydalanuvchisi';
+    // Bir vaqtda kelgan bir xil xabar (poyga) unique (externalId) bilan bloklanadi —
+    // P2002 ni "allaqachon saqlangan" deb qabul qilamiz (500 va Meta qayta-yuborish tsikli bo'lmasin)
+    try {
+      // Dedup: aynan shu Instagram foydalanuvchisi bo'yicha (externalId — unique)
+      const existing = await this.prisma.lead.findUnique({ where: { externalId } });
+      if (existing) {
+        await this.prisma.$transaction([
+          this.prisma.leadMessage.create({
+            data: { leadId: existing.id, direction: 'IN', text: msg, externalId: mid ?? null },
+          }),
+          this.prisma.lead.update({
+            where: { id: existing.id },
+            data: {
+              crmUpdatedAt: new Date(),
+              // telefon topilsa va hali bo'sh bo'lsa — vasiy telefoniga yozamiz
+              ...(phone && !existing.phone ? { phone } : {}),
+            },
+          }),
+        ]);
+        this.logger.log(`Instagram lead yangilandi: ${externalId}`);
+        return;
+      }
 
-    // Yangi Instagram lead — "Tasdiqlanmagan" bosqichiga tushadi
-    const stage = await this.unconfirmedStage();
-    if (!stage) {
-      this.logger.error('Lead bosqichlari yo‘q — seed ishga tushiring');
-      return;
+      // (ixtiyoriy) Graph API orqali ism/username olish
+      const profile = await this.fetchProfile(senderId);
+      const username = profile?.username ?? null;
+      const igName = profile?.name || profile?.username || 'Instagram foydalanuvchisi';
+
+      // Yangi Instagram lead — "Tasdiqlanmagan" bosqichiga tushadi
+      const stage = await this.unconfirmedStage();
+      if (!stage) {
+        this.logger.error('Lead bosqichlari yo‘q — seed ishga tushiring');
+        return;
+      }
+      await this.prisma.lead.create({
+        data: {
+          fullName: igName, // talaba ismi (operator suhbat davomida to'g'rilaydi)
+          phone: phone ?? '', // vasiy telefoni (xabardan topilsa)
+          igUsername: username,
+          source: 'Instagram Direct',
+          externalId,
+          stageId: stage.id,
+          crmUpdatedAt: new Date(),
+          messages: { create: { direction: 'IN', text: msg, externalId: mid ?? null } },
+        },
+      });
+      this.logger.log(`Instagram'dan yangi lead: ${username ? '@' + username : externalId}`);
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        this.logger.log(`Instagram xabar allaqachon saqlangan (poyga, P2002): ${mid ?? externalId}`);
+        return;
+      }
+      throw e;
     }
-    await this.prisma.lead.create({
-      data: {
-        fullName: igName, // talaba ismi (operator suhbat davomida to'g'rilaydi)
-        phone: phone ?? '', // vasiy telefoni (xabardan topilsa)
-        igUsername: username,
-        source: 'Instagram Direct',
-        externalId,
-        stageId: stage.id,
-        crmUpdatedAt: new Date(),
-        messages: { create: { direction: 'IN', text: msg } },
-      },
-    });
-    this.logger.log(`Instagram'dan yangi lead: ${username ? '@' + username : externalId}`);
   }
 
   /** "Tasdiqlanmagan" bosqichi (IG/Sayt leadlar shu yerga) — topilmasa birinchi bosqich */
