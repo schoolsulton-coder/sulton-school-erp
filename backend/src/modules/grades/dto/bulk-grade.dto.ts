@@ -3,8 +3,8 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -17,9 +17,9 @@ class GradeItem {
   @IsNotEmpty()
   studentId: string;
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(5)
   value: number;
 
   @IsOptional()
@@ -31,6 +31,10 @@ export class BulkGradeDto {
   @IsString()
   @IsNotEmpty()
   subjectId: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string; // ustoz ko'lamini tekshirish uchun
 
   @IsOptional()
   @IsEnum(['DAILY', 'QUARTER', 'SEMESTER', 'YEAR', 'EXAM'])

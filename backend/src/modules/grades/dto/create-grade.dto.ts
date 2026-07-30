@@ -1,8 +1,8 @@
 import {
   IsDateString,
   IsEnum,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -18,9 +18,9 @@ export class CreateGradeDto {
   @IsNotEmpty()
   subjectId: string;
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(5)
   value: number;
 
   @IsOptional()

@@ -860,12 +860,14 @@ model Grade {
   teacher   User?     @relation("GradeTeacher", fields: [teacherId], references: [id])
   value     Float
   type      GradeType @default(DAILY)
-  period    String?   // "1-chorak", "2-yarim yillik"
+  period    String?   // "1-chorak", "2-chorak", ... (Chorak/Yillik uchun asosiy ajratuvchi)
   comment   String?
   date      DateTime  @default(now())
 
   @@index([studentId])
   @@index([subjectId])
+  @@index([subjectId, type, date])
+  @@index([teacherId])
   @@map("grades")
 }
 

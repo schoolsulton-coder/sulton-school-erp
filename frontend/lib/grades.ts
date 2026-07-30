@@ -2,11 +2,19 @@ import { api } from './api';
 
 export type GradeType = 'DAILY' | 'QUARTER' | 'SEMESTER' | 'YEAR' | 'EXAM';
 
+export interface GradeCell {
+  id: string;
+  value: number;
+  type: GradeType;
+  date: string;
+  comment?: string | null;
+}
+
 export interface GradebookRow {
   id: string;
   firstName: string;
   lastName: string;
-  grades: { id: string; value: number; type: GradeType; date: string; comment?: string | null }[];
+  grades: GradeCell[];
   average: number;
 }
 
@@ -17,28 +25,61 @@ export interface StudentGradeReport {
   totalGrades: number;
 }
 
+export interface MySubjects {
+  canGradeAll: boolean;
+  classes: { id: string; name: string }[];
+  subjects: { id: string; name: string }[];
+  assignments: { classId: string; className: string; subjectId: string; subjectName: string }[];
+}
+
 export const GRADE_TYPE_LABEL: Record<GradeType, string> = {
   DAILY: 'Kunlik',
+  EXAM: 'Nazorat',
   QUARTER: 'Chorak',
-  SEMESTER: 'Yarim yillik',
   YEAR: 'Yillik',
-  EXAM: 'Imtihon',
+  SEMESTER: 'Yarim yillik',
 };
 
+// Jurnal selektorida ko'rinadigan turlar (tartib bilan)
+export const GRADE_TYPES: { key: GradeType; label: string }[] = [
+  { key: 'DAILY', label: 'Kunlik' },
+  { key: 'EXAM', label: 'Nazorat' },
+  { key: 'QUARTER', label: 'Chorak' },
+  { key: 'YEAR', label: 'Yillik' },
+];
+
+export const CHORAK_OPTIONS = ['1-chorak', '2-chorak', '3-chorak', '4-chorak'];
+
 export const gradesApi = {
-  gradebook: (classId: string, subjectId: string) =>
-    api.get<GradebookRow[]>(`/grades/class/${classId}/subject/${subjectId}`).then((r) => r.data),
+  mySubjects: () => api.get<MySubjects>('/grades/my-subjects').then((r) => r.data),
+  gradebook: (classId: string, subjectId: string, type?: string) =>
+    api
+      .get<GradebookRow[]>(`/grades/class/${classId}/subject/${subjectId}`, { params: { type } })
+      .then((r) => r.data),
   studentReport: (studentId: string) =>
     api.get<StudentGradeReport>(`/grades/student/${studentId}/report`).then((r) => r.data),
   bulk: (data: {
     subjectId: string;
+    classId?: string;
     type?: GradeType;
     period?: string;
     date?: string;
     items: { studentId: string; value: number; comment?: string }[];
-  }) => api.post('/grades/bulk', data).then((r) => r.data),
+  }) => api.post<{ saved: number }>('/grades/bulk', data).then((r) => r.data),
+  update: (id: string, data: { value?: number; comment?: string }) =>
+    api.patch(`/grades/${id}`, data).then((r) => r.data),
   remove: (id: string) => api.delete(`/grades/${id}`).then((r) => r.data),
 };
 
+// 5 balli rang
 export const gradeColor = (v: number) =>
-  v >= 85 ? 'text-green-600' : v >= 70 ? 'text-brand' : v >= 55 ? 'text-amber-600' : 'text-red-600';
+  v >= 4.5 ? 'text-green-600' : v >= 3.5 ? 'text-sky-600' : v >= 2.5 ? 'text-amber-600' : 'text-red-600';
+
+export const gradeBg = (v: number) =>
+  v >= 4.5
+    ? 'bg-green-100 text-green-700'
+    : v >= 3.5
+      ? 'bg-sky-100 text-sky-700'
+      : v >= 2.5
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-red-100 text-red-700';

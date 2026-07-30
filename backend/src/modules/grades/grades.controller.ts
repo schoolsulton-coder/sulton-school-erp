@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -12,10 +13,13 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { GradesService } from './grades.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { BulkGradeDto } from './dto/bulk-grade.dto';
+import { UpdateGradeDto } from './dto/update-grade.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+type JwtUser = { id: string; role: string };
 
 @ApiTags('grades')
 @ApiBearerAuth()
@@ -23,6 +27,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('grades')
 export class GradesController {
   constructor(private readonly service: GradesService) {}
+
+  // Ustoz/kurator o'z fanlari va sinflari (selektorlar uchun)
+  @Get('my-subjects')
+  @Permissions('grades.view')
+  mySubjects(@CurrentUser() user: JwtUser) {
+    return this.service.mySubjects(user);
+  }
 
   @Get()
   @Permissions('grades.view')
@@ -46,25 +57,36 @@ export class GradesController {
   gradebook(
     @Param('classId') classId: string,
     @Param('subjectId') subjectId: string,
+    @Query('type') type?: string,
   ) {
-    return this.service.classGradebook(classId, subjectId);
+    return this.service.classGradebook(classId, subjectId, type);
   }
 
   @Post()
   @Permissions('grades.create')
-  create(@CurrentUser('id') teacherId: string, @Body() dto: CreateGradeDto) {
-    return this.service.create(teacherId, dto);
+  create(@CurrentUser() user: JwtUser, @Body() dto: CreateGradeDto) {
+    return this.service.create(user, dto);
   }
 
   @Post('bulk')
   @Permissions('grades.create')
-  bulk(@CurrentUser('id') teacherId: string, @Body() dto: BulkGradeDto) {
-    return this.service.bulkCreate(teacherId, dto);
+  bulk(@CurrentUser() user: JwtUser, @Body() dto: BulkGradeDto) {
+    return this.service.bulkCreate(user, dto);
+  }
+
+  @Patch(':id')
+  @Permissions('grades.update')
+  update(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateGradeDto,
+  ) {
+    return this.service.update(user, id, dto);
   }
 
   @Delete(':id')
   @Permissions('grades.delete')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.service.remove(user, id);
   }
 }
