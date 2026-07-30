@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { BarChart3 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   gradesApi,
@@ -115,9 +117,14 @@ export default function GradesPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold">Baholash</h1>
-        <p className="text-sm text-slate-500">Sinf jurnali · 5 balli tizim</p>
+      <div className="mb-5 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Baholash</h1>
+          <p className="text-sm text-slate-500">Sinf jurnali · 5 balli tizim</p>
+        </div>
+        <Link href="/grades/statistics" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+          <BarChart3 size={15} /> Statistika
+        </Link>
       </div>
 
       {/* Tanlovlar */}

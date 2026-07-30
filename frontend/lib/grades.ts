@@ -50,8 +50,22 @@ export const GRADE_TYPES: { key: GradeType; label: string }[] = [
 
 export const CHORAK_OPTIONS = ['1-chorak', '2-chorak', '3-chorak', '4-chorak'];
 
+export interface ClassStats {
+  average: number;
+  count: number;
+  excellentPct: number;
+  failPct: number;
+  distribution: Record<string, number>; // {5:n,4:n,3:n,2:n,1:n}
+  students: { id: string; name: string; average: number; count: number }[];
+  bySubject: { name: string; average: number; count: number }[];
+}
+
 export const gradesApi = {
   mySubjects: () => api.get<MySubjects>('/grades/my-subjects').then((r) => r.data),
+  classStats: (
+    classId: string,
+    params: { subjectId?: string; type?: string; from?: string; to?: string; period?: string },
+  ) => api.get<ClassStats>(`/grades/class/${classId}/stats`, { params }).then((r) => r.data),
   gradebook: (classId: string, subjectId: string, type?: string) =>
     api
       .get<GradebookRow[]>(`/grades/class/${classId}/subject/${subjectId}`, { params: { type } })

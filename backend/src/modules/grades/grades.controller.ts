@@ -62,6 +62,19 @@ export class GradesController {
     return this.service.classGradebook(classId, subjectId, type);
   }
 
+  @Get('class/:classId/stats')
+  @Permissions('grades.view')
+  classStats(
+    @Param('classId') classId: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('period') period?: string,
+  ) {
+    return this.service.classStats(classId, { subjectId, type, from, to, period });
+  }
+
   @Post()
   @Permissions('grades.create')
   create(@CurrentUser() user: JwtUser, @Body() dto: CreateGradeDto) {

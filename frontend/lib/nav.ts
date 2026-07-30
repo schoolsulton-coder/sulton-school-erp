@@ -28,6 +28,7 @@ export const SECTIONS: NavSection[] = [
     icon: BookOpen,
     children: [
       { href: '/grades', label: 'Baholash', perm: 'grades.view' },
+      { href: '/grades/statistics', label: 'Baho statistikasi', perm: 'grades.view' },
       { href: '/attendance', label: 'Davomat', perm: 'attendance.view' },
       { href: '/homework', label: 'Vazifalar', perm: 'homework.view' },
       { href: '/behavior', label: 'Ahloqiy baho', perm: 'behavior.view' },

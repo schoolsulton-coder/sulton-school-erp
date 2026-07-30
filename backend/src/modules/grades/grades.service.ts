@@ -264,6 +264,73 @@ export class GradesService {
     return { overall, subjects, progress, totalGrades: grades.length };
   }
 
+  /** Sinf statistikasi: filtrlar (fan/tur/sana oralig'i) bo'yicha taqsimot, o'rtacha, reyting */
+  async classStats(
+    classId: string,
+    params: { subjectId?: string; type?: string; from?: string; to?: string; period?: string },
+  ) {
+    const where: any = { student: { classId } };
+    if (params.subjectId) where.subjectId = params.subjectId;
+    if (params.type) where.type = params.type;
+    if (params.period) where.period = params.period;
+    if (params.from || params.to) {
+      where.date = {};
+      if (params.from) where.date.gte = new Date(params.from.slice(0, 10) + 'T00:00:00.000Z');
+      if (params.to) where.date.lte = new Date(params.to.slice(0, 10) + 'T23:59:59.999Z');
+    }
+    const grades = await this.prisma.grade.findMany({
+      where,
+      select: {
+        value: true,
+        studentId: true,
+        subjectId: true,
+        student: { select: { firstName: true, lastName: true } },
+        subject: { select: { name: true } },
+      },
+    });
+
+    const distribution: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    for (const g of grades) {
+      const v = Math.round(g.value);
+      if (distribution[v] != null) distribution[v] += 1;
+    }
+
+    const byStudent = new Map<string, { id: string; name: string; values: number[] }>();
+    for (const g of grades) {
+      const s = byStudent.get(g.studentId) ?? {
+        id: g.studentId,
+        name: `${g.student.lastName} ${g.student.firstName}`,
+        values: [],
+      };
+      s.values.push(g.value);
+      byStudent.set(g.studentId, s);
+    }
+    const students = [...byStudent.values()]
+      .map((s) => ({ id: s.id, name: s.name, average: avg(s.values), count: s.values.length }))
+      .sort((a, b) => b.average - a.average);
+
+    const bySubjectMap = new Map<string, { name: string; values: number[] }>();
+    for (const g of grades) {
+      const s = bySubjectMap.get(g.subjectId) ?? { name: g.subject.name, values: [] };
+      s.values.push(g.value);
+      bySubjectMap.set(g.subjectId, s);
+    }
+    const bySubject = [...bySubjectMap.values()]
+      .map((s) => ({ name: s.name, average: avg(s.values), count: s.values.length }))
+      .sort((a, b) => b.average - a.average);
+
+    const all = grades.map((g) => g.value);
+    return {
+      average: avg(all),
+      count: all.length,
+      excellentPct: all.length ? Math.round((all.filter((v) => v >= 4.5).length / all.length) * 100) : 0,
+      failPct: all.length ? Math.round((all.filter((v) => v < 3).length / all.length) * 100) : 0,
+      distribution,
+      students,
+      bySubject,
+    };
+  }
+
   /** Sinf jurnali: bir fan (+ tur) bo'yicha o'quvchilar va baholari */
   async classGradebook(classId: string, subjectId: string, type?: string) {
     const students = await this.prisma.student.findMany({
