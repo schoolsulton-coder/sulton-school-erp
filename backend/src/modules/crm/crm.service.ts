@@ -872,10 +872,14 @@ export class CrmService implements OnModuleInit {
     search?: string;
     academicYear?: string;
     branchId?: string;
+    stageId?: string;
+    source?: string;
   }) {
     const where: any = {};
     if (params.academicYear) where.academicYear = params.academicYear;
     if (params.branchId) where.branchId = params.branchId;
+    if (params.stageId) where.stageId = params.stageId;
+    if (params.source) where.source = params.source;
     if (params.search) {
       where.OR = [
         { fullName: { contains: params.search, mode: 'insensitive' } },

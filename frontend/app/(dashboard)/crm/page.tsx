@@ -6,6 +6,7 @@ import { Bell, RefreshCw, Clock, CalendarClock, Search, Download, Plus, BarChart
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   crmApi,
+  LEAD_SOURCE_FILTERS,
   type Visit,
   type VisitStatus,
   type AdmissionRow,
@@ -292,22 +293,23 @@ function FunnelPanel() {
   const router = useRouter();
   const [view, setView] = useState<'list' | 'kanban'>('list');
   const [search, setSearch] = useState('');
-  const [branchId, setBranchId] = useState('');
+  const [stageId, setStageId] = useState('');
+  const [source, setSource] = useState('');
   const [year, setYear] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [detail, setDetail] = useState<AdmissionRow | null>(null);
 
   const { data: adm } = useQuery({
-    queryKey: ['admissions', search, branchId, year],
+    queryKey: ['admissions', search, stageId, source, year],
     queryFn: () =>
       crmApi.admissionsList({
         search: search || undefined,
-        branchId: branchId || undefined,
+        stageId: stageId || undefined,
+        source: source || undefined,
         academicYear: year || undefined,
       }),
   });
   const { data: stages } = useQuery({ queryKey: ['crm-stages'], queryFn: crmApi.stages });
-  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
 
   // Kanban drag-drop: kartani bosqichdan bosqichga o'tkazish
@@ -359,7 +361,7 @@ function FunnelPanel() {
     return Object.entries(g).sort((a, b) => b[0].localeCompare(a[0]));
   }, [rows]);
 
-  const clear = () => { setSearch(''); setBranchId(''); setYear(''); };
+  const clear = () => { setSearch(''); setStageId(''); setSource(''); setYear(''); };
   const refresh = () => qc.invalidateQueries({ queryKey: ['admissions'] });
 
   return (
@@ -391,9 +393,13 @@ function FunnelPanel() {
       {/* Filtrlar */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
         <input placeholder="Ism, gaplashgan, psixolog, izoh…" value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} min-w-[220px] flex-1`} />
-        <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={inputCls}>
-          <option value="">Barcha filiallar</option>
-          {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        <select value={stageId} onChange={(e) => setStageId(e.target.value)} className={inputCls}>
+          <option value="">Barcha statuslar</option>
+          {stages?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={source} onChange={(e) => setSource(e.target.value)} className={inputCls}>
+          <option value="">Barcha manbalar</option>
+          {LEAD_SOURCE_FILTERS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={year} onChange={(e) => setYear(e.target.value)} className={inputCls}>
           <option value="">Barcha yillar</option>

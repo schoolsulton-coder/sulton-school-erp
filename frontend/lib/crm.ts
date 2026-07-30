@@ -289,8 +289,13 @@ export const crmApi = {
     api
       .post<{ ok: boolean; reason?: string; imported: number; skipped: number; messages: number }>('/crm/sync-instagram')
       .then((r) => r.data),
-  admissionsList: (params: { search?: string; academicYear?: string; branchId?: string }) =>
-    api.get<AdmissionsResponse>('/crm/admissions', { params }).then((r) => r.data),
+  admissionsList: (params: {
+    search?: string;
+    academicYear?: string;
+    branchId?: string;
+    stageId?: string;
+    source?: string;
+  }) => api.get<AdmissionsResponse>('/crm/admissions', { params }).then((r) => r.data),
   getAdmission: (id: string) =>
     api.get<AdmissionDetailData>(`/crm/leads/${id}`).then((r) => r.data),
   updateAdmission: (id: string, data: UpdateAdmission) =>
@@ -381,7 +386,7 @@ export const crmApi = {
   }) => api.post('/crm/admissions', data).then((r) => r.data),
 };
 
-// Lead manbalari (qaerdan kelgan)
+// Lead manbalari (qaerdan kelgan) — yangi qabul formasi uchun
 export const LEAD_SOURCES = [
   'Jonli tashrif',
   'Telegram',
@@ -389,6 +394,16 @@ export const LEAD_SOURCES = [
   'Reklama',
   'Tanish orqali',
   'Sayt (sultonschool.uz)',
+];
+
+// Filtr uchun — bazada saqlanadigan aniq manba qiymatlari
+export const LEAD_SOURCE_FILTERS = [
+  'Instagram Direct',
+  'Sayt (sultonschool.uz)',
+  'Jonli tashrif',
+  'Telegram',
+  'Reklama',
+  'Tanish orqali',
 ];
 
 export const WHO_OPTIONS = ['Ota va farzand', 'Ona va farzand', 'Ota', 'Ona', 'Vasiy'];

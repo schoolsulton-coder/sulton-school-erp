@@ -255,8 +255,10 @@ export class CrmController {
     @Query('search') search?: string,
     @Query('academicYear') academicYear?: string,
     @Query('branchId') branchId?: string,
+    @Query('stageId') stageId?: string,
+    @Query('source') source?: string,
   ) {
-    return this.service.admissionsList({ search, academicYear, branchId });
+    return this.service.admissionsList({ search, academicYear, branchId, stageId, source });
   }
 
   @Post('admissions')
