@@ -907,7 +907,7 @@ export class CrmService implements OnModuleInit {
         _count: { select: { activities: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 300,
+      take: 2000,
     });
     return { total: data.length, data };
   }
