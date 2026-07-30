@@ -291,7 +291,7 @@ const kanbanTop = (name: string) => {
 function FunnelPanel() {
   const qc = useQueryClient();
   const router = useRouter();
-  const [view, setView] = useState<'list' | 'kanban'>('list');
+  const [view, setView] = useState<'list' | 'kanban'>('kanban');
   const [search, setSearch] = useState('');
   const [stageId, setStageId] = useState('');
   const [source, setSource] = useState('');
@@ -455,7 +455,16 @@ function FunnelPanel() {
                           ) : null}
                         </td>
                         <td className="px-4 py-2">{r.branch?.name ?? '—'}</td>
-                        <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${stageBadge(r.stage?.name ?? '')}`}>{r.stage?.name ?? '—'}</span></td>
+                        <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={r.stageId}
+                            onChange={(e) => moveStage.mutate({ id: r.id, stageId: e.target.value })}
+                            title="Statusni o'zgartirish"
+                            className={`cursor-pointer rounded-full px-2 py-1 text-xs font-medium outline-none ring-1 ring-inset ring-black/5 ${stageBadge(r.stage?.name ?? '')}`}
+                          >
+                            {stages?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </td>
                         <td className="whitespace-nowrap px-4 py-2 text-slate-500">{r.crmUpdatedAt ? fmtShort(r.crmUpdatedAt) : '—'}</td>
                         <td className="whitespace-nowrap px-4 py-2">{r.class ? `${r.class.name} (${r.class.language ?? '—'})` : '—'}</td>
                         <td className="px-4 py-2">{r.manager?.fullName ?? '—'}</td>

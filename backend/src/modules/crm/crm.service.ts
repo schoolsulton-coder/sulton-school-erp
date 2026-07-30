@@ -453,6 +453,8 @@ export class CrmService implements OnModuleInit {
   ) {
     if (!/tasdiq/i.test(currentStageName ?? '')) return; // hozir Tasdiqlanmaganda emas
     if (/tasdiq/i.test(targetStageName ?? '')) return; // hali ham Tasdiqlanmaganga
+    // "Vakansiya bo'yicha" — shartnoma tuzilmaydi, majburiy maydonlarsiz o'tkaziladi
+    if (/vakan/i.test(targetStageName ?? '')) return;
     const missing: string[] = [];
     if (!vals.fullName?.trim()) missing.push('Talaba ismi');
     if (!vals.guardianName?.trim()) missing.push('Vasiy ismi');

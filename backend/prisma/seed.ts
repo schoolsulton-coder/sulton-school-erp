@@ -183,6 +183,12 @@ async function main() {
       data: { name: 'Tasdiqlanmagan', order: -1, color: '#f59e0b' },
     });
   }
+  // "Vakansiya bo'yicha" — shartnoma tuzmaydigan leadlar (oxirida, order 5)
+  if (!(await prisma.leadStage.findFirst({ where: { name: "Vakansiya bo'yicha" } }))) {
+    await prisma.leadStage.create({
+      data: { name: "Vakansiya bo'yicha", order: 5, color: '#6366f1' },
+    });
+  }
 
   // 7) Sozlamalar reference ma'lumotlari (Filial, Psixolog, O'quv yili)
   if ((await prisma.branch.count()) === 0) {
