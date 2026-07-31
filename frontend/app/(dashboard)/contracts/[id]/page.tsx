@@ -4,8 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, FileText, Pencil, Trash2, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronDown, FileText, Pencil, Trash2, Plus, X } from 'lucide-react';
 import { contractsApi } from '@/lib/contracts';
+import { contractTemplatesApi } from '@/lib/contract-templates';
 import { crmApi, type ClassForm } from '@/lib/crm';
 
 const num = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -45,8 +46,10 @@ export default function ContractDetailPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editInst, setEditInst] = useState<any | null>(null);
+  const [tplOpen, setTplOpen] = useState(false);
 
   const { data: c } = useQuery({ queryKey: ['contract', id], queryFn: () => contractsApi.get(id) as Promise<any> });
+  const { data: templates } = useQuery({ queryKey: ['contract-templates'], queryFn: contractTemplatesApi.list });
 
   const del = useMutation({
     mutationFn: () => contractsApi.remove(id),
@@ -99,7 +102,27 @@ export default function ContractDetailPage() {
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Shartnoma davri</div>
             <div className="mt-1 font-medium text-slate-700">{fmtDate(c.startDate)} — {fmtDate(c.endDate)}</div>
             <div className="mt-3 flex flex-wrap justify-end gap-1.5">
-              <button onClick={() => contractsApi.openPdf(id, c.number)} title="PDF" className="rounded-lg border border-slate-200 p-2 text-brand hover:bg-slate-50"><FileText size={16} /></button>
+              <button onClick={() => contractsApi.openPdf(id, c.number)} title="Standart PDF" className="rounded-lg border border-slate-200 p-2 text-brand hover:bg-slate-50"><FileText size={16} /></button>
+              <div className="relative">
+                <button onClick={() => setTplOpen((o) => !o)} title="Shablon bo'yicha PDF" className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 p-2 text-brand hover:bg-slate-50">
+                  <FileText size={16} /><ChevronDown size={12} />
+                </button>
+                {tplOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setTplOpen(false)} />
+                    <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-1 text-left shadow-lg">
+                      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Shablon bo'yicha PDF</div>
+                      {!templates?.length ? (
+                        <Link href="/settings/contract-templates" className="block rounded-lg px-2 py-2 text-sm text-slate-500 hover:bg-slate-50">Shablon yo'q — qo'shish →</Link>
+                      ) : (
+                        templates.map((t) => (
+                          <button key={t.id} onClick={() => { setTplOpen(false); contractTemplatesApi.openPdf(t.id, id, c.number); }} className="block w-full truncate rounded-lg px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">{t.name}</button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               <button onClick={() => setEditOpen(true)} title="Tahrirlash" className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><Pencil size={16} /></button>
               <button
                 onClick={() => { if (confirm(`${c.number} shartnomasini o'chirasizmi? Barcha oylar va to'lovlar ham o'chadi. Bu amalni qaytarib bo'lmaydi.`)) del.mutate(); }}

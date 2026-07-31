@@ -577,6 +577,18 @@ model Contract {
   @@map("contracts")
 }
 
+/// DOCX'dan yuklab olingan va ERP ichida tahrirlanadigan shartnoma shabloni.
+/// html — mammoth orqali DOCX'dan aylantirilgan, {{token}} o'rin egallovchilar bilan.
+model ContractTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  html      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contract_templates")
+}
+
 model ContractInstallment {
   id         String            @id @default(uuid())
   contractId String

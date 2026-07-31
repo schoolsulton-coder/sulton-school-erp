@@ -9,13 +9,19 @@ import puppeteer from 'puppeteer';
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
 
-  async fromHtml(html: string): Promise<Buffer> {
+  async fromHtml(
+    html: string,
+    opts?: { javascript?: boolean },
+  ): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
       const page = await browser.newPage();
+      // Foydalanuvchi (xodim) yaratgan shablon HTML uchun JS o'chiriladi —
+      // server tomonda skript ishga tushmasin (himoya).
+      if (opts?.javascript === false) await page.setJavaScriptEnabled(false);
       await page.setContent(html, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',

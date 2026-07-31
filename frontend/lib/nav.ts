@@ -42,6 +42,7 @@ export const SECTIONS: NavSection[] = [
       { href: '/users', label: 'Foydalanuvchilar', perm: 'users.view' },
       { href: '/settings/subjects', label: 'Fanlar', perm: 'classes.view' },
       { href: '/settings/categories', label: 'Xarajat kategoriyalari', perm: 'finance.view' },
+      { href: '/settings/contract-templates', label: 'Shartnoma shablonlari', perm: 'contracts.view' },
       { href: '/notifications', label: 'Bildirishnomalar', perm: 'notifications.view' },
       { href: '/esmaktab', label: 'E-maktab', perm: 'reports.view' },
     ],

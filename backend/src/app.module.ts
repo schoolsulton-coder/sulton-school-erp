@@ -8,6 +8,7 @@ import { StudentsModule } from './modules/students/students.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { ClassesModule } from './modules/classes/classes.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
+import { ContractTemplatesModule } from './modules/contract-templates/contract-templates.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { UsersModule } from './modules/users/users.module';
@@ -43,6 +44,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     CrmModule,
     ClassesModule,
     ContractsModule,
+    ContractTemplatesModule,
     FinanceModule,
     ExpensesModule,
     UsersModule,
