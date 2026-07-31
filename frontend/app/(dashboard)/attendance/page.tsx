@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Search } from 'lucide-react';
 import { attendanceApi, ATT_STATUS, type AttStatus, type ClassDayRow } from '@/lib/attendance';
 import { useAuthStore } from '@/store/auth';
+import { StudentDetailModal } from '@/components/student-detail';
 
 // Maktab (Toshkent) kuni — backend bilan bir xil
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
@@ -22,6 +23,7 @@ export default function AttendancePage() {
   const [date, setDate] = useState(today());
   const [studentSearch, setStudentSearch] = useState('');
   const [marks, setMarks] = useState<Record<string, AttStatus>>({});
+  const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
 
   const { data: my } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
   const { data: rows } = useQuery({
@@ -141,7 +143,7 @@ export default function AttendancePage() {
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             {filtered.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 last:border-0">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.lastName} {r.firstName}</span>
+                <button onClick={() => setDetail({ id: r.id, name: `${r.lastName} ${r.firstName}` })} className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-800 hover:text-brand hover:underline">{r.lastName} {r.firstName}</button>
                 <div className="flex shrink-0 gap-1">
                   {ORDER.map((st) => {
                     const active = marks[r.id] === st;
@@ -178,6 +180,8 @@ export default function AttendancePage() {
           )}
         </>
       )}
+
+      {detail && <StudentDetailModal studentId={detail.id} name={detail.name} className={my?.classes.find((c) => c.id === classId)?.name} onClose={() => setDetail(null)} />}
     </div>
   );
 }

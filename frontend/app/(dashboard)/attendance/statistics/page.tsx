@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
 import { attendanceApi } from '@/lib/attendance';
+import { StudentDetailModal } from '@/components/student-detail';
 
 const sel = 'rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand';
 const rateColor = (v: number) => (v >= 90 ? 'text-green-600' : v >= 75 ? 'text-sky-600' : v >= 60 ? 'text-amber-600' : 'text-red-600');
@@ -13,6 +14,7 @@ export default function AttendanceStatsPage() {
   const [classId, setClassId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
 
   const { data: my } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
   const { data: stats } = useQuery({
@@ -103,7 +105,7 @@ export default function AttendanceStatsPage() {
                     {stats.students?.map((s, i) => (
                       <tr key={s.id} className="border-t border-slate-100 first:border-0">
                         <td className="w-10 px-4 py-2 text-slate-400">{i + 1}</td>
-                        <td className="px-4 py-2 font-medium">{s.name}</td>
+                        <td className="px-4 py-2"><button onClick={() => setDetail({ id: s.id, name: s.name })} className="font-medium text-slate-800 hover:text-brand hover:underline">{s.name}</button></td>
                         <td className="px-4 py-2 text-right text-slate-400">{s.present}/{s.total}</td>
                         <td className={`w-16 px-4 py-2 text-right text-base font-bold ${rateColor(s.rate)}`}>{s.rate}%</td>
                       </tr>
@@ -115,6 +117,7 @@ export default function AttendanceStatsPage() {
           </div>
         </div>
       )}
+      {detail && <StudentDetailModal studentId={detail.id} name={detail.name} onClose={() => setDetail(null)} />}
     </div>
   );
 }

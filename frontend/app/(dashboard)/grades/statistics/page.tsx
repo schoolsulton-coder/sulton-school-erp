@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
 import { gradesApi, GRADE_TYPES, gradeColor, gradeBg } from '@/lib/grades';
+import { StudentDetailModal } from '@/components/student-detail';
 
 const sel = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
 
@@ -14,6 +15,7 @@ export default function GradeStatsPage() {
   const [type, setType] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
 
   const { data: my } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
   const subjectOptions = useMemo(() => {
@@ -158,7 +160,7 @@ export default function GradeStatsPage() {
                 {stats.students.map((s, i) => (
                   <tr key={s.id} className="border-t border-slate-100">
                     <td className="px-4 py-2 text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-2 font-medium">{s.name}</td>
+                    <td className="px-4 py-2"><button onClick={() => setDetail({ id: s.id, name: s.name })} className="font-medium text-slate-800 hover:text-brand hover:underline">{s.name}</button></td>
                     <td className="px-4 py-2 text-center text-slate-500">{s.count}</td>
                     <td className={`px-4 py-2 text-center text-base font-bold ${gradeColor(s.average)}`}>{s.average}</td>
                   </tr>
@@ -168,6 +170,7 @@ export default function GradeStatsPage() {
           </div>
         </div>
       )}
+      {detail && <StudentDetailModal studentId={detail.id} name={detail.name} onClose={() => setDetail(null)} />}
     </div>
   );
 }

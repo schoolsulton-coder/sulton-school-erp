@@ -15,6 +15,7 @@ import {
   type GradeCell,
 } from '@/lib/grades';
 import { useAuthStore } from '@/store/auth';
+import { StudentDetailModal } from '@/components/student-detail';
 
 // Maktab (Toshkent) kuni — backend schoolToday() bilan bir xil bo'lishi shart
 // (aks holda ustozning qurilmasi boshqa zonada bo'lsa, saqlash rad etiladi)
@@ -37,6 +38,7 @@ export default function GradesPage() {
   const [studentSearch, setStudentSearch] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
   const [edit, setEdit] = useState<GradeCell | null>(null);
+  const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   const { data: my } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
@@ -214,7 +216,11 @@ export default function GradesPage() {
                 {filteredRows.map((s, idx) => (
                   <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
                     <td className="hidden px-3 py-2 text-slate-400 sm:table-cell">{idx + 1}</td>
-                    <td className="px-3 py-2 font-medium">{s.lastName} {s.firstName}</td>
+                    <td className="px-3 py-2">
+                      <button onClick={() => setDetail({ id: s.id, name: `${s.lastName} ${s.firstName}` })} className="text-left font-medium text-slate-800 hover:text-brand hover:underline">
+                        {s.lastName} {s.firstName}
+                      </button>
+                    </td>
                     <td className="hidden px-3 py-2 md:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {s.grades.slice(0, 12).map((g) => (
@@ -271,6 +277,7 @@ export default function GradesPage() {
 
       {/* Baho tahrirlash / o'chirish */}
       {edit && <EditGradeModal grade={edit} canDelete={can('grades.delete')} onClose={() => setEdit(null)} onSave={(v) => patch.mutate({ id: edit.id, value: v })} onDelete={() => del.mutate(edit.id)} busy={patch.isPending || del.isPending} />}
+      {detail && <StudentDetailModal studentId={detail.id} name={detail.name} className={my?.classes.find((c) => c.id === classId)?.name} onClose={() => setDetail(null)} />}
     </div>
   );
 }
