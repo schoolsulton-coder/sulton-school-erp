@@ -16,11 +16,9 @@ import {
 } from '@/lib/grades';
 import { useAuthStore } from '@/store/auth';
 
-const today = () => {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; // mahalliy kun
-};
+// Maktab (Toshkent) kuni — backend schoolToday() bilan bir xil bo'lishi shart
+// (aks holda ustozning qurilmasi boshqa zonada bo'lsa, saqlash rad etiladi)
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
 const fmtDay = (iso: string) => {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '' : `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -116,7 +114,7 @@ export default function GradesPage() {
   const sel = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="mb-5 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">Baholash</h1>
@@ -128,34 +126,41 @@ export default function GradesPage() {
       </div>
 
       {/* Tanlovlar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-        <select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(''); }} className={sel}>
-          <option value="">Sinf</option>
-          {my?.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={sel} disabled={!classId && !my?.canGradeAll}>
-          <option value="">Fan</option>
-          {subjectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-
-        {/* Baho turi — pill tugmalar */}
-        <div className="flex overflow-hidden rounded-lg border border-slate-300">
+      <div className="mb-4 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(''); }} className={`${sel} flex-1 sm:flex-none`}>
+            <option value="">Sinf</option>
+            {my?.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={`${sel} flex-1 sm:flex-none`} disabled={!classId && !my?.canGradeAll}>
+            <option value="">Fan</option>
+            {subjectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={my ? !my.canGradeAll : true}
+            title={my && !my.canGradeAll ? 'Ustoz faqat bugungi kunga baho qo\'yadi' : ''}
+            className={`${sel} disabled:bg-slate-50 disabled:text-slate-500`}
+          />
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} className={sel}>
+            <option value="">Chorak</option>
+            {CHORAK_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {/* Baho turi — pill tugmalar (mobilda gorizontal aylanadi) */}
+        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
           {GRADE_TYPES.map((t) => (
             <button
               key={t.key}
               onClick={() => setType(t.key)}
-              className={`px-3 py-2 text-sm font-medium ${type === t.key ? 'bg-brand text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+              className={`shrink-0 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium ${type === t.key ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
             >
               {t.label}
             </button>
           ))}
         </div>
-
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={sel} />
-        <select value={period} onChange={(e) => setPeriod(e.target.value)} className={sel}>
-          <option value="">Chorak (ixtiyoriy)</option>
-          {CHORAK_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
       </div>
 
       {!classId || !subjectId ? (
@@ -169,7 +174,7 @@ export default function GradesPage() {
             <div className="mb-3 flex items-center gap-2 text-sm">
               <span className="text-slate-500">Hammaga:</span>
               {['5', '4', '3', '2', '1'].map((v) => (
-                <button key={v} onClick={() => fillAll(v)} className={`h-8 w-8 rounded-lg font-bold ${gradeBg(Number(v))} hover:ring-2 hover:ring-brand/30`}>{v}</button>
+                <button key={v} onClick={() => fillAll(v)} className={`h-10 w-10 rounded-lg font-bold sm:h-8 sm:w-8 ${gradeBg(Number(v))} hover:ring-2 hover:ring-brand/30`}>{v}</button>
               ))}
               <button onClick={() => setValues({})} className="ml-1 rounded-lg border border-slate-200 px-3 py-1.5 text-slate-500 hover:bg-slate-50">Tozalash</button>
             </div>
@@ -179,19 +184,19 @@ export default function GradesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
                 <tr>
-                  <th className="w-8 px-3 py-2.5">#</th>
+                  <th className="hidden w-8 px-3 py-2.5 sm:table-cell">#</th>
                   <th className="px-3 py-2.5">O&apos;quvchi</th>
-                  <th className="px-3 py-2.5">So&apos;nggi baholar ({GRADE_TYPES.find((t) => t.key === type)?.label})</th>
-                  <th className="w-20 px-3 py-2.5 text-center">O&apos;rtacha</th>
-                  <th className="w-28 px-3 py-2.5 text-center">Baho ({fmtDay(date)})</th>
+                  <th className="hidden px-3 py-2.5 md:table-cell">So&apos;nggi baholar ({GRADE_TYPES.find((t) => t.key === type)?.label})</th>
+                  <th className="w-16 px-2 py-2.5 text-center sm:w-20">O&apos;rtacha</th>
+                  <th className="w-20 px-2 py-2.5 text-center sm:w-28">Baho ({fmtDay(date)})</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((s, idx) => (
                   <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
-                    <td className="px-3 py-2 text-slate-400">{idx + 1}</td>
+                    <td className="hidden px-3 py-2 text-slate-400 sm:table-cell">{idx + 1}</td>
                     <td className="px-3 py-2 font-medium">{s.lastName} {s.firstName}</td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-3 py-2 md:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {s.grades.slice(0, 12).map((g) => (
                           <button
@@ -207,8 +212,8 @@ export default function GradesPage() {
                         {!s.grades.length && <span className="text-xs text-slate-400">—</span>}
                       </div>
                     </td>
-                    <td className={`px-3 py-2 text-center text-base font-bold ${gradeColor(s.average)}`}>{s.average || '—'}</td>
-                    <td className="px-3 py-2 text-center">
+                    <td className={`px-2 py-2 text-center text-base font-bold ${gradeColor(s.average)}`}>{s.average || '—'}</td>
+                    <td className="px-2 py-2 text-center">
                       <input
                         ref={(el) => { inputs.current[idx] = el; }}
                         type="text"
@@ -219,7 +224,7 @@ export default function GradesPage() {
                         onChange={(e) => setVal(s.id, e.target.value)}
                         onKeyDown={(e) => onKey(e, idx)}
                         onFocus={(e) => e.target.select()}
-                        className="h-9 w-12 rounded-lg border border-slate-300 text-center text-base font-semibold outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-slate-50 disabled:text-slate-300"
+                        className="h-11 w-14 rounded-lg border border-slate-300 text-center text-lg font-semibold outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-slate-50 disabled:text-slate-300 sm:h-9 sm:w-12 sm:text-base"
                       />
                     </td>
                   </tr>

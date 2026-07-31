@@ -28,9 +28,10 @@ function stripUstoz(s: string): string {
 }
 
 const SCHEDULE_BTN = '📅 Dars jadvali';
-/** Ulangandan keyin doimiy menyu tugmasi */
+const GRADES_BTN = '📊 Baholar';
+/** Ulangandan keyin doimiy menyu tugmalari */
 const MENU_KEYBOARD = {
-  keyboard: [[{ text: SCHEDULE_BTN }]],
+  keyboard: [[{ text: SCHEDULE_BTN }, { text: GRADES_BTN }]],
   resize_keyboard: true,
 };
 
@@ -67,7 +68,7 @@ export class TelegramService implements OnModuleInit {
       });
       if (link) {
         return ctx.reply(
-          'Xush kelibsiz! 👋\n\nFarzandingiz haftalik dars jadvalini olish uchun quyidagi tugmani bosing 👇',
+          'Xush kelibsiz! 👋\n\nFarzandingiz dars jadvali yoki baholarini olish uchun quyidagi tugmalardan birini bosing 👇',
           { reply_markup: MENU_KEYBOARD },
         );
       }
@@ -125,6 +126,10 @@ export class TelegramService implements OnModuleInit {
     this.bot.hears(SCHEDULE_BTN, (ctx: any) => this.handleScheduleRequest(ctx));
     this.bot.command('jadval', (ctx: any) => this.handleScheduleRequest(ctx));
 
+    // Baholar — tugma yoki /baholar buyrug'i
+    this.bot.hears(GRADES_BTN, (ctx: any) => this.handleGradesRequest(ctx));
+    this.bot.command('baholar', (ctx: any) => this.handleGradesRequest(ctx));
+
     // Farzand tanlangach — uning jadvalini yuboramiz
     this.bot.action(/^sched:(.+)$/, async (ctx: any) => {
       const studentId: string = ctx.match[1];
@@ -141,6 +146,24 @@ export class TelegramService implements OnModuleInit {
         return ctx.reply('Bu o‘quvchi sizga biriktirilmagan.');
       }
       return this.sendChildSchedule(ctx, student);
+    });
+
+    // Farzand tanlangach — uning baholarini yuboramiz
+    this.bot.action(/^grades:(.+)$/, async (ctx: any) => {
+      const studentId: string = ctx.match[1];
+      const link = await this.prisma.telegramLink.findFirst({
+        where: { chatId: String(ctx.chat.id) },
+      });
+      await ctx.answerCbQuery().catch(() => undefined);
+      if (!link) {
+        return ctx.reply('Avval telefon raqamingizni ulang — /start');
+      }
+      const students = await this.getStudentsForUser(link.userId);
+      const student = students.find((s) => s.id === studentId);
+      if (!student) {
+        return ctx.reply('Bu o‘quvchi sizga biriktirilmagan.');
+      }
+      return this.sendChildGrades(ctx, student);
     });
 
     // Token'ni tekshirish va bot @username'ini olish (deep-link uchun).
@@ -161,6 +184,7 @@ export class TelegramService implements OnModuleInit {
       .setMyCommands([
         { command: 'start', description: 'Boshlash / botga ulanish' },
         { command: 'jadval', description: '📅 Farzand dars jadvali' },
+        { command: 'baholar', description: '📊 Farzand baholari' },
       ])
       .catch(() => undefined);
 
@@ -194,6 +218,82 @@ export class TelegramService implements OnModuleInit {
     return ctx.reply('Qaysi farzandingiz uchun dars jadvali kerak?', {
       reply_markup: { inline_keyboard },
     });
+  }
+
+  // ===== Baholar oqimi =====
+
+  private async handleGradesRequest(ctx: any) {
+    const link = await this.prisma.telegramLink.findFirst({
+      where: { chatId: String(ctx.chat.id) },
+    });
+    if (!link) {
+      return ctx.reply('Avval telefon raqamingizni ulang — /start');
+    }
+    const students = await this.getStudentsForUser(link.userId);
+    if (students.length === 0) {
+      return ctx.reply('Sizga biriktirilgan farzand topilmadi. Administrator bilan bog‘laning.');
+    }
+    if (students.length === 1) {
+      return this.sendChildGrades(ctx, students[0]);
+    }
+    const inline_keyboard = students.map((s) => [
+      {
+        text: `${s.lastName} ${s.firstName}${s.class ? ` — ${s.class.name}` : ''}`,
+        callback_data: `grades:${s.id}`,
+      },
+    ]);
+    return ctx.reply('Qaysi farzandingiz baholari kerak?', {
+      reply_markup: { inline_keyboard },
+    });
+  }
+
+  private async sendChildGrades(ctx: any, student: { id: string; firstName: string; lastName: string }) {
+    const text = await this.buildGradesText(student.id, `${student.lastName} ${student.firstName}`);
+    // Shu farzand jadvaliga tez o'tish uchun inline tugma (menyu tugmalari pastda saqlanadi)
+    return ctx.reply(text, {
+      reply_markup: { inline_keyboard: [[{ text: '📅 Shu farzand jadvali', callback_data: `sched:${student.id}` }]] },
+    });
+  }
+
+  /** O'quvchining fan bo'yicha baholari (kunlik o'rtacha + chorak/yillik alohida) */
+  private async buildGradesText(studentId: string, studentName: string) {
+    const grades = await this.prisma.grade.findMany({
+      where: { studentId },
+      include: { subject: { select: { name: true } } },
+      orderBy: { date: 'desc' },
+    });
+    let text = `👦 ${studentName}\n📊 Fanlar bo‘yicha baholar`;
+    if (grades.length === 0) {
+      return text + '\n\nHozircha baho qo‘yilmagan.';
+    }
+    const PERIOD = ['QUARTER', 'YEAR', 'SEMESTER'];
+    const bySubject = new Map<
+      string,
+      { name: string; daily: number[]; recent: number[]; period: string[] }
+    >();
+    for (const g of grades) {
+      const s = bySubject.get(g.subjectId) ?? { name: g.subject.name, daily: [], recent: [], period: [] };
+      if (PERIOD.includes(g.type)) {
+        const label = g.type === 'YEAR' ? 'Yillik' : g.type === 'SEMESTER' ? 'Yarim yillik' : g.period || 'Chorak';
+        s.period.push(`${label}: ${g.value}`);
+      } else {
+        s.daily.push(g.value);
+        if (s.recent.length < 10) s.recent.push(g.value);
+      }
+      bySubject.set(g.subjectId, s);
+    }
+    const subjects = [...bySubject.values()].sort((a, b) => a.name.localeCompare(b.name));
+    for (const s of subjects) {
+      text += `\n\n📘 ${s.name}`;
+      if (s.daily.length) {
+        const av = Math.round((s.daily.reduce((a, b) => a + b, 0) / s.daily.length) * 10) / 10;
+        text += ` — o‘rtacha: ${av}\n${[...s.recent].reverse().join(' ')}`;
+      }
+      if (s.period.length) {
+        text += `\n🎯 ${[...s.period].reverse().join(' · ')}`;
+      }
+    }
+    return text;
   }
 
   /**
@@ -268,7 +368,10 @@ export class TelegramService implements OnModuleInit {
       student.class.name,
       `${student.lastName} ${student.firstName}`,
     );
-    return ctx.reply(text, { reply_markup: MENU_KEYBOARD });
+    // Shu farzand baholariga tez o'tish uchun inline tugma
+    return ctx.reply(text, {
+      reply_markup: { inline_keyboard: [[{ text: '📊 Shu farzand baholari', callback_data: `grades:${student.id}` }]] },
+    });
   }
 
   /** Sinf bo'yicha haftalik jadvalni matn ko'rinishida tayyorlaydi */

@@ -49,8 +49,17 @@ export class NotificationsService {
     }
   }
 
-  /** O'quvchining barcha vasiylariga xabar (xatolar bloklamaydi) */
-  async notifyGuardians(studentId: string, title: string, body: string) {
+  /**
+   * O'quvchining barcha vasiylariga xabar (xatolar bloklamaydi).
+   * telegramOnly=true — Telegram ulanmagan vasiyga SMS yuborilmaydi
+   * (baho kabi tez-tez keladigan xabarlar uchun — SMS xarajati/spam bo'lmasin).
+   */
+  async notifyGuardians(
+    studentId: string,
+    title: string,
+    body: string,
+    opts?: { telegramOnly?: boolean },
+  ) {
     try {
       const links = await this.prisma.studentGuardian.findMany({
         where: { studentId },
@@ -67,7 +76,7 @@ export class NotificationsService {
             `${title}\n${body}`,
           );
           await this.record(g.user.id, 'TELEGRAM', title, body, ok);
-        } else if (g.phone) {
+        } else if (g.phone && !opts?.telegramOnly) {
           const ok = await this.sms.send(g.phone, `${title}: ${body}`);
           await this.record(g.user?.id ?? null, 'SMS', title, body, ok);
         }

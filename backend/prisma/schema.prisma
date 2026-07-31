@@ -104,10 +104,11 @@ enum EmployeeStatus {
 
 enum GradeType {
   DAILY         // kunlik
+  HOMEWORK      // uyga vazifa
   QUARTER       // chorak
   SEMESTER      // yarim yillik
   YEAR          // yillik
-  EXAM          // imtihon
+  EXAM          // imtihon (nazorat)
 }
 
 enum AttendanceStatus {

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { BulkGradeDto } from './dto/bulk-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
@@ -13,17 +14,40 @@ type JwtUser = { id: string; role: string };
 const avg = (nums: number[]) =>
   nums.length ? Math.round((nums.reduce((s, n) => s + n, 0) / nums.length) * 10) / 10 : 0;
 
-// Hamma fanlarga baho qo'ya oladigan rollar (ustoz — faqat o'z fani)
+// Hamma fanlarga baho qo'ya oladigan rollar (ustoz — faqat o'z fani, faqat bugun)
 const GRADE_ALL_ROLES = ['superadmin', 'akademik', 'admin'];
 // Chorak/Yillik — "period" (chorak) bo'yicha ajratiladi; qolganlari — kun bo'yicha
 const PERIOD_TYPES = ['QUARTER', 'YEAR'];
 
+// "O'qiyotgan" o'quvchi — shartnomasi shu holatlardan birida (ketgan/bekor/lead emas).
+// To'liq to'langan shartnoma avtomat COMPLETED bo'ladi — u ham baholanadi.
+const ENROLLED_CONTRACT: any = {
+  some: { status: { in: ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'] } },
+};
+
+const GRADE_TYPE_LABEL: Record<string, string> = {
+  DAILY: 'Kunlik',
+  HOMEWORK: 'Uyga vazifa',
+  EXAM: 'Nazorat',
+  QUARTER: 'Chorak',
+  YEAR: 'Yillik',
+  SEMESTER: 'Yarim yillik',
+};
+
 @Injectable()
 export class GradesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   private canGradeAll(role?: string) {
     return !!role && GRADE_ALL_ROLES.includes(role);
+  }
+
+  /** Maktab (Toshkent) mahalliy sanasi "YYYY-MM-DD" */
+  private schoolToday(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
   }
 
   /** Berilgan kun uchun oraliq + saqlash sanasi (kun o'rtasi) */
@@ -140,12 +164,14 @@ export class GradesService {
       : { studentId: args.studentId, subjectId: args.subjectId, type: args.type as any, date: { gte: start, lte: end } };
     const ex = await tx.grade.findFirst({ where, orderBy: { date: 'desc' } });
     if (ex) {
-      return tx.grade.update({
+      const changed = ex.value !== args.value;
+      const grade = await tx.grade.update({
         where: { id: ex.id },
         data: { value: args.value, comment: args.comment, teacherId: user.id, period: args.period ?? null },
       });
+      return { grade, changed };
     }
-    return tx.grade.create({
+    const grade = await tx.grade.create({
       data: {
         studentId: args.studentId,
         subjectId: args.subjectId,
@@ -157,25 +183,61 @@ export class GradesService {
         date: store,
       },
     });
+    return { grade, changed: true };
+  }
+
+  /** Baho qo'yilganda vasiyga Telegram (best-effort, jarayonni bloklamaydi) */
+  private async notifyGrades(
+    subjectId: string,
+    type: string,
+    items: { studentId: string; value: number }[],
+  ) {
+    const subj = await this.prisma.subject.findUnique({ where: { id: subjectId }, select: { name: true } });
+    const subjName = subj?.name ?? 'Fan';
+    const typeLabel = GRADE_TYPE_LABEL[type] ?? type;
+    for (const it of items) {
+      await this.notifications.notifyGuardians(
+        it.studentId,
+        '📊 Yangi baho',
+        `${subjName} (${typeLabel}): ${it.value} ball`,
+        { telegramOnly: true },
+      );
+    }
+  }
+
+  /** Ustoz faqat bugungi kunga baho qo'ya oladi (akademik — istalgan kun) */
+  private assertTeacherToday(user: JwtUser, day: string) {
+    if (!this.canGradeAll(user.role) && day !== this.schoolToday()) {
+      throw new ForbiddenException("Ustoz faqat bugungi kunga baho qo'ya oladi");
+    }
   }
 
   async create(user: JwtUser, dto: CreateGradeDto) {
     const st = await this.prisma.student.findUnique({ where: { id: dto.studentId }, select: { classId: true } });
     await this.assertCanGrade(user, dto.subjectId, st?.classId ?? undefined);
-    return this.upsertGrade(this.prisma, user, {
+    const type = dto.type ?? 'DAILY';
+    const day = dto.date ? dto.date.slice(0, 10) : this.schoolToday();
+    this.assertTeacherToday(user, day);
+    const r = await this.upsertGrade(this.prisma, user, {
       studentId: dto.studentId,
       subjectId: dto.subjectId,
       value: dto.value,
-      type: dto.type ?? 'DAILY',
+      type,
       period: dto.period,
       comment: dto.comment,
-      date: dto.date,
+      date: day,
     });
+    if (r.changed) {
+      this.notifyGrades(dto.subjectId, type, [{ studentId: dto.studentId, value: dto.value }]).catch(() => undefined);
+    }
+    return r.grade;
   }
 
   /** Butun sinfni bir fan+tur bo'yicha baholash — mavjudlarini yangilaydi (dublikatsiz) */
   async bulkCreate(user: JwtUser, dto: BulkGradeDto) {
     await this.assertCanGrade(user, dto.subjectId, dto.classId);
+    const day = dto.date ? dto.date.slice(0, 10) : this.schoolToday();
+    this.assertTeacherToday(user, day);
     // O'quvchilar haqiqatan shu sinfga tegishlimi? (ustoz uchun)
     if (!this.canGradeAll(user.role) && dto.classId && dto.items.length) {
       const ids = [...new Set(dto.items.map((i) => i.studentId))];
@@ -185,19 +247,24 @@ export class GradesService {
       }
     }
     const type = dto.type ?? 'DAILY';
+    const changed: { studentId: string; value: number }[] = [];
     await this.prisma.$transaction(async (tx) => {
       for (const i of dto.items) {
-        await this.upsertGrade(tx, user, {
+        const r = await this.upsertGrade(tx, user, {
           studentId: i.studentId,
           subjectId: dto.subjectId,
           value: i.value,
           type,
           period: dto.period,
           comment: i.comment,
-          date: dto.date,
+          date: day,
         });
+        if (r.changed) changed.push({ studentId: i.studentId, value: i.value });
       }
     });
+    if (changed.length) {
+      this.notifyGrades(dto.subjectId, type, changed).catch(() => undefined);
+    }
     return { saved: dto.items.length };
   }
 
@@ -205,16 +272,26 @@ export class GradesService {
     const g = await this.prisma.grade.findUnique({ where: { id } });
     if (!g) throw new NotFoundException('Baho topilmadi');
     await this.assertCanGrade(user, g.subjectId);
-    if (!this.canGradeAll(user.role) && g.teacherId !== user.id) {
-      throw new ForbiddenException("Faqat o'zingiz qo'ygan bahoni tahrirlaysiz");
+    if (!this.canGradeAll(user.role)) {
+      if (g.teacherId !== user.id) {
+        throw new ForbiddenException("Faqat o'zingiz qo'ygan bahoni tahrirlaysiz");
+      }
+      const gradeDay = g.date.toISOString().slice(0, 10);
+      if (gradeDay !== this.schoolToday()) {
+        throw new ForbiddenException('Ustoz faqat bugungi baholarni tahrirlaydi');
+      }
     }
-    return this.prisma.grade.update({
+    const updated = await this.prisma.grade.update({
       where: { id },
       data: {
         ...(dto.value != null ? { value: dto.value } : {}),
         ...(dto.comment !== undefined ? { comment: dto.comment } : {}),
       },
     });
+    if (dto.value != null && dto.value !== g.value) {
+      this.notifyGrades(g.subjectId, g.type, [{ studentId: g.studentId, value: dto.value }]).catch(() => undefined);
+    }
+    return updated;
   }
 
   async remove(user: JwtUser, id: string) {
@@ -269,7 +346,7 @@ export class GradesService {
     classId: string,
     params: { subjectId?: string; type?: string; from?: string; to?: string; period?: string },
   ) {
-    const where: any = { student: { classId } };
+    const where: any = { student: { classId, contracts: ENROLLED_CONTRACT } };
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.type) where.type = params.type;
     if (params.period) where.period = params.period;
@@ -334,7 +411,8 @@ export class GradesService {
   /** Sinf jurnali: bir fan (+ tur) bo'yicha o'quvchilar va baholari */
   async classGradebook(classId: string, subjectId: string, type?: string) {
     const students = await this.prisma.student.findMany({
-      where: { classId, status: 'ACTIVE' },
+      // Faqat o'qiyotgan (shartnomasi faol/to'langan/band) o'quvchilar jurnalga kiradi
+      where: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT },
       select: {
         id: true,
         firstName: true,

@@ -1,6 +1,6 @@
 import { api } from './api';
 
-export type GradeType = 'DAILY' | 'QUARTER' | 'SEMESTER' | 'YEAR' | 'EXAM';
+export type GradeType = 'DAILY' | 'HOMEWORK' | 'QUARTER' | 'SEMESTER' | 'YEAR' | 'EXAM';
 
 export interface GradeCell {
   id: string;
@@ -34,6 +34,7 @@ export interface MySubjects {
 
 export const GRADE_TYPE_LABEL: Record<GradeType, string> = {
   DAILY: 'Kunlik',
+  HOMEWORK: 'Uyga vazifa',
   EXAM: 'Nazorat',
   QUARTER: 'Chorak',
   YEAR: 'Yillik',
@@ -43,6 +44,7 @@ export const GRADE_TYPE_LABEL: Record<GradeType, string> = {
 // Jurnal selektorida ko'rinadigan turlar (tartib bilan)
 export const GRADE_TYPES: { key: GradeType; label: string }[] = [
   { key: 'DAILY', label: 'Kunlik' },
+  { key: 'HOMEWORK', label: 'Uy vazifa' },
   { key: 'EXAM', label: 'Nazorat' },
   { key: 'QUARTER', label: 'Chorak' },
   { key: 'YEAR', label: 'Yillik' },
