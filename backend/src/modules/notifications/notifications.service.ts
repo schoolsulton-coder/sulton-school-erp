@@ -68,14 +68,16 @@ export class NotificationsService {
         },
       });
 
+      const sentChats = new Set<string>();
       for (const sg of links) {
         const g = sg.guardian;
-        if (g.user?.telegramLink) {
-          const ok = await this.telegram.send(
-            g.user.telegramLink.chatId,
-            `${title}\n${body}`,
-          );
-          await this.record(g.user.id, 'TELEGRAM', title, body, ok);
+        // chatId ni bot bilan bir xil tarzda topamiz: user linki -> telefon -> username
+        const chatId = await this.resolveGuardianChatId(g);
+        if (chatId) {
+          if (sentChats.has(chatId)) continue; // bir chatga takror yubormaymiz
+          sentChats.add(chatId);
+          const ok = await this.telegram.send(chatId, `${title}\n${body}`);
+          await this.record(g.user?.id ?? null, 'TELEGRAM', title, body, ok);
         } else if (g.phone && !opts?.telegramOnly) {
           const ok = await this.sms.send(g.phone, `${title}: ${body}`);
           await this.record(g.user?.id ?? null, 'SMS', title, body, ok);
@@ -84,6 +86,40 @@ export class NotificationsService {
     } catch (e) {
       this.logger.error('notifyGuardians xatosi', e as Error);
     }
+  }
+
+  /**
+   * Vasiyning Telegram chatId'sini topadi — bot ulanish mantiqiga mos:
+   *   1) vasiy user'ining o'z telegramLink'i,
+   *   2) telefon bo'yicha (bot telefon orqali ulaydi, guardian.userId bo'lmasligi mumkin),
+   *   3) telegram username bo'yicha.
+   */
+  private async resolveGuardianChatId(g: {
+    phone?: string | null;
+    telegramUsername?: string | null;
+    user?: { telegramLink?: { chatId: string } | null } | null;
+  }): Promise<string | null> {
+    if (g.user?.telegramLink?.chatId) return g.user.telegramLink.chatId;
+
+    const phoneTail = g.phone ? g.phone.replace(/\D/g, '').slice(-9) : null;
+    if (phoneTail && phoneTail.length >= 7) {
+      const link = await this.prisma.telegramLink.findFirst({
+        where: { user: { phone: { contains: phoneTail } } },
+        select: { chatId: true },
+      });
+      if (link?.chatId) return link.chatId;
+    }
+
+    if (g.telegramUsername) {
+      const uname = g.telegramUsername.replace(/^@/, '');
+      const link = await this.prisma.telegramLink.findFirst({
+        where: { username: { equals: uname, mode: 'insensitive' } },
+        select: { chatId: true },
+      });
+      if (link?.chatId) return link.chatId;
+    }
+
+    return null;
   }
 
   /**
