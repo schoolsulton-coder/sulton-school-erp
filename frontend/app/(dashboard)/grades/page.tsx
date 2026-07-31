@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Search } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   gradesApi,
@@ -34,6 +34,7 @@ export default function GradesPage() {
   const [type, setType] = useState<GradeType>('DAILY');
   const [date, setDate] = useState(today());
   const [period, setPeriod] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
   const [edit, setEdit] = useState<GradeCell | null>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -99,11 +100,13 @@ export default function GradesPage() {
   });
 
   const rows: GradebookRow[] = gradebook ?? [];
+  const q = studentSearch.trim().toLowerCase();
+  const filteredRows = q ? rows.filter((s) => `${s.lastName} ${s.firstName}`.toLowerCase().includes(q)) : rows;
   const setVal = (id: string, v: string) => {
     if (v !== '' && !/^[1-5]$/.test(v)) return; // faqat 1..5
     setValues((p) => ({ ...p, [id]: v }));
   };
-  const fillAll = (v: string) => setValues(Object.fromEntries(rows.map((s) => [s.id, v])));
+  const fillAll = (v: string) => setValues((p) => ({ ...p, ...Object.fromEntries(filteredRows.map((s) => [s.id, v])) }));
   const enteredCount = Object.values(values).filter((v) => v !== '').length;
 
   const onKey = (e: React.KeyboardEvent, idx: number) => {
@@ -111,28 +114,28 @@ export default function GradesPage() {
     else if (e.key === 'ArrowUp') { e.preventDefault(); inputs.current[idx - 1]?.focus(); }
   };
 
-  const sel = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
+  const sel = 'min-w-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand';
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-5 flex items-start justify-between">
+    <div className="p-3 sm:p-6">
+      <div className="mb-3 flex items-center justify-between sm:mb-5">
         <div>
-          <h1 className="text-2xl font-bold">Baholash</h1>
-          <p className="text-sm text-slate-500">Sinf jurnali · 5 balli tizim</p>
+          <h1 className="text-xl font-bold sm:text-2xl">Baholash</h1>
+          <p className="hidden text-sm text-slate-500 sm:block">Sinf jurnali · 5 balli tizim</p>
         </div>
-        <Link href="/grades/statistics" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        <Link href="/grades/statistics" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2">
           <BarChart3 size={15} /> Statistika
         </Link>
       </div>
 
       {/* Tanlovlar */}
-      <div className="mb-4 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(''); }} className={`${sel} flex-1 sm:flex-none`}>
+      <div className="mb-3 space-y-1.5 rounded-xl border border-slate-200 bg-white p-2">
+        <div className="flex items-center gap-1.5">
+          <select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(''); }} className={`${sel} flex-1`}>
             <option value="">Sinf</option>
             {my?.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={`${sel} flex-1 sm:flex-none`} disabled={!classId && !my?.canGradeAll}>
+          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={`${sel} flex-[2]`} disabled={!classId && !my?.canGradeAll}>
             <option value="">Fan</option>
             {subjectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -142,20 +145,22 @@ export default function GradesPage() {
             onChange={(e) => setDate(e.target.value)}
             disabled={my ? !my.canGradeAll : true}
             title={my && !my.canGradeAll ? 'Ustoz faqat bugungi kunga baho qo\'yadi' : ''}
-            className={`${sel} disabled:bg-slate-50 disabled:text-slate-500`}
+            className={`${sel} flex-1 disabled:bg-slate-50 disabled:text-slate-500`}
           />
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} className={sel}>
-            <option value="">Chorak</option>
-            {CHORAK_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          {(type === 'QUARTER' || type === 'YEAR') && (
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} className={`${sel} flex-1`}>
+              <option value="">Chorak</option>
+              {CHORAK_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
         </div>
         {/* Baho turi — pill tugmalar (mobilda gorizontal aylanadi) */}
-        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
+        <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5">
           {GRADE_TYPES.map((t) => (
             <button
               key={t.key}
               onClick={() => setType(t.key)}
-              className={`shrink-0 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium ${type === t.key ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13px] font-medium ${type === t.key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
               {t.label}
             </button>
@@ -169,6 +174,19 @@ export default function GradesPage() {
         </div>
       ) : (
         <>
+          {/* O'quvchi qidirish (ro'yxat uzun bo'lganda) */}
+          {rows.length > 6 && (
+            <div className="relative mb-3">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder={`O'quvchi qidirish (${rows.length} ta)`}
+                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
+              />
+            </div>
+          )}
+
           {/* Hammaga tez qo'yish */}
           {canCreate && (
             <div className="mb-3 flex items-center gap-2 text-sm">
@@ -192,7 +210,7 @@ export default function GradesPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((s, idx) => (
+                {filteredRows.map((s, idx) => (
                   <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
                     <td className="hidden px-3 py-2 text-slate-400 sm:table-cell">{idx + 1}</td>
                     <td className="px-3 py-2 font-medium">{s.lastName} {s.firstName}</td>
@@ -229,7 +247,7 @@ export default function GradesPage() {
                     </td>
                   </tr>
                 ))}
-                {!rows.length && <tr><td colSpan={5} className="px-3 py-10 text-center text-slate-400">O&apos;quvchi topilmadi</td></tr>}
+                {!filteredRows.length && <tr><td colSpan={5} className="px-3 py-10 text-center text-slate-400">{q ? 'Qidiruvga mos o\'quvchi yo\'q' : 'O\'quvchi topilmadi'}</td></tr>}
               </tbody>
             </table>
           </div>
