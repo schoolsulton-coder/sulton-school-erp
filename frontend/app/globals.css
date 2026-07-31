@@ -18,3 +18,16 @@ body {
   color: #0f172a;
   background: #faf7f7;
 }
+
+/* Shartnoma shabloni hujjati (tahrirlagich + preview) — PDF ko'rinishiga yaqin */
+.tpl-doc h1 { font-size: 18px; font-weight: 700; text-align: center; margin: 0 0 8px; }
+.tpl-doc h2 { font-size: 15px; font-weight: 700; margin: 14px 0 6px; }
+.tpl-doc h3 { font-size: 13px; font-weight: 700; margin: 12px 0 4px; }
+.tpl-doc p { margin: 6px 0; }
+.tpl-doc ul, .tpl-doc ol { margin: 6px 0; padding-left: 22px; list-style: revert; }
+.tpl-doc strong, .tpl-doc b { font-weight: 700; }
+.tpl-doc em, .tpl-doc i { font-style: italic; }
+/* DOCX'dan kelgan jadval chegaralarini tiklaymiz */
+.tpl-doc table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.tpl-doc td, .tpl-doc th { border: 1px solid #444; padding: 4px 8px; vertical-align: top; }
+.tpl-doc img { max-width: 100%; }

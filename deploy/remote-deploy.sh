@@ -41,6 +41,24 @@ cd "$APP_DIR/frontend"
 npm ci --no-audit --prefer-offline
 npm run build
 
+echo "==> Chromium (PDF/puppeteer) tayyorlash"
+if [ ! -e "$APP_DIR/.chromium-deps-ok" ]; then
+  echo "   Tizim kutubxonalari o'rnatilmoqda (bir marta)"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq 2>/dev/null || true
+  for pkg in ca-certificates fonts-liberation fonts-dejavu-core libnss3 libnspr4 \
+    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libgbm1 libgtk-3-0 \
+    libpango-1.0-0 libcairo2 libasound2 libasound2t64 libxcomposite1 libxdamage1 \
+    libxfixes3 libxrandr2 libxkbcommon0 libx11-6 libxcb1 libxext6 libxshmfence1; do
+    apt-get install -y -qq "$pkg" 2>/dev/null || true
+  done
+  touch "$APP_DIR/.chromium-deps-ok"
+  echo "   ✅ kutubxonalar tayyor"
+fi
+# Bundled Chromium bor bo'lsa tez o'tadi, bo'lmasa yuklaydi (xato deploy'ni buzmaydi)
+( cd "$APP_DIR/backend" && npx --yes puppeteer browsers install chrome >/dev/null 2>&1 ) \
+  && echo "   ✅ Chromium mavjud" || echo "   !! Chromium yuklanmadi — PDF ishlamasligi mumkin"
+
 echo "==> Qayta ishga tushirish (pm2)"
 cd "$APP_DIR"
 pm2 restart deploy/ecosystem.config.js --update-env

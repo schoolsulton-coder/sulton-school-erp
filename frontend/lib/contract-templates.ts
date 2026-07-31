@@ -39,22 +39,44 @@ export const contractTemplatesApi = {
       .then((r) => r.data);
   },
 
-  /** Shablon bo'yicha shartnomaga PDF (blob → yangi oynada) */
+  /** Shablon bo'yicha shartnomaga PDF (blob → yangi oynada). Xato bo'lsa — sababini ko'rsatadi */
   openPdf: async (templateId: string, contractId: string, number: string) => {
-    const res = await api.get(
-      `/contract-templates/${templateId}/pdf/${contractId}`,
-      { responseType: 'blob' },
-    );
-    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.download = `${number}.pdf`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    try {
+      const res = await api.get(
+        `/contract-templates/${templateId}/pdf/${contractId}`,
+        { responseType: 'blob' },
+      );
+      const blob = res.data as Blob;
+      if (blob.type && !blob.type.includes('pdf')) {
+        alert(await readPdfError(blob));
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.download = `${number}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (e: any) {
+      const d = e?.response?.data;
+      alert(d instanceof Blob ? await readPdfError(d) : (e?.message ?? "PDF yaratib bo'lmadi"));
+    }
   },
 };
+
+/** Blob ichidagi server xato xabarini o'qiydi (PDF o'rniga JSON kelganda) */
+export async function readPdfError(blob: Blob): Promise<string> {
+  try {
+    const txt = await blob.text();
+    const msg = JSON.parse(txt)?.message;
+    if (msg) return Array.isArray(msg) ? msg.join(', ') : String(msg);
+  } catch {
+    /* ignore */
+  }
+  return "PDF yaratib bo'lmadi. Serverda Chromium (PDF) o'rnatilganini tekshiring.";
+}
 
 /** Preview/insert uchun sample qiymatlar bilan {{token}} larni almashtiradi (client-side) */
 export function fillWithSamples(html: string, placeholders: Placeholder[]): string {

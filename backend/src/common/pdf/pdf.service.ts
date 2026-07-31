@@ -15,7 +15,14 @@ export class PdfService {
   ): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      // VPS'da tizim Chromium'i o'rnatilgan bo'lsa — PUPPETEER_EXECUTABLE_PATH orqali
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // kichik /dev/shm — Chrome crash bo'lmasin
+        '--disable-gpu',
+      ],
     });
     try {
       const page = await browser.newPage();

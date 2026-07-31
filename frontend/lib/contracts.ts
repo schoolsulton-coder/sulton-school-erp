@@ -1,4 +1,5 @@
 import { api } from './api';
+import { readPdfError } from './contract-templates';
 
 export interface ContractListItem {
   id: string;
@@ -144,19 +145,27 @@ export const contractsApi = {
   createDiscount: (data: { name: string; type: 'PERCENT' | 'FIXED'; value: number }) =>
     api.post('/contracts/discounts', data).then((r) => r.data),
 
-  /** PDF'ni blob sifatida olib, yangi oynada ochadi (auth header bilan) */
+  /** PDF'ni blob sifatida olib, yangi oynada ochadi (auth header bilan). Xato bo'lsa — sababini ko'rsatadi */
   openPdf: async (id: string, number: string) => {
-    const res = await api.get(`/contracts/${id}/pdf`, { responseType: 'blob' });
-    const url = URL.createObjectURL(
-      new Blob([res.data], { type: 'application/pdf' }),
-    );
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.download = `${number}.pdf`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    try {
+      const res = await api.get(`/contracts/${id}/pdf`, { responseType: 'blob' });
+      const blob = res.data as Blob;
+      if (blob.type && !blob.type.includes('pdf')) {
+        alert(await readPdfError(blob));
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.download = `${number}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (e: any) {
+      const d = e?.response?.data;
+      alert(d instanceof Blob ? await readPdfError(d) : (e?.message ?? "PDF yaratib bo'lmadi"));
+    }
   },
 };
 

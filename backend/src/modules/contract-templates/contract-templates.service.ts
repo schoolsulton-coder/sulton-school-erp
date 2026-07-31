@@ -120,8 +120,9 @@ export class ContractTemplatesService {
       h2 { font-size:15px; margin:14px 0 6px; }
       h3 { font-size:13px; margin:12px 0 4px; }
       p { margin:6px 0; }
-      table { border-collapse:collapse; width:100%; }
-      td, th { vertical-align:top; }
+      /* Word (DOCX) jadval chegaralari mammoth tomonidan tashlanadi — tiklaymiz */
+      table { border-collapse:collapse; width:100%; margin:8px 0; }
+      td, th { vertical-align:top; border:1px solid #444; padding:4px 8px; }
       img { max-width:100%; }
       ul, ol { margin:6px 0; padding-left:22px; }
     </style></head><body>${inner}</body></html>`;
