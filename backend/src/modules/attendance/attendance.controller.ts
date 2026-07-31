@@ -13,6 +13,9 @@ import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+type JwtUser = { id: string; role: string };
 
 @ApiTags('attendance')
 @ApiBearerAuth()
@@ -21,10 +24,16 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 export class AttendanceController {
   constructor(private readonly service: AttendanceService) {}
 
+  @Get('my-classes')
+  @Permissions('attendance.view')
+  myClasses(@CurrentUser() user: JwtUser) {
+    return this.service.myClasses(user);
+  }
+
   @Post('mark')
   @Permissions('attendance.create')
-  mark(@Body() dto: MarkAttendanceDto) {
-    return this.service.markClass(dto);
+  mark(@CurrentUser() user: JwtUser, @Body() dto: MarkAttendanceDto) {
+    return this.service.markClass(user, dto);
   }
 
   @Get('class/:classId')

@@ -79,7 +79,8 @@ export default function GradesPage() {
         classId,
         type,
         period: period || undefined,
-        date,
+        // Ustoz uchun har doim joriy kun (tab tunni kesib o'tsa ham 403 bo'lmasin)
+        date: my && !my.canGradeAll ? today() : date,
         items: Object.entries(values)
           .filter(([, v]) => v !== '')
           .map(([studentId, v]) => ({ studentId, value: Number(v) })),

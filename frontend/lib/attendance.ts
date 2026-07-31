@@ -18,6 +18,12 @@ export interface AttReport {
   excused: number;
   rate: number;
   records?: { date: string; status: AttStatus; note?: string | null }[];
+  students?: { id: string; name: string; rate: number; present: number; total: number }[];
+}
+
+export interface MyClasses {
+  canMarkAll: boolean;
+  classes: { id: string; name: string }[];
 }
 
 export const ATT_STATUS: Record<AttStatus, { label: string; cls: string; active: string }> = {
@@ -28,6 +34,7 @@ export const ATT_STATUS: Record<AttStatus, { label: string; cls: string; active:
 };
 
 export const attendanceApi = {
+  myClasses: () => api.get<MyClasses>('/attendance/my-classes').then((r) => r.data),
   classDay: (classId: string, date: string) =>
     api.get<ClassDayRow[]>(`/attendance/class/${classId}`, { params: { date } }).then((r) => r.data),
   mark: (data: {

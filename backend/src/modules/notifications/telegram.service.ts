@@ -29,9 +29,10 @@ function stripUstoz(s: string): string {
 
 const SCHEDULE_BTN = '📅 Dars jadvali';
 const GRADES_BTN = '📊 Baholar';
+const ATTENDANCE_BTN = '📋 Davomat';
 /** Ulangandan keyin doimiy menyu tugmalari */
 const MENU_KEYBOARD = {
-  keyboard: [[{ text: SCHEDULE_BTN }, { text: GRADES_BTN }]],
+  keyboard: [[{ text: SCHEDULE_BTN }, { text: GRADES_BTN }], [{ text: ATTENDANCE_BTN }]],
   resize_keyboard: true,
 };
 
@@ -130,6 +131,10 @@ export class TelegramService implements OnModuleInit {
     this.bot.hears(GRADES_BTN, (ctx: any) => this.handleGradesRequest(ctx));
     this.bot.command('baholar', (ctx: any) => this.handleGradesRequest(ctx));
 
+    // Davomat — tugma yoki /davomat buyrug'i
+    this.bot.hears(ATTENDANCE_BTN, (ctx: any) => this.handleAttendanceRequest(ctx));
+    this.bot.command('davomat', (ctx: any) => this.handleAttendanceRequest(ctx));
+
     // Farzand tanlangach — uning jadvalini yuboramiz
     this.bot.action(/^sched:(.+)$/, async (ctx: any) => {
       const studentId: string = ctx.match[1];
@@ -166,6 +171,24 @@ export class TelegramService implements OnModuleInit {
       return this.sendChildGrades(ctx, student);
     });
 
+    // Farzand tanlangach — uning davomatini yuboramiz
+    this.bot.action(/^att:(.+)$/, async (ctx: any) => {
+      const studentId: string = ctx.match[1];
+      const link = await this.prisma.telegramLink.findFirst({
+        where: { chatId: String(ctx.chat.id) },
+      });
+      await ctx.answerCbQuery().catch(() => undefined);
+      if (!link) {
+        return ctx.reply('Avval telefon raqamingizni ulang — /start');
+      }
+      const students = await this.getStudentsForUser(link.userId);
+      const student = students.find((s) => s.id === studentId);
+      if (!student) {
+        return ctx.reply('Bu o‘quvchi sizga biriktirilmagan.');
+      }
+      return this.sendChildAttendance(ctx, student);
+    });
+
     // Token'ni tekshirish va bot @username'ini olish (deep-link uchun).
     // Eslatma: Telegraf'da launch() promise'i bot TO'XTAGANDA resolve bo'ladi,
     // shuning uchun username'ni getMe() orqali alohida olamiz.
@@ -185,6 +208,7 @@ export class TelegramService implements OnModuleInit {
         { command: 'start', description: 'Boshlash / botga ulanish' },
         { command: 'jadval', description: '📅 Farzand dars jadvali' },
         { command: 'baholar', description: '📊 Farzand baholari' },
+        { command: 'davomat', description: '📋 Farzand davomati' },
       ])
       .catch(() => undefined);
 
@@ -247,11 +271,86 @@ export class TelegramService implements OnModuleInit {
     });
   }
 
+  // ===== Davomat oqimi =====
+
+  private async handleAttendanceRequest(ctx: any) {
+    const link = await this.prisma.telegramLink.findFirst({
+      where: { chatId: String(ctx.chat.id) },
+    });
+    if (!link) {
+      return ctx.reply('Avval telefon raqamingizni ulang — /start');
+    }
+    const students = await this.getStudentsForUser(link.userId);
+    if (students.length === 0) {
+      return ctx.reply('Sizga biriktirilgan farzand topilmadi. Administrator bilan bog‘laning.');
+    }
+    if (students.length === 1) {
+      return this.sendChildAttendance(ctx, students[0]);
+    }
+    const inline_keyboard = students.map((s) => [
+      {
+        text: `${s.lastName} ${s.firstName}${s.class ? ` — ${s.class.name}` : ''}`,
+        callback_data: `att:${s.id}`,
+      },
+    ]);
+    return ctx.reply('Qaysi farzandingiz davomati kerak?', {
+      reply_markup: { inline_keyboard },
+    });
+  }
+
+  private async sendChildAttendance(ctx: any, student: { id: string; firstName: string; lastName: string }) {
+    const text = await this.buildAttendanceText(student.id, `${student.lastName} ${student.firstName}`);
+    return ctx.reply(text, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '📅 Jadval', callback_data: `sched:${student.id}` },
+          { text: '📊 Baholar', callback_data: `grades:${student.id}` },
+        ]],
+      },
+    });
+  }
+
+  /** O'quvchi davomati — umumiy foiz + so'nggi kelmagan/kechikkan kunlar */
+  private async buildAttendanceText(studentId: string, studentName: string) {
+    const records = await this.prisma.attendance.findMany({
+      where: { studentId },
+      orderBy: { date: 'desc' },
+      take: 120,
+    });
+    let text = `👦 ${studentName}\n📋 Davomat`;
+    if (records.length === 0) {
+      return text + '\n\nHozircha davomat belgilanmagan.';
+    }
+    const c = (st: string) => records.filter((r) => r.status === st).length;
+    const present = c('PRESENT');
+    const total = records.length;
+    const rate = Math.round((present / total) * 100);
+    text += `\n\nDavomat: ${rate}% (${present}/${total})`;
+    text += `\n✅ Bor: ${present}  ❌ Yo‘q: ${c('ABSENT')}  ⏰ Kech: ${c('LATE')}  📄 Sababli: ${c('EXCUSED')}`;
+    const issues = records.filter((r) => r.status !== 'PRESENT').slice(0, 10);
+    if (issues.length) {
+      const label: Record<string, string> = { ABSENT: '❌ yo‘q', LATE: '⏰ kech', EXCUSED: '📄 sababli' };
+      text += `\n\nSo‘nggi:`;
+      for (const r of issues) {
+        // Sana Toshkent zonasida (saqlanган kun bilan mos) — YYYY-MM-DD
+        const iso = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+        const [, mm, dd] = iso.split('-');
+        text += `\n${dd}.${mm} — ${label[r.status] ?? r.status}`;
+      }
+    }
+    return text;
+  }
+
   private async sendChildGrades(ctx: any, student: { id: string; firstName: string; lastName: string }) {
     const text = await this.buildGradesText(student.id, `${student.lastName} ${student.firstName}`);
-    // Shu farzand jadvaliga tez o'tish uchun inline tugma (menyu tugmalari pastda saqlanadi)
+    // Shu farzand jadvali/davomatiga tez o'tish
     return ctx.reply(text, {
-      reply_markup: { inline_keyboard: [[{ text: '📅 Shu farzand jadvali', callback_data: `sched:${student.id}` }]] },
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '📅 Jadval', callback_data: `sched:${student.id}` },
+          { text: '📋 Davomat', callback_data: `att:${student.id}` },
+        ]],
+      },
     });
   }
 
@@ -368,9 +467,14 @@ export class TelegramService implements OnModuleInit {
       student.class.name,
       `${student.lastName} ${student.firstName}`,
     );
-    // Shu farzand baholariga tez o'tish uchun inline tugma
+    // Shu farzand baho/davomatiga tez o'tish
     return ctx.reply(text, {
-      reply_markup: { inline_keyboard: [[{ text: '📊 Shu farzand baholari', callback_data: `grades:${student.id}` }]] },
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '📊 Baholar', callback_data: `grades:${student.id}` },
+          { text: '📋 Davomat', callback_data: `att:${student.id}` },
+        ]],
+      },
     });
   }
 
