@@ -177,12 +177,28 @@ model User {
   notifications   Notification[]
   telegramLink    TelegramLink?
   auditLogs       AuditLog[]
+  debtorContacts  DebtorContact[]  @relation("DebtorContactAuthor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([roleId])
   @@map("users")
+}
+
+/// Qarzdor bilan aloqa jurnali (qo'ng'iroq, izoh) — qarzdorlik sahifasida
+model DebtorContact {
+  id        String   @id @default(uuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?    @relation("DebtorContactAuthor", fields: [authorId], references: [id])
+  type      String   @default("OTHER") // CALL, TELEGRAM, SMS, MEETING, OTHER
+  note      String
+  createdAt DateTime @default(now())
+
+  @@index([studentId, createdAt])
+  @@map("debtor_contacts")
 }
 
 model Role {
@@ -254,6 +270,7 @@ model Student {
   attendances Attendance[]
   submissions HomeworkSubmission[]
   behavior    BehaviorRecord[]
+  debtorContacts DebtorContact[]
   lead        Lead?                @relation("LeadStudent")
 
   createdAt DateTime @default(now())
