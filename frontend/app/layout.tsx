@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
+// Sahifa HTML'ini brauzer keshlab qolmasin (deploy'dan keyin o'zgarishlar
+// darhol ko'rinsin). Hashli /_next/static bo'laklar baribir uzoq keshlanadi.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Sulton School — ERP & LMS',
   description: 'Zamonaviy xususiy maktab uchun raqamli boshqaruv platformasi',
