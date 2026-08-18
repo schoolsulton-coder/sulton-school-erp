@@ -78,7 +78,7 @@ export function TransferFormModal({
             disabled={save.isPending}
             className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
           >
-            {save.isPending ? 'Saqlanmoqda...' : "⇄ O'tkazish"}
+            {save.isPending ? 'Saqlanmoqda...' : "Qo'shish"}
           </button>
         </>
       }

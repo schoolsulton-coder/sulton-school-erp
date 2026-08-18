@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeftRight,
+  Plus,
   ArrowDownLeft,
   ArrowUpRight,
   Scale,
@@ -154,7 +154,7 @@ export default function TransfersPage() {
           onClick={() => setForm({})}
           className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
         >
-          <ArrowLeftRight size={16} /> O&apos;tkazish
+          <Plus size={16} /> Qo&apos;shish
         </button>
         {(fromName || toName) && (
           <button

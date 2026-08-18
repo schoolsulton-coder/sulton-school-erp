@@ -129,7 +129,7 @@ export default function CashflowPage() {
           onClick={() => setForm({})}
           className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
         >
-          <Plus size={16} /> Yangi yozuv
+          <Plus size={16} /> Qo&apos;shish
         </button>
         {(accountId || type) && (
           <button
