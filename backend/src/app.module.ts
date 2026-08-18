@@ -24,6 +24,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { EsmaktabModule } from './modules/esmaktab/esmaktab.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { DebtorsModule } from './modules/debtors/debtors.module';
+import { CounterpartiesModule } from './modules/counterparties/counterparties.module';
 
 /**
  * AppModule — barcha ERP/LMS modullarini birlashtiradi.
@@ -61,6 +62,7 @@ import { DebtorsModule } from './modules/debtors/debtors.module';
     EsmaktabModule,
     PaymentsModule,
     DebtorsModule,
+    CounterpartiesModule,
     // Barcha asosiy modullar ulandi 🎉
     // GradesModule, AttendanceModule, HomeworkModule, BehaviorModule,
     // NotificationsModule, TelegramModule, EsmaktabModule, ReportsModule

@@ -434,6 +434,8 @@ model Branch {
   leads     Lead[]
   suppliers Supplier[]
   expenses  Expense[]
+  counterparties Counterparty[]
+  counterpartyLinks CounterpartyBranch[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -677,6 +679,7 @@ model Account {
   payments              Payment[]
   expensePayments       ExpensePayment[] @relation("ExpenseSomAccount")
   expenseDollarPayments ExpensePayment[] @relation("ExpenseDollarAccount")
+  counterpartyEntries   CounterpartyEntry[] @relation("CpEntryAccount")
 
   @@map("accounts")
 }
@@ -1028,4 +1031,74 @@ model AuditLog {
   @@index([userId])
   @@index([entity])
   @@map("audit_logs")
+}
+
+// ============================================================================
+//  TASHQI PUL OQIMI — Kontragentlar (oldi-berdi daftari)
+// ============================================================================
+
+// Kontragent (oldi-berdichi/oldi-berdi shaxs yoki tashkilot)
+model Counterparty {
+  id        String   @id @default(uuid())
+  name      String
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  // Tab/kategoriya: OLDI_BERDICHI, OLDI_BERDI, TRANSFER, SOTUV, INVESTOR, INVESTITSIYA
+  category  String   @default("OLDI_BERDICHI")
+  // Transferlarda ko'rinadimi (filiallararo oldi-berdichi)
+  filiallararo Boolean @default(false)
+  note      String?
+  entries   CounterpartyEntry[]
+  // Investor bir nechta filialga tegishli bo'lishi mumkin (m2m)
+  branchLinks CounterpartyBranch[]
+  createdAt DateTime @default(now())
+
+  @@index([category])
+  @@index([branchId])
+  @@map("counterparties")
+}
+
+// Kontragent ↔ Filial (investorlar uchun ko'p-filial bog'lanishi)
+model CounterpartyBranch {
+  counterpartyId String
+  branchId       String
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id], onDelete: Cascade)
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([counterpartyId, branchId])
+  @@index([branchId])
+  @@map("counterparty_branches")
+}
+
+// Kontragent bo'yicha kirim/chiqim yozuvi (oldi-berdi tranzaksiyasi)
+model CounterpartyEntry {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id], onDelete: Cascade)
+  direction      String       // IN = kirim (bizga), OUT = chiqim (bizdan)
+  amount         Float        // so'm ekvivalenti = somAmount + dollarAmount*dollarRate
+  somAmount      Float?
+  dollarAmount   Float?
+  dollarRate     Float?
+  sabab          String?      // Qarz berildi / Qarz olindi / ... (oldi-berdi)
+  // Kassa/hisob (investitsiya, transfer)
+  kassaTuri      String?      // Naqd / Karta / Bank
+  accountId      String?
+  account        Account?     @relation("CpEntryAccount", fields: [accountId], references: [id])
+  branchId       String?      // investitsiya filiali (scalar)
+  // Investitsiya maydonlari
+  periodYear     Int?
+  periodMonth    Int?
+  academicYear   String?
+  investType     String?
+  // Transfer juftligini bog'lash (jo'natuvchi/qabul qiluvchi bir transferId)
+  transferPairId String?
+  date           DateTime     @default(now())
+  note           String?
+  createdAt      DateTime     @default(now())
+
+  @@index([counterpartyId])
+  @@index([accountId])
+  @@index([transferPairId])
+  @@map("counterparty_entries")
 }
