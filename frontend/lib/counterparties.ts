@@ -33,6 +33,7 @@ export interface CounterpartyRow {
   branches: { id: string; name: string }[];
   category: CpCategory;
   filiallararo: boolean;
+  pairId: string | null;
   note: string | null;
   tranzaksiya: number;
   kirim: number;
@@ -78,6 +79,11 @@ export interface EntryInput {
   sabab?: string;
   kassaTuri?: string;
   accountId?: string;
+  somFlowAccountId?: string;
+  dollarKassaTuri?: string;
+  dollarFlowAccountId?: string;
+  capex?: number;
+  operation?: number;
   branchId?: string;
   periodYear?: number;
   periodMonth?: number;
@@ -93,7 +99,10 @@ export interface TransferInput {
   somAmount?: number;
   dollarAmount?: number;
   dollarRate?: number;
-  kassaTuri?: string;
+  fromSomAccountId?: string;
+  toSomAccountId?: string;
+  fromDollarAccountId?: string;
+  toDollarAccountId?: string;
   date?: string;
   note?: string;
 }
@@ -108,6 +117,7 @@ export const counterpartiesApi = {
     category?: string;
     filiallararo?: boolean;
     branchIds?: string[];
+    pairId?: string;
     note?: string;
   }) => api.post('/counterparties', data).then((r) => r.data),
   addEntry: (id: string, data: EntryInput) =>

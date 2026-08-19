@@ -31,9 +31,22 @@ export class CreateTransferDto {
   @Min(0)
   dollarRate?: number;
 
+  // Har tomon uchun tashqi hisoblar (so'm / dollar)
   @IsOptional()
   @IsString()
-  kassaTuri?: string;
+  fromSomAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  toSomAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  fromDollarAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  toDollarAccountId?: string;
 
   @IsOptional()
   @IsDateString()

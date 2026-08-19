@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeftRight, UserPlus, TrendingUp } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
-import { financeApi } from '@/lib/finance';
 import { counterpartiesApi, som, KASSA_TURI, INVEST_TYPES, MONTHS } from '@/lib/counterparties';
 import { ModalShell, inp, lbl, todayIso } from './flow-ui';
+import { HisobSelect } from './flow-account-select';
 
 const nowYear = () => new Date().getFullYear();
 const academicYears = () => Array.from({ length: 5 }, (_, i) => `${2024 + i}-${2025 + i}`);
@@ -24,29 +24,45 @@ function Footer({ onClose, pending, onSave }: { onClose: () => void; pending: bo
   );
 }
 
-/* ===== Yangi transfer (jo'natuvchi → qabul qiluvchi) ===== */
+/* ===== Yangi transfer (jo'natuvchi → qabul qiluvchi, tomonlar hisobi bilan) ===== */
 export function NewTransferModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [fromId, setFrom] = useState('');
   const [toId, setTo] = useState('');
   const [date, setDate] = useState(todayIso());
   const [somOn, setSomOn] = useState(true);
   const [somV, setSomV] = useState('');
+  const [somKassaFrom, setSomKassaFrom] = useState(KASSA_TURI[0]);
+  const [somKassaTo, setSomKassaTo] = useState(KASSA_TURI[0]);
+  const [somAccFrom, setSomAccFrom] = useState('');
+  const [somAccTo, setSomAccTo] = useState('');
   const [usdOn, setUsdOn] = useState(false);
   const [usdV, setUsdV] = useState('');
   const [rate, setRate] = useState('');
+  const [usdKassaFrom, setUsdKassaFrom] = useState(KASSA_TURI[0]);
+  const [usdKassaTo, setUsdKassaTo] = useState(KASSA_TURI[0]);
+  const [usdAccFrom, setUsdAccFrom] = useState('');
+  const [usdAccTo, setUsdAccTo] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
-  // Transfer ishtirokchilari — filiallararo oldi-berdichilar
   const { data: list } = useQuery({
     queryKey: ['counterparties', 'OLDI_BERDICHI', 'true', 'transfer'],
     queryFn: () => counterpartiesApi.list({ category: 'OLDI_BERDICHI', filiallararo: 'true' }),
   });
+  const opts = list?.data ?? [];
+  const from = opts.find((c) => c.id === fromId);
+  const to = opts.find((c) => c.id === toId);
 
   const somN = somOn ? Number(somV) || 0 : 0;
   const usdN = usdOn ? Number(usdV) || 0 : 0;
   const rateN = Number(rate) || 0;
   const total = somN + usdN * rateN;
+
+  const pickFrom = (id: string) => {
+    setFrom(id);
+    const f = opts.find((c) => c.id === id);
+    if (f?.pairId) setTo(f.pairId); // juftini avtomatik tanlash
+  };
 
   const save = useMutation({
     mutationFn: () =>
@@ -56,6 +72,10 @@ export function NewTransferModal({ onClose, onSaved }: { onClose: () => void; on
         somAmount: somN || undefined,
         dollarAmount: usdN || undefined,
         dollarRate: usdN > 0 ? rateN : undefined,
+        fromSomAccountId: somN > 0 ? somAccFrom || undefined : undefined,
+        toSomAccountId: somN > 0 ? somAccTo || undefined : undefined,
+        fromDollarAccountId: usdN > 0 ? usdAccFrom || undefined : undefined,
+        toDollarAccountId: usdN > 0 ? usdAccTo || undefined : undefined,
         date: `${date}T${new Date().toTimeString().slice(0, 8)}`,
         note: note || undefined,
       }),
@@ -65,15 +85,13 @@ export function NewTransferModal({ onClose, onSaved }: { onClose: () => void; on
 
   const submit = () => {
     setError('');
-    if (!fromId) return setError('Jo\'natuvchini tanlang');
+    if (!fromId) return setError("Jo'natuvchini tanlang");
     if (!toId) return setError('Qabul qiluvchini tanlang');
     if (fromId === toId) return setError('Bir xil kontragent tanlandi');
     if (usdN > 0 && rateN <= 0) return setError('Dollar kursini kiriting');
     if (total <= 0) return setError("Summa noto'g'ri");
     save.mutate();
   };
-
-  const opts = list?.data ?? [];
 
   return (
     <ModalShell
@@ -87,7 +105,7 @@ export function NewTransferModal({ onClose, onSaved }: { onClose: () => void; on
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={lbl}>Jo&apos;natuvchi <span className="text-rose-500">*</span></label>
-            <select value={fromId} onChange={(e) => setFrom(e.target.value)} className={inp}>
+            <select value={fromId} onChange={(e) => pickFrom(e.target.value)} className={inp}>
               <option value="">—</option>
               {opts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -98,6 +116,9 @@ export function NewTransferModal({ onClose, onSaved }: { onClose: () => void; on
               <option value="">—</option>
               {opts.filter((c) => c.id !== fromId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            {from?.pairId && toId === from.pairId && (
+              <p className="mt-1 text-xs text-brand">Yuboruvchining juftligi avtomatik tanlandi</p>
+            )}
           </div>
         </div>
 
@@ -106,20 +127,85 @@ export function NewTransferModal({ onClose, onSaved }: { onClose: () => void; on
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inp} />
         </div>
 
+        {/* So'mda */}
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={somOn} onChange={(e) => setSomOn(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
           So&apos;mda
         </label>
-        {somOn && <input type="number" min={0} value={somV} onChange={(e) => setSomV(e.target.value)} placeholder="So'm summasi" className={inp} />}
+        {somOn && (
+          <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div>
+                <label className={lbl}>So&apos;m summasi</label>
+                <input type="number" min={0} value={somV} onChange={(e) => setSomV(e.target.value)} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Jo&apos;natuvchi kassa turi</label>
+                <select value={somKassaFrom} onChange={(e) => setSomKassaFrom(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Qabul qiluvchi kassa turi</label>
+                <select value={somKassaTo} onChange={(e) => setSomKassaTo(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Jo&apos;natuvchi hisob (so&apos;m)</label>
+                <HisobSelect branchId={from?.branch?.id} currency="SOM" kassaTuri={somKassaFrom} value={somAccFrom} onChange={setSomAccFrom} />
+              </div>
+              <div>
+                <label className={lbl}>Qabul qiluvchi hisob (so&apos;m)</label>
+                <HisobSelect branchId={to?.branch?.id} currency="SOM" kassaTuri={somKassaTo} value={somAccTo} onChange={setSomAccTo} />
+              </div>
+            </div>
+          </div>
+        )}
 
+        {/* Dollarda */}
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={usdOn} onChange={(e) => setUsdOn(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
           Dollarda
         </label>
         {usdOn && (
-          <div className="grid grid-cols-2 gap-3">
-            <input type="number" min={0} value={usdV} onChange={(e) => setUsdV(e.target.value)} placeholder="Dollar" className={inp} />
-            <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Dollar kursi" className={inp} />
+          <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Dollar</label>
+                <input type="number" min={0} value={usdV} onChange={(e) => setUsdV(e.target.value)} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Kurs</label>
+                <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} className={inp} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Jo&apos;natuvchi kassa turi (USD)</label>
+                <select value={usdKassaFrom} onChange={(e) => setUsdKassaFrom(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Qabul qiluvchi kassa turi (USD)</label>
+                <select value={usdKassaTo} onChange={(e) => setUsdKassaTo(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Jo&apos;natuvchi hisob ($)</label>
+                <HisobSelect branchId={from?.branch?.id} currency="USD" kassaTuri={usdKassaFrom} value={usdAccFrom} onChange={setUsdAccFrom} />
+              </div>
+              <div>
+                <label className={lbl}>Qabul qiluvchi hisob ($)</label>
+                <HisobSelect branchId={to?.branch?.id} currency="USD" kassaTuri={usdKassaTo} value={usdAccTo} onChange={setUsdAccTo} />
+              </div>
+            </div>
           </div>
         )}
 
@@ -203,16 +289,19 @@ export function NewInvestmentModal({ onClose, onSaved }: { onClose: () => void; 
   const [investType, setInvestType] = useState('');
   const [somOn, setSomOn] = useState(true);
   const [somV, setSomV] = useState('');
-  const [kassaTuri, setKassa] = useState(KASSA_TURI[0]);
-  const [accountId, setAccount] = useState('');
+  const [somKassa, setSomKassa] = useState(KASSA_TURI[0]);
+  const [somAcc, setSomAcc] = useState('');
   const [usdOn, setUsdOn] = useState(false);
   const [usdV, setUsdV] = useState('');
   const [rate, setRate] = useState('');
+  const [usdKassa, setUsdKassa] = useState(KASSA_TURI[0]);
+  const [usdAcc, setUsdAcc] = useState('');
+  const [capex, setCapex] = useState('');
+  const [operation, setOperation] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
-  const { data: accounts } = useQuery({ queryKey: ['fin-accounts'], queryFn: financeApi.accounts });
   const { data: investors } = useQuery({
     queryKey: ['counterparties', 'INVESTOR', 'all'],
     queryFn: () => counterpartiesApi.list({ category: 'INVESTOR' }),
@@ -222,6 +311,10 @@ export function NewInvestmentModal({ onClose, onSaved }: { onClose: () => void; 
   const usdN = usdOn ? Number(usdV) || 0 : 0;
   const rateN = Number(rate) || 0;
   const total = somN + usdN * rateN;
+  const capexN = Number(capex) || 0;
+  const operationN = Number(operation) || 0;
+  const taqsim = capexN + operationN;
+  const farq = total - taqsim;
 
   const save = useMutation({
     mutationFn: () =>
@@ -230,8 +323,12 @@ export function NewInvestmentModal({ onClose, onSaved }: { onClose: () => void; 
         somAmount: somN || undefined,
         dollarAmount: usdN || undefined,
         dollarRate: usdN > 0 ? rateN : undefined,
-        kassaTuri: somN > 0 ? kassaTuri : undefined,
-        accountId: somN > 0 ? accountId || undefined : undefined,
+        kassaTuri: somN > 0 ? somKassa : undefined,
+        somFlowAccountId: somN > 0 ? somAcc || undefined : undefined,
+        dollarKassaTuri: usdN > 0 ? usdKassa : undefined,
+        dollarFlowAccountId: usdN > 0 ? usdAcc || undefined : undefined,
+        capex: capexN || undefined,
+        operation: operationN || undefined,
         branchId: branchId || undefined,
         periodYear: year,
         periodMonth: month,
@@ -250,6 +347,8 @@ export function NewInvestmentModal({ onClose, onSaved }: { onClose: () => void; 
     if (!investorId) return setError('Investorni tanlang');
     if (usdN > 0 && rateN <= 0) return setError('Dollar kursini kiriting');
     if (total <= 0) return setError("Summa noto'g'ri");
+    if (direction === 'IN' && taqsim > 0 && Math.abs(farq) > 0.01)
+      return setError('Capex + Operation = Jami bo\'lishi kerak');
     save.mutate();
   };
 
@@ -325,6 +424,7 @@ export function NewInvestmentModal({ onClose, onSaved }: { onClose: () => void; 
           </div>
         </div>
 
+        {/* So'mda */}
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={somOn} onChange={(e) => setSomOn(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
           So&apos;mda
@@ -333,31 +433,70 @@ export function NewInvestmentModal({ onClose, onSaved }: { onClose: () => void; 
           <div className="space-y-2 rounded-xl bg-slate-50 p-3">
             <input type="number" min={0} value={somV} onChange={(e) => setSomV(e.target.value)} placeholder="So'm summasi" className={inp} />
             <div className="grid grid-cols-2 gap-2">
-              <select value={kassaTuri} onChange={(e) => setKassa(e.target.value)} className={inp}>
-                {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
-              </select>
-              <select value={accountId} onChange={(e) => setAccount(e.target.value)} className={inp}>
-                <option value="">Hisob —</option>
-                {accounts?.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <div>
+                <label className={lbl}>Kassa turi (so&apos;m)</label>
+                <select value={somKassa} onChange={(e) => setSomKassa(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Hisob (so&apos;m)</label>
+                <HisobSelect branchId={branchId} currency="SOM" kassaTuri={somKassa} value={somAcc} onChange={setSomAcc} />
+              </div>
             </div>
           </div>
         )}
 
+        {/* Dollarda */}
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={usdOn} onChange={(e) => setUsdOn(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
           Dollarda
         </label>
         {usdOn && (
-          <div className="grid grid-cols-2 gap-3">
-            <input type="number" min={0} value={usdV} onChange={(e) => setUsdV(e.target.value)} placeholder="Dollar" className={inp} />
-            <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Dollar kursi" className={inp} />
+          <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" min={0} value={usdV} onChange={(e) => setUsdV(e.target.value)} placeholder="Dollar" className={inp} />
+              <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Kurs" className={inp} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={lbl}>Kassa turi (USD)</label>
+                <select value={usdKassa} onChange={(e) => setUsdKassa(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Hisob (USD)</label>
+                <HisobSelect branchId={branchId} currency="USD" kassaTuri={usdKassa} value={usdAcc} onChange={setUsdAcc} />
+              </div>
+            </div>
           </div>
         )}
 
         <div className="text-sm text-slate-500">
           Jami summa: <span className={`font-semibold ${direction === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>{direction === 'IN' ? '+' : '−'}{som(total)}</span>
         </div>
+
+        {/* Kirim taqsimoti (faqat kirim uchun) */}
+        {direction === 'IN' && (
+          <div className="rounded-xl border border-slate-200 p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Kirim taqsimoti (Capex + Operation = Jami)</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>For Capex (kapital)</label>
+                <input type="number" min={0} value={capex} onChange={(e) => setCapex(e.target.value)} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>For Operation (operatsion)</label>
+                <input type="number" min={0} value={operation} onChange={(e) => setOperation(e.target.value)} className={inp} />
+              </div>
+            </div>
+            <div className="mt-1 flex justify-between text-xs">
+              <span className="text-slate-400">Yig&apos;indi: {som(taqsim)} / {som(total)}</span>
+              {taqsim > 0 && Math.abs(farq) > 0.01 && <span className="text-rose-500">Farq: {som(farq)}</span>}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className={lbl}>Izoh</label>

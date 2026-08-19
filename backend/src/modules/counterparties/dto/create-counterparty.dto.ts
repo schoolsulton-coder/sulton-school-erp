@@ -32,6 +32,11 @@ export class CreateCounterpartyDto {
   @IsString({ each: true })
   branchIds?: string[];
 
+  // Transfer juftligi
+  @IsOptional()
+  @IsString()
+  pairId?: string;
+
   @IsOptional()
   @IsString()
   note?: string;

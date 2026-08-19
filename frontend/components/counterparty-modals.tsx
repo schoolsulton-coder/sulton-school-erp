@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Trash2, Plus, ArrowLeftRight } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
-import { counterpartiesApi, som, SABAB_OPTIONS, type CpCategory } from '@/lib/counterparties';
+import { counterpartiesApi, som, SABAB_OPTIONS, KASSA_TURI, type CpCategory } from '@/lib/counterparties';
 import { ModalShell, inp, lbl, todayIso } from './flow-ui';
+import { HisobSelect } from './flow-account-select';
 
 /* ===== Yangi oldi-berdichi ===== */
 export function NewCounterpartyModal({
@@ -20,13 +21,26 @@ export function NewCounterpartyModal({
   const [name, setName] = useState('');
   const [branchId, setBranchId] = useState('');
   const [filiallararo, setFiliallararo] = useState(false);
+  const [pairId, setPairId] = useState('');
   const [error, setError] = useState('');
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
+  // Juftlik uchun mavjud filiallararo oldi-berdichilar
+  const { data: pairs } = useQuery({
+    queryKey: ['counterparties', 'OLDI_BERDICHI', 'true', 'pairs'],
+    queryFn: () => counterpartiesApi.list({ category: 'OLDI_BERDICHI', filiallararo: 'true' }),
+    enabled: filiallararo,
+  });
 
   const save = useMutation({
     mutationFn: () =>
-      counterpartiesApi.create({ name: name.trim(), branchId: branchId || undefined, category, filiallararo }),
+      counterpartiesApi.create({
+        name: name.trim(),
+        branchId: branchId || undefined,
+        category,
+        filiallararo,
+        pairId: filiallararo && pairId ? pairId : undefined,
+      }),
     onSuccess: onSaved,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
   });
@@ -75,6 +89,17 @@ export function NewCounterpartyModal({
             <option value="1">Ha (filiallararo — transferlarda)</option>
           </select>
         </div>
+        {filiallararo && (
+          <div>
+            <label className={lbl}>Juftlik (ixtiyoriy — transferda avtomatik tanlanadi)</label>
+            <select value={pairId} onChange={(e) => setPairId(e.target.value)} className={inp}>
+              <option value="">—</option>
+              {pairs?.data.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {error && <p className="text-sm font-medium text-rose-500">{error}</p>}
       </div>
     </ModalShell>
@@ -88,9 +113,13 @@ export function NewTransactionModal({ onClose, onSaved }: { onClose: () => void;
   const [date, setDate] = useState(todayIso());
   const [sabab, setSabab] = useState(SABAB_OPTIONS[0]);
   const [som_, setSom] = useState('');
+  const [somKassa, setSomKassa] = useState(KASSA_TURI[0]);
+  const [somAcc, setSomAcc] = useState('');
   const [hasUsd, setHasUsd] = useState(false);
   const [usd, setUsd] = useState('');
   const [rate, setRate] = useState('');
+  const [usdKassa, setUsdKassa] = useState(KASSA_TURI[0]);
+  const [usdAcc, setUsdAcc] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -98,6 +127,8 @@ export function NewTransactionModal({ onClose, onSaved }: { onClose: () => void;
     queryKey: ['counterparties', 'OLDI_BERDICHI', 'all'],
     queryFn: () => counterpartiesApi.list({ category: 'OLDI_BERDICHI' }),
   });
+  const selected = list?.data.find((c) => c.id === counterpartyId);
+  const branchId = selected?.branch?.id;
 
   const somN = Number(som_) || 0;
   const usdN = hasUsd ? Number(usd) || 0 : 0;
@@ -111,6 +142,10 @@ export function NewTransactionModal({ onClose, onSaved }: { onClose: () => void;
         somAmount: somN || undefined,
         dollarAmount: usdN || undefined,
         dollarRate: usdN > 0 ? rateN : undefined,
+        kassaTuri: somN > 0 ? somKassa : undefined,
+        somFlowAccountId: somN > 0 ? somAcc || undefined : undefined,
+        dollarKassaTuri: usdN > 0 ? usdKassa : undefined,
+        dollarFlowAccountId: usdN > 0 ? usdAcc || undefined : undefined,
         sabab,
         date: `${date}T${new Date().toTimeString().slice(0, 8)}`,
         note: note || undefined,
@@ -198,15 +233,43 @@ export function NewTransactionModal({ onClose, onSaved }: { onClose: () => void;
           <label className={lbl}>So&apos;m summasi (ixtiyoriy — faqat dollar ham bo&apos;ladi)</label>
           <input type="number" min={0} value={som_} onChange={(e) => setSom(e.target.value)} placeholder="0" className={inp} />
         </div>
+        {somN > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Kassa turi (so&apos;m)</label>
+              <select value={somKassa} onChange={(e) => setSomKassa(e.target.value)} className={inp}>
+                {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Hisob (so&apos;m)</label>
+              <HisobSelect branchId={branchId} currency="SOM" kassaTuri={somKassa} value={somAcc} onChange={setSomAcc} />
+            </div>
+          </div>
+        )}
 
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={hasUsd} onChange={(e) => setHasUsd(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
           Dollar ham bor
         </label>
         {hasUsd && (
-          <div className="grid grid-cols-2 gap-3">
-            <input type="number" min={0} value={usd} onChange={(e) => setUsd(e.target.value)} placeholder="Dollar" className={inp} />
-            <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Dollar kursi" className={inp} />
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <input type="number" min={0} value={usd} onChange={(e) => setUsd(e.target.value)} placeholder="Dollar" className={inp} />
+              <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Dollar kursi" className={inp} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>Kassa turi (USD)</label>
+                <select value={usdKassa} onChange={(e) => setUsdKassa(e.target.value)} className={inp}>
+                  {KASSA_TURI.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Hisob (USD)</label>
+                <HisobSelect branchId={branchId} currency="USD" kassaTuri={usdKassa} value={usdAcc} onChange={setUsdAcc} />
+              </div>
+            </div>
           </div>
         )}
 

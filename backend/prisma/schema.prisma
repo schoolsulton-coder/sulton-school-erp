@@ -1053,10 +1053,15 @@ model Counterparty {
   entries   CounterpartyEntry[]
   // Investor bir nechta filialga tegishli bo'lishi mumkin (m2m)
   branchLinks CounterpartyBranch[]
+  // Transfer juftligi (jo'natuvchi ↔ qabul qiluvchi)
+  pairId    String?
+  pair      Counterparty?  @relation("CpPair", fields: [pairId], references: [id])
+  pairedBy  Counterparty[] @relation("CpPair")
   createdAt DateTime @default(now())
 
   @@index([category])
   @@index([branchId])
+  @@index([pairId])
   @@map("counterparties")
 }
 
@@ -1084,9 +1089,18 @@ model CounterpartyEntry {
   dollarRate     Float?
   sabab          String?      // Qarz berildi / Qarz olindi / ... (oldi-berdi)
   // Kassa/hisob (investitsiya, transfer)
-  kassaTuri      String?      // Naqd / Karta / Bank
+  kassaTuri      String?      // Naqd / Karta / Bank (so'm)
   accountId      String?
   account        Account?     @relation("CpEntryAccount", fields: [accountId], references: [id])
+  // Tashqi hisoblar (FlowAccount) — so'm va dollar qismi uchun alohida
+  somFlowAccountId String?
+  somFlowAccount   FlowAccount? @relation("EntrySomFlow", fields: [somFlowAccountId], references: [id])
+  dollarKassaTuri  String?
+  dollarFlowAccountId String?
+  dollarFlowAccount FlowAccount? @relation("EntryDollarFlow", fields: [dollarFlowAccountId], references: [id])
+  // Investitsiya kirim taqsimoti
+  capex          Float?
+  operation      Float?
   branchId       String?      // investitsiya filiali (scalar)
   // Investitsiya maydonlari
   periodYear     Int?
@@ -1102,6 +1116,8 @@ model CounterpartyEntry {
   @@index([counterpartyId])
   @@index([accountId])
   @@index([transferPairId])
+  @@index([somFlowAccountId])
+  @@index([dollarFlowAccountId])
   @@map("counterparty_entries")
 }
 
@@ -1117,6 +1133,8 @@ model FlowAccount {
   user      User?    @relation(fields: [userId], references: [id])
   balance   Float    @default(0)
   active    Boolean  @default(true)
+  entrySom    CounterpartyEntry[] @relation("EntrySomFlow")
+  entryDollar CounterpartyEntry[] @relation("EntryDollarFlow")
   createdAt DateTime @default(now())
 
   @@index([branchId])

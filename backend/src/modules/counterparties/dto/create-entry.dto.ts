@@ -41,6 +41,28 @@ export class CreateEntryDto {
   @IsString()
   accountId?: string;
 
+  // Tashqi hisoblar (so'm / dollar)
+  @IsOptional()
+  @IsString()
+  somFlowAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  dollarKassaTuri?: string;
+
+  @IsOptional()
+  @IsString()
+  dollarFlowAccountId?: string;
+
+  // Investitsiya kirim taqsimoti
+  @IsOptional()
+  @IsNumber()
+  capex?: number;
+
+  @IsOptional()
+  @IsNumber()
+  operation?: number;
+
   @IsOptional()
   @IsString()
   branchId?: string;

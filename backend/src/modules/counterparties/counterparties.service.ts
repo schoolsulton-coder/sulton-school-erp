@@ -46,6 +46,7 @@ export class CounterpartiesService {
         branches: c.branchLinks.map((l) => l.branch), // investorlar uchun ko'p filial
         category: c.category,
         filiallararo: c.filiallararo,
+        pairId: c.pairId,
         note: c.note,
         tranzaksiya: c.entries.length,
         kirim,
@@ -83,20 +84,28 @@ export class CounterpartiesService {
     return c;
   }
 
-  create(dto: CreateCounterpartyDto) {
+  async create(dto: CreateCounterpartyDto) {
     const branchIds = (dto.branchIds ?? []).filter(Boolean);
-    return this.prisma.counterparty.create({
+    const cp = await this.prisma.counterparty.create({
       data: {
         name: dto.name,
         branchId: dto.branchId,
         category: dto.category ?? 'OLDI_BERDICHI',
         filiallararo: dto.filiallararo ?? false,
+        pairId: dto.pairId || null,
         note: dto.note,
         ...(branchIds.length
           ? { branchLinks: { create: branchIds.map((branchId) => ({ branchId })) } }
           : {}),
       },
     });
+    // Juftlikni ikki tomonlama bog'lash
+    if (dto.pairId) {
+      await this.prisma.counterparty
+        .update({ where: { id: dto.pairId }, data: { pairId: cp.id } })
+        .catch(() => undefined);
+    }
+    return cp;
   }
 
   async addEntry(counterpartyId: string, dto: CreateEntryDto) {
@@ -111,25 +120,48 @@ export class CounterpartiesService {
     const amount = som + usd * rate; // so'm ekvivalenti
     if (amount <= 0) throw new BadRequestException("Summa noto'g'ri");
 
-    return this.prisma.counterpartyEntry.create({
-      data: {
-        counterpartyId,
-        direction: dto.direction,
-        amount,
-        somAmount: som || null,
-        dollarAmount: usd || null,
-        dollarRate: usd > 0 ? rate : null,
-        sabab: dto.sabab,
-        kassaTuri: dto.kassaTuri,
-        accountId: dto.accountId || null,
-        branchId: dto.branchId || null,
-        periodYear: dto.periodYear,
-        periodMonth: dto.periodMonth,
-        academicYear: dto.academicYear,
-        investType: dto.investType,
-        date: dto.date ? new Date(dto.date) : new Date(),
-        note: dto.note,
-      },
+    const sign = dto.direction === 'IN' ? 1 : -1; // IN = hisobga kirim (+), OUT = chiqim (−)
+
+    return this.prisma.$transaction(async (tx) => {
+      const entry = await tx.counterpartyEntry.create({
+        data: {
+          counterpartyId,
+          direction: dto.direction,
+          amount,
+          somAmount: som || null,
+          dollarAmount: usd || null,
+          dollarRate: usd > 0 ? rate : null,
+          sabab: dto.sabab,
+          kassaTuri: dto.kassaTuri,
+          accountId: dto.accountId || null,
+          somFlowAccountId: dto.somFlowAccountId || null,
+          dollarKassaTuri: dto.dollarKassaTuri,
+          dollarFlowAccountId: dto.dollarFlowAccountId || null,
+          capex: dto.capex,
+          operation: dto.operation,
+          branchId: dto.branchId || null,
+          periodYear: dto.periodYear,
+          periodMonth: dto.periodMonth,
+          academicYear: dto.academicYear,
+          investType: dto.investType,
+          date: dto.date ? new Date(dto.date) : new Date(),
+          note: dto.note,
+        },
+      });
+      // Tashqi hisob balansini yangilash (so'm hisob so'mda, dollar hisob dollarda)
+      if (dto.somFlowAccountId && som) {
+        await tx.flowAccount.update({
+          where: { id: dto.somFlowAccountId },
+          data: { balance: { increment: sign * som } },
+        });
+      }
+      if (dto.dollarFlowAccountId && usd) {
+        await tx.flowAccount.update({
+          where: { id: dto.dollarFlowAccountId },
+          data: { balance: { increment: sign * usd } },
+        });
+      }
+      return entry;
     });
   }
 
@@ -157,21 +189,47 @@ export class CounterpartiesService {
       somAmount: som || null,
       dollarAmount: usd || null,
       dollarRate: usd > 0 ? rate : null,
-      kassaTuri: dto.kassaTuri,
       transferPairId: pairId,
       date,
       note: dto.note,
     };
 
-    await this.prisma.$transaction([
-      this.prisma.counterpartyEntry.create({
-        data: { counterpartyId: dto.fromId, direction: 'OUT', ...shared },
-      }),
-      this.prisma.counterpartyEntry.create({
-        data: { counterpartyId: dto.toId, direction: 'IN', ...shared },
-      }),
-    ]);
-    return { ok: true };
+    return this.prisma.$transaction(async (tx) => {
+      // Jo'natuvchi (OUT) — o'z hisoblari bilan
+      await tx.counterpartyEntry.create({
+        data: {
+          counterpartyId: dto.fromId,
+          direction: 'OUT',
+          ...shared,
+          somFlowAccountId: dto.fromSomAccountId || null,
+          dollarFlowAccountId: dto.fromDollarAccountId || null,
+        },
+      });
+      // Qabul qiluvchi (IN) — o'z hisoblari bilan
+      await tx.counterpartyEntry.create({
+        data: {
+          counterpartyId: dto.toId,
+          direction: 'IN',
+          ...shared,
+          somFlowAccountId: dto.toSomAccountId || null,
+          dollarFlowAccountId: dto.toDollarAccountId || null,
+        },
+      });
+      // Balanslar: jo'natuvchidan chiqim (−), qabul qiluvchiga kirim (+)
+      if (dto.fromSomAccountId && som) {
+        await tx.flowAccount.update({ where: { id: dto.fromSomAccountId }, data: { balance: { decrement: som } } });
+      }
+      if (dto.toSomAccountId && som) {
+        await tx.flowAccount.update({ where: { id: dto.toSomAccountId }, data: { balance: { increment: som } } });
+      }
+      if (dto.fromDollarAccountId && usd) {
+        await tx.flowAccount.update({ where: { id: dto.fromDollarAccountId }, data: { balance: { decrement: usd } } });
+      }
+      if (dto.toDollarAccountId && usd) {
+        await tx.flowAccount.update({ where: { id: dto.toDollarAccountId }, data: { balance: { increment: usd } } });
+      }
+      return { ok: true };
+    });
   }
 
   async remove(id: string) {
