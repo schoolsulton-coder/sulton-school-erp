@@ -51,7 +51,8 @@ export class CounterpartiesService {
         tranzaksiya: c.entries.length,
         kirim,
         chiqim,
-        balans: chiqim - kirim, // musbat = bizning foydamizga (yashil)
+        // Investor: kirim−chiqim (qoldiq); boshqa: chiqim−kirim
+        balans: c.category === 'INVESTOR' ? kirim - chiqim : chiqim - kirim,
       };
     });
 
@@ -60,13 +61,149 @@ export class CounterpartiesService {
 
     const jamiKirim = data.reduce((s, d) => s + d.kirim, 0);
     const jamiChiqim = data.reduce((s, d) => s + d.chiqim, 0);
+    const isInvestor = params.category === 'INVESTOR';
 
     return {
       totals: {
         shaxslar: data.length,
         jamiKirim,
         jamiChiqim,
-        balans: jamiChiqim - jamiKirim,
+        balans: isInvestor ? jamiKirim - jamiChiqim : jamiChiqim - jamiKirim,
+      },
+      data,
+    };
+  }
+
+  // Flow hisob yorlig'i: "Nom (Naqd) (So'm)"
+  private flowLabel(a: { name: string; kassaTuri: string; currency: string } | null) {
+    if (!a) return null;
+    const cur = a.currency === 'USD' ? 'Dollar' : "So'm";
+    return `${a.name} (${a.kassaTuri}) (${cur})`;
+  }
+
+  // ===== Yozuvlar ro'yxati (Oldi-berdilar / Investitsiyalar tab'lari) =====
+  async entries(params: { scope: 'OLDI_BERDI' | 'INVESTITSIYA'; from?: string; to?: string; search?: string; branchId?: string }) {
+    const isInv = params.scope === 'INVESTITSIYA';
+    const cpWhere: any = { category: isInv ? 'INVESTOR' : 'OLDI_BERDICHI' };
+    if (params.branchId) cpWhere.branchId = params.branchId;
+
+    const where: any = { counterparty: cpWhere };
+    if (!isInv) where.transferPairId = null; // oldi-berdi: transfer bo'lmagan yozuvlar
+    if (params.from || params.to) {
+      where.date = {};
+      if (params.from) where.date.gte = new Date(params.from);
+      if (params.to) where.date.lte = new Date(params.to);
+    }
+    if (params.search) {
+      where.OR = [
+        { note: { contains: params.search, mode: 'insensitive' } },
+        { sabab: { contains: params.search, mode: 'insensitive' } },
+        { counterparty: { ...cpWhere, name: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const rows = await this.prisma.counterpartyEntry.findMany({
+      where,
+      include: {
+        counterparty: { include: { branch: { select: { name: true } } } },
+        somFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+        dollarFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+      },
+      orderBy: { date: 'desc' },
+      take: 500,
+    });
+
+    const data = rows.map((e) => ({
+      id: e.id,
+      date: e.date,
+      direction: e.direction,
+      sabab: e.sabab,
+      note: e.note,
+      counterparty: e.counterparty.name,
+      branch: e.counterparty.branch?.name ?? null,
+      hisob: this.flowLabel(e.somFlowAccount) ?? this.flowLabel(e.dollarFlowAccount),
+      investType: e.investType,
+      periodYear: e.periodYear,
+      periodMonth: e.periodMonth,
+      academicYear: e.academicYear,
+      amount: e.amount,
+    }));
+
+    const kirim = data.filter((d) => d.direction === 'IN').reduce((s, d) => s + d.amount, 0);
+    const chiqim = data.filter((d) => d.direction === 'OUT').reduce((s, d) => s + d.amount, 0);
+
+    return {
+      totals: {
+        count: data.length,
+        kirim,
+        chiqim,
+        balans: isInv ? kirim - chiqim : chiqim - kirim,
+      },
+      data,
+    };
+  }
+
+  // ===== Transferlar ro'yxati (juftlik bo'yicha guruhlangan) =====
+  async transfers(params: { from?: string; to?: string; search?: string; branchId?: string }) {
+    const where: any = { transferPairId: { not: null } };
+    if (params.from || params.to) {
+      where.date = {};
+      if (params.from) where.date.gte = new Date(params.from);
+      if (params.to) where.date.lte = new Date(params.to);
+    }
+
+    const rows = await this.prisma.counterpartyEntry.findMany({
+      where,
+      include: {
+        counterparty: { include: { branch: { select: { id: true, name: true } } } },
+        somFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+        dollarFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+      },
+      orderBy: { date: 'desc' },
+      take: 1000,
+    });
+
+    const groups: Record<string, { from?: (typeof rows)[number]; to?: (typeof rows)[number] }> = {};
+    for (const e of rows) {
+      const pid = e.transferPairId as string;
+      (groups[pid] ||= {});
+      if (e.direction === 'OUT') groups[pid].from = e;
+      else groups[pid].to = e;
+    }
+
+    let data = Object.entries(groups).map(([pid, g]) => {
+      const any = g.from ?? g.to!;
+      return {
+        id: pid,
+        date: any.date,
+        from: g.from?.counterparty.name ?? null,
+        fromHisob: this.flowLabel(g.from?.somFlowAccount ?? null) ?? this.flowLabel(g.from?.dollarFlowAccount ?? null),
+        fromBranch: g.from?.counterparty.branch?.id ?? null,
+        to: g.to?.counterparty.name ?? null,
+        toHisob: this.flowLabel(g.to?.somFlowAccount ?? null) ?? this.flowLabel(g.to?.dollarFlowAccount ?? null),
+        note: any.note,
+        amount: any.amount,
+        nosoz: !(g.from && g.to),
+      };
+    });
+
+    if (params.branchId) data = data.filter((d) => d.fromBranch === params.branchId);
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      data = data.filter(
+        (d) =>
+          (d.from ?? '').toLowerCase().includes(q) ||
+          (d.to ?? '').toLowerCase().includes(q) ||
+          (d.note ?? '').toLowerCase().includes(q),
+      );
+    }
+    data.sort((a, b) => +new Date(b.date) - +new Date(a.date));
+
+    return {
+      totals: {
+        count: data.length,
+        jami: data.reduce((s, d) => s + d.amount, 0),
+        nosoz: data.filter((d) => d.nosoz).length,
       },
       data,
     };

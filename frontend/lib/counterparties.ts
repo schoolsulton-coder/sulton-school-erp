@@ -107,9 +107,49 @@ export interface TransferInput {
   note?: string;
 }
 
+export interface EntryRow {
+  id: string;
+  date: string;
+  direction: 'IN' | 'OUT';
+  sabab: string | null;
+  note: string | null;
+  counterparty: string;
+  branch: string | null;
+  hisob: string | null;
+  investType: string | null;
+  periodYear: number | null;
+  periodMonth: number | null;
+  academicYear: string | null;
+  amount: number;
+}
+export interface EntriesResp {
+  totals: { count: number; kirim: number; chiqim: number; balans: number };
+  data: EntryRow[];
+}
+
+export interface TransferRow {
+  id: string;
+  date: string;
+  from: string | null;
+  fromHisob: string | null;
+  to: string | null;
+  toHisob: string | null;
+  note: string | null;
+  amount: number;
+  nosoz: boolean;
+}
+export interface TransfersResp {
+  totals: { count: number; jami: number; nosoz: number };
+  data: TransferRow[];
+}
+
 export const counterpartiesApi = {
   list: (params?: { category?: string; branchId?: string; search?: string; filiallararo?: string }) =>
     api.get<CounterpartyList>('/counterparties', { params }).then((r) => r.data),
+  entriesList: (params: { scope: string; from?: string; to?: string; search?: string; branchId?: string }) =>
+    api.get<EntriesResp>('/counterparties/entries', { params }).then((r) => r.data),
+  transfersList: (params?: { from?: string; to?: string; search?: string; branchId?: string }) =>
+    api.get<TransfersResp>('/counterparties/transfers', { params }).then((r) => r.data),
   get: (id: string) => api.get<CounterpartyDetail>(`/counterparties/${id}`).then((r) => r.data),
   create: (data: {
     name: string;

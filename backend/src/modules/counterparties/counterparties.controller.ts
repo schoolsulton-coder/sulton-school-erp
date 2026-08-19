@@ -41,6 +41,35 @@ export class CounterpartiesController {
     });
   }
 
+  @Get('entries')
+  @Permissions('finance.view')
+  entries(
+    @Query('scope') scope?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.service.entries({
+      scope: scope === 'INVESTITSIYA' ? 'INVESTITSIYA' : 'OLDI_BERDI',
+      from,
+      to,
+      search,
+      branchId,
+    });
+  }
+
+  @Get('transfers')
+  @Permissions('finance.view')
+  transfers(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.service.transfers({ from, to, search, branchId });
+  }
+
   @Get(':id')
   @Permissions('finance.view')
   get(@Param('id') id: string) {
