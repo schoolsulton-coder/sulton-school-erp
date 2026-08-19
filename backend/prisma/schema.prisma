@@ -178,6 +178,7 @@ model User {
   telegramLink    TelegramLink?
   auditLogs       AuditLog[]
   debtorContacts  DebtorContact[]  @relation("DebtorContactAuthor")
+  flowAccounts    FlowAccount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -436,6 +437,7 @@ model Branch {
   expenses  Expense[]
   counterparties Counterparty[]
   counterpartyLinks CounterpartyBranch[]
+  flowAccounts FlowAccount[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -1101,4 +1103,23 @@ model CounterpartyEntry {
   @@index([accountId])
   @@index([transferPairId])
   @@map("counterparty_entries")
+}
+
+// Tashqi pul oqimi hisobi (kassa) — filial + valyuta + kassa turi + foydalanuvchi
+model FlowAccount {
+  id        String   @id @default(uuid())
+  name      String
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  currency  String   @default("SOM")  // SOM | USD
+  kassaTuri String   @default("Naqd") // Naqd | Karta | Bank
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  balance   Float    @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([branchId])
+  @@index([currency])
+  @@map("flow_accounts")
 }

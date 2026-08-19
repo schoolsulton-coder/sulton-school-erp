@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Users, ArrowDownLeft, ArrowUpRight, Scale } from 'lucide-react';
+import { Plus, Search, Users, ArrowDownLeft, ArrowUpRight, Scale, Wallet } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { counterpartiesApi, som, CP_TABS, type CpCategory } from '@/lib/counterparties';
 import { StatCard } from '@/components/flow-ui';
 import { NewCounterpartyModal, NewTransactionModal, CounterpartyDetailModal } from '@/components/counterparty-modals';
 import { NewTransferModal, NewInvestorModal, NewInvestmentModal } from '@/components/investor-modals';
+import { FlowAccountsModal } from '@/components/flow-accounts-modal';
 
 const ADD_LABEL: Record<CpCategory, string> = {
   OLDI_BERDICHI: 'Yangi oldi-berdichi',
@@ -25,6 +26,7 @@ export default function CashflowPage() {
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [modal, setModal] = useState<null | 'cp' | 'tx' | 'transfer' | 'investor' | 'investment'>(null);
+  const [showAccounts, setShowAccounts] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const isOB = category === 'OLDI_BERDICHI';
@@ -62,12 +64,20 @@ export default function CashflowPage() {
           <h1 className="text-2xl font-bold text-slate-800">Tashqi pul-oqimi</h1>
           <p className="text-sm text-slate-400">{totals?.shaxslar ?? 0} ta oldi-berdichi</p>
         </div>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
-        >
-          <Plus size={18} /> {ADD_LABEL[category]}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAccounts(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
+          >
+            <Wallet size={18} /> Hisoblar
+          </button>
+          <button
+            onClick={onAdd}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
+          >
+            <Plus size={18} /> {ADD_LABEL[category]}
+          </button>
+        </div>
       </div>
 
       {/* Tab'lar */}
@@ -223,6 +233,7 @@ export default function CashflowPage() {
       {modal === 'investment' && (
         <NewInvestmentModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
       )}
+      {showAccounts && <FlowAccountsModal onClose={() => setShowAccounts(false)} />}
       {detailId && <CounterpartyDetailModal id={detailId} onClose={() => setDetailId(null)} onChanged={refresh} />}
     </div>
   );
