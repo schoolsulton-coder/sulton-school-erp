@@ -248,7 +248,7 @@ export class CounterpartiesService {
     return cp;
   }
 
-  async addEntry(counterpartyId: string, dto: CreateEntryDto) {
+  async addEntry(counterpartyId: string, dto: CreateEntryDto, userId?: string) {
     const c = await this.prisma.counterparty.findUnique({
       where: { id: counterpartyId },
     });
@@ -286,6 +286,8 @@ export class CounterpartiesService {
           investType: dto.investType,
           date: dto.date ? new Date(dto.date) : new Date(),
           note: dto.note,
+          createdById: userId || null,
+          updatedById: userId || null,
         },
       });
       // Tashqi hisob balansini yangilash (so'm hisob so'mda, dollar hisob dollarda)
@@ -306,7 +308,7 @@ export class CounterpartiesService {
   }
 
   // Transfer: jo'natuvchi (OUT) → qabul qiluvchi (IN), bitta transferPairId bilan
-  async transfer(dto: CreateTransferDto) {
+  async transfer(dto: CreateTransferDto, userId?: string) {
     if (dto.fromId === dto.toId) {
       throw new BadRequestException('Bir xil kontragent tanlandi');
     }
@@ -332,6 +334,8 @@ export class CounterpartiesService {
       transferPairId: pairId,
       date,
       note: dto.note,
+      createdById: userId || null,
+      updatedById: userId || null,
     };
 
     return this.prisma.$transaction(async (tx) => {
@@ -375,5 +379,216 @@ export class CounterpartiesService {
   async remove(id: string) {
     await this.prisma.counterparty.delete({ where: { id } });
     return { ok: true };
+  }
+
+  private userLabel(u: { fullName: string; email: string | null } | null) {
+    if (!u) return null;
+    return u.email ?? u.fullName;
+  }
+
+  // ===== Bitta yozuv detali (yon panel) =====
+  async entryDetail(id: string) {
+    const e = await this.prisma.counterpartyEntry.findUnique({
+      where: { id },
+      include: {
+        counterparty: { include: { branch: { select: { name: true } } } },
+        somFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+        dollarFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+        createdBy: { select: { fullName: true, email: true } },
+        updatedBy: { select: { fullName: true, email: true } },
+      },
+    });
+    if (!e) throw new NotFoundException('Yozuv topilmadi');
+    const isInv = e.counterparty.category === 'INVESTOR';
+    return {
+      id: e.id,
+      date: e.date,
+      direction: e.direction,
+      title: isInv ? e.investType ?? 'Investitsiya' : e.sabab ?? 'Tranzaksiya',
+      sabab: e.sabab,
+      note: e.note,
+      counterparty: { id: e.counterparty.id, name: e.counterparty.name, isInvestor: isInv },
+      branch: e.counterparty.branch?.name ?? null,
+      somAmount: e.somAmount,
+      dollarAmount: e.dollarAmount,
+      dollarRate: e.dollarRate,
+      amount: e.amount,
+      kassaTuri: e.kassaTuri,
+      somHisob: this.flowLabel(e.somFlowAccount),
+      dollarKassaTuri: e.dollarKassaTuri,
+      dollarHisob: this.flowLabel(e.dollarFlowAccount),
+      investType: e.investType,
+      academicYear: e.academicYear,
+      periodYear: e.periodYear,
+      periodMonth: e.periodMonth,
+      capex: e.capex,
+      operation: e.operation,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+      createdBy: this.userLabel(e.createdBy),
+      updatedBy: this.userLabel(e.updatedBy),
+    };
+  }
+
+  // ===== Transfer detali (yon panel) =====
+  async transferDetail(pairId: string) {
+    const legs = await this.prisma.counterpartyEntry.findMany({
+      where: { transferPairId: pairId },
+      include: {
+        counterparty: { include: { branch: { select: { name: true } } } },
+        somFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+        dollarFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+        createdBy: { select: { fullName: true, email: true } },
+        updatedBy: { select: { fullName: true, email: true } },
+        confirmedBy: { select: { fullName: true, email: true } },
+      },
+    });
+    if (!legs.length) throw new NotFoundException('Transfer topilmadi');
+    const from = legs.find((l) => l.direction === 'OUT');
+    const to = legs.find((l) => l.direction === 'IN');
+    const any = from ?? to!;
+    return {
+      id: pairId,
+      date: any.date,
+      amount: any.amount,
+      somAmount: any.somAmount,
+      dollarAmount: any.dollarAmount,
+      dollarRate: any.dollarRate,
+      from: from ? { id: from.counterpartyId, name: from.counterparty.name } : null,
+      fromBranch: from?.counterparty.branch?.name ?? null,
+      fromSomHisob: this.flowLabel(from?.somFlowAccount ?? null),
+      fromDollarHisob: this.flowLabel(from?.dollarFlowAccount ?? null),
+      fromSomKassa: from?.somFlowAccount?.kassaTuri ?? null,
+      to: to ? { id: to.counterpartyId, name: to.counterparty.name } : null,
+      toBranch: to?.counterparty.branch?.name ?? null,
+      toSomHisob: this.flowLabel(to?.somFlowAccount ?? null),
+      toDollarHisob: this.flowLabel(to?.dollarFlowAccount ?? null),
+      toSomKassa: to?.somFlowAccount?.kassaTuri ?? null,
+      note: any.note,
+      confirmedAt: any.confirmedAt,
+      confirmedBy: this.userLabel(any.confirmedBy),
+      createdAt: any.createdAt,
+      updatedAt: any.updatedAt,
+      createdBy: this.userLabel(any.createdBy),
+      updatedBy: this.userLabel(any.updatedBy),
+    };
+  }
+
+  async confirmTransfer(pairId: string, userId: string | undefined, confirm: boolean) {
+    const legs = await this.prisma.counterpartyEntry.findMany({ where: { transferPairId: pairId }, select: { id: true } });
+    if (!legs.length) throw new NotFoundException('Transfer topilmadi');
+    await this.prisma.counterpartyEntry.updateMany({
+      where: { transferPairId: pairId },
+      data: confirm ? { confirmedAt: new Date(), confirmedById: userId || null } : { confirmedAt: null, confirmedById: null },
+    });
+    return { ok: true };
+  }
+
+  // Yozuvni o'chirish + hisob balansini qaytarish
+  async removeEntry(id: string) {
+    const e = await this.prisma.counterpartyEntry.findUnique({ where: { id } });
+    if (!e) throw new NotFoundException('Yozuv topilmadi');
+    const sign = e.direction === 'IN' ? 1 : -1;
+    await this.prisma.$transaction(async (tx) => {
+      if (e.somFlowAccountId && e.somAmount) {
+        await tx.flowAccount.update({ where: { id: e.somFlowAccountId }, data: { balance: { decrement: sign * e.somAmount } } });
+      }
+      if (e.dollarFlowAccountId && e.dollarAmount) {
+        await tx.flowAccount.update({ where: { id: e.dollarFlowAccountId }, data: { balance: { decrement: sign * e.dollarAmount } } });
+      }
+      await tx.counterpartyEntry.delete({ where: { id } });
+    });
+    return { ok: true };
+  }
+
+  // Transferni o'chirish + ikkala hisob balansini qaytarish
+  async removeTransfer(pairId: string) {
+    const legs = await this.prisma.counterpartyEntry.findMany({ where: { transferPairId: pairId } });
+    if (!legs.length) throw new NotFoundException('Transfer topilmadi');
+    await this.prisma.$transaction(async (tx) => {
+      for (const l of legs) {
+        const sign = l.direction === 'IN' ? 1 : -1;
+        if (l.somFlowAccountId && l.somAmount) {
+          await tx.flowAccount.update({ where: { id: l.somFlowAccountId }, data: { balance: { decrement: sign * l.somAmount } } });
+        }
+        if (l.dollarFlowAccountId && l.dollarAmount) {
+          await tx.flowAccount.update({ where: { id: l.dollarFlowAccountId }, data: { balance: { decrement: sign * l.dollarAmount } } });
+        }
+      }
+      await tx.counterpartyEntry.deleteMany({ where: { transferPairId: pairId } });
+    });
+    return { ok: true };
+  }
+
+  // ===== Entity detali (to'liq sahifa): stat + xronologik operatsiyalar (qoldiq) =====
+  async counterpartyDetail(id: string) {
+    const c = await this.prisma.counterparty.findUnique({
+      where: { id },
+      include: {
+        branch: { select: { name: true } },
+        pair: { select: { name: true, branch: { select: { name: true } } } },
+        entries: {
+          include: {
+            somFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+            dollarFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
+          },
+          orderBy: { date: 'asc' },
+        },
+      },
+    });
+    if (!c) throw new NotFoundException('Topilmadi');
+    const isInv = c.category === 'INVESTOR';
+
+    let running = 0;
+    const ops = c.entries.map((e) => {
+      const contrib = isInv
+        ? e.direction === 'IN' ? e.amount : -e.amount
+        : e.direction === 'OUT' ? e.amount : -e.amount;
+      running += contrib;
+      return {
+        id: e.id,
+        date: e.date,
+        direction: e.direction,
+        type: e.transferPairId ? 'TRANSFER' : isInv ? 'INVESTITSIYA' : 'TRANZAKSIYA',
+        transferPairId: e.transferPairId,
+        sabab: e.sabab,
+        note: e.note,
+        investType: e.investType,
+        academicYear: e.academicYear,
+        periodYear: e.periodYear,
+        periodMonth: e.periodMonth,
+        capex: e.capex,
+        operation: e.operation,
+        hisob: this.flowLabel(e.somFlowAccount) ?? this.flowLabel(e.dollarFlowAccount),
+        amount: e.amount,
+        balans: running,
+      };
+    });
+    ops.reverse(); // eng yangi yuqorida
+
+    const kirim = c.entries.filter((e) => e.direction === 'IN').reduce((s, e) => s + e.amount, 0);
+    const chiqim = c.entries.filter((e) => e.direction === 'OUT').reduce((s, e) => s + e.amount, 0);
+
+    return {
+      id: c.id,
+      name: c.name,
+      branch: c.branch?.name ?? null,
+      category: c.category,
+      filiallararo: c.filiallararo,
+      pairName: c.pair?.name ?? null,
+      pairBranch: c.pair?.branch?.name ?? null,
+      totals: {
+        operatsiyalar: c.entries.length,
+        tranzaksiya: c.entries.filter((e) => !e.transferPairId).length,
+        transfer: c.entries.filter((e) => e.transferPairId).length,
+        sotuv: 0,
+        kirim,
+        chiqim,
+        balans: isInv ? kirim - chiqim : chiqim - kirim,
+        capex: c.entries.reduce((s, e) => s + (e.capex ?? 0), 0),
+        operation: c.entries.reduce((s, e) => s + (e.operation ?? 0), 0),
+      },
+      operations: ops,
+    };
   }
 }

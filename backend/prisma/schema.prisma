@@ -179,6 +179,9 @@ model User {
   auditLogs       AuditLog[]
   debtorContacts  DebtorContact[]  @relation("DebtorContactAuthor")
   flowAccounts    FlowAccount[]
+  cpEntriesCreated   CounterpartyEntry[] @relation("CpEntryCreatedBy")
+  cpEntriesUpdated   CounterpartyEntry[] @relation("CpEntryUpdatedBy")
+  cpEntriesConfirmed CounterpartyEntry[] @relation("CpEntryConfirmedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1111,7 +1114,17 @@ model CounterpartyEntry {
   transferPairId String?
   date           DateTime     @default(now())
   note           String?
+  // Audit
+  createdById    String?
+  createdBy      User?        @relation("CpEntryCreatedBy", fields: [createdById], references: [id])
+  updatedById    String?
+  updatedBy      User?        @relation("CpEntryUpdatedBy", fields: [updatedById], references: [id])
+  // Transfer tasdig'i
+  confirmedAt    DateTime?
+  confirmedById  String?
+  confirmedBy    User?        @relation("CpEntryConfirmedBy", fields: [confirmedById], references: [id])
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
 
   @@index([counterpartyId])
   @@index([accountId])
