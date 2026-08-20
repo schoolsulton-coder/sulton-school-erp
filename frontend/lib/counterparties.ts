@@ -32,6 +32,8 @@ export interface CounterpartyRow {
   category: CpCategory;
   filiallararo: boolean;
   pairId: string | null;
+  pairName: string | null;
+  pairBranch: string | null;
   note: string | null;
   tranzaksiya: number;
   kirim: number;

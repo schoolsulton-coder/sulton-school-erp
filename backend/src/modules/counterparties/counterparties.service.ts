@@ -27,6 +27,7 @@ export class CounterpartiesService {
       include: {
         branch: { select: { id: true, name: true } },
         branchLinks: { include: { branch: { select: { id: true, name: true } } } },
+        pair: { select: { name: true, branch: { select: { name: true } } } },
         entries: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -47,6 +48,8 @@ export class CounterpartiesService {
         category: c.category,
         filiallararo: c.filiallararo,
         pairId: c.pairId,
+        pairName: c.pair?.name ?? null,
+        pairBranch: c.pair?.branch?.name ?? null,
         note: c.note,
         tranzaksiya: c.entries.length,
         kirim,

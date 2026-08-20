@@ -42,6 +42,7 @@ export default function CashflowPage() {
   const isEntries = category === 'OLDI_BERDI' || category === 'INVESTITSIYA';
   const isTransfer = category === 'TRANSFER';
   const isInvestitsiya = category === 'INVESTITSIYA';
+  const isFiliallararo = category === 'OLDI_BERDICHI' && subFil === 'true';
   const range = useMemo(last30, []);
   const rp = { from: `${range.from}T00:00:00`, to: `${range.to}T23:59:59.999` };
 
@@ -85,7 +86,11 @@ export default function CashflowPage() {
 
   const count = isCp ? cpTotals?.shaxslar ?? 0 : isEntries ? enTotals?.count ?? 0 : isTransfer ? trTotals?.count ?? 0 : 0;
   const subtitle = isCp
-    ? `${count} ta ${category === 'INVESTOR' ? 'investor' : 'oldi-berdichi'}`
+    ? category === 'INVESTOR'
+      ? `${count} ta investor`
+      : isFiliallararo
+      ? `${count} ta filiallararo hisob`
+      : `${count} ta oldi-berdichi`
     : category === 'OLDI_BERDI'
     ? `${count} ta tranzaksiya`
     : isTransfer
@@ -105,7 +110,7 @@ export default function CashflowPage() {
             <Wallet size={18} /> Hisoblar
           </button>
           <button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark">
-            <Plus size={18} /> {ADD_LABEL[category]}
+            <Plus size={18} /> {isFiliallararo ? 'Yangi filiallararo hisob' : ADD_LABEL[category]}
           </button>
         </div>
       </div>
@@ -137,7 +142,7 @@ export default function CashflowPage() {
       {/* Stat kartalar */}
       {isCp && (
         <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard tone="sky" label={category === 'INVESTOR' ? 'Investorlar' : 'Shaxslar'} value={`${cpTotals?.shaxslar ?? 0}`} icon={Users} />
+          <StatCard tone="sky" label={category === 'INVESTOR' ? 'Investorlar' : isFiliallararo ? 'Hisoblar' : 'Shaxslar'} value={`${cpTotals?.shaxslar ?? 0}`} icon={Users} />
           <StatCard tone="emerald" label="Jami kirim" value={som(cpTotals?.jamiKirim ?? 0)} icon={ArrowDownLeft} />
           <StatCard tone="amber" label="Jami chiqim" value={som(cpTotals?.jamiChiqim ?? 0)} icon={ArrowUpRight} />
           <StatCard tone="rose" label={category === 'INVESTOR' ? 'Balans (qoldiq)' : 'Balans'} value={som(cpTotals?.balans ?? 0)} icon={Scale} />
@@ -180,7 +185,7 @@ export default function CashflowPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  <th className="px-5 py-3">Ism</th>
+                  <th className="px-5 py-3">{isFiliallararo ? 'Hisob' : 'Ism'}</th>
                   <th className="px-5 py-3">{category === 'INVESTOR' ? 'Filiallar' : 'Filial'}</th>
                   <th className="px-5 py-3 text-center">{category === 'INVESTOR' ? 'Investitsiya' : 'Tranzaksiya'}</th>
                   <th className="px-5 py-3 text-right">Kirim</th>
@@ -195,7 +200,17 @@ export default function CashflowPage() {
                 ) : cpRows.length ? (
                   cpRows.map((c) => (
                     <tr key={c.id} onClick={() => setDetailId(c.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
-                      <td className="px-5 py-3.5 font-semibold text-slate-800">{c.name}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-800">{c.name}</span>
+                          {isFiliallararo && (
+                            <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">Filiallararo</span>
+                          )}
+                        </div>
+                        {isFiliallararo && c.pairName && (
+                          <div className="text-xs text-slate-400">↔ {c.pairName}{c.pairBranch ? ` (${c.pairBranch})` : ''}</div>
+                        )}
+                      </td>
                       <td className="px-5 py-3.5 text-slate-500">
                         {category === 'INVESTOR' ? (c.branches.length ? c.branches.map((b) => b.name).join(', ') : '—') : c.branch?.name ?? '—'}
                       </td>
@@ -224,7 +239,7 @@ export default function CashflowPage() {
       {isEntries && <EntriesTable rows={entriesQuery.data?.data ?? []} isInvestor={isInvestitsiya} loading={entriesQuery.isLoading} />}
       {isTransfer && <TransfersTable rows={transfersQuery.data?.data ?? []} loading={transfersQuery.isLoading} />}
 
-      {modal === 'cp' && <NewCounterpartyModal category={category} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
+      {modal === 'cp' && <NewCounterpartyModal category={category} defaultFiliallararo={isFiliallararo} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {modal === 'tx' && <NewTransactionModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {modal === 'transfer' && <NewTransferModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {modal === 'investor' && <NewInvestorModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}

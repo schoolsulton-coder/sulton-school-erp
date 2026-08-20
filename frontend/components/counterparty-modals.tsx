@@ -11,16 +11,18 @@ import { HisobSelect } from './flow-account-select';
 /* ===== Yangi oldi-berdichi ===== */
 export function NewCounterpartyModal({
   category,
+  defaultFiliallararo = false,
   onClose,
   onSaved,
 }: {
   category: CpCategory;
+  defaultFiliallararo?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [filiallararo, setFiliallararo] = useState(false);
+  const [filiallararo, setFiliallararo] = useState(defaultFiliallararo);
   const [pairId, setPairId] = useState('');
   const [error, setError] = useState('');
 
@@ -54,8 +56,8 @@ export function NewCounterpartyModal({
 
   return (
     <ModalShell
-      title="Yangi oldi-berdichi"
-      subtitle="Kontragent (shaxs yoki tashkilot)"
+      title={defaultFiliallararo ? 'Yangi filiallararo hisob' : 'Yangi oldi-berdichi'}
+      subtitle={defaultFiliallararo ? 'Filiallararo (transferlarda ko\'rinadi)' : 'Kontragent (shaxs yoki tashkilot)'}
       icon={UserPlus}
       onClose={onClose}
       footer={<SaveFooter onClose={onClose} pending={save.isPending} onSave={submit} />}
