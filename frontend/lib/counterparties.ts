@@ -143,9 +143,45 @@ export interface TransfersResp {
   data: TransferRow[];
 }
 
+export interface EntryDetail {
+  id: string; date: string; direction: 'IN' | 'OUT'; title: string; sabab: string | null; note: string | null;
+  counterparty: { id: string; name: string; isInvestor: boolean }; branch: string | null;
+  somAmount: number | null; dollarAmount: number | null; dollarRate: number | null; amount: number;
+  kassaTuri: string | null; somHisob: string | null; dollarKassaTuri: string | null; dollarHisob: string | null;
+  investType: string | null; academicYear: string | null; periodYear: number | null; periodMonth: number | null;
+  capex: number | null; operation: number | null;
+  createdAt: string; updatedAt: string; createdBy: string | null; updatedBy: string | null;
+}
+export interface TransferDetail {
+  id: string; date: string; amount: number; somAmount: number | null; dollarAmount: number | null; dollarRate: number | null;
+  from: { id: string; name: string } | null; fromBranch: string | null; fromSomHisob: string | null; fromDollarHisob: string | null; fromSomKassa: string | null;
+  to: { id: string; name: string } | null; toBranch: string | null; toSomHisob: string | null; toDollarHisob: string | null; toSomKassa: string | null;
+  note: string | null; confirmedAt: string | null; confirmedBy: string | null;
+  createdAt: string; updatedAt: string; createdBy: string | null; updatedBy: string | null;
+}
+export interface OpRow {
+  id: string; date: string; direction: 'IN' | 'OUT'; type: 'TRANZAKSIYA' | 'TRANSFER' | 'INVESTITSIYA';
+  transferPairId: string | null; sabab: string | null; note: string | null; investType: string | null;
+  academicYear: string | null; periodYear: number | null; periodMonth: number | null;
+  capex: number | null; operation: number | null; hisob: string | null; amount: number; balans: number;
+}
+export interface EntityDetail {
+  id: string; name: string; branch: string | null; branches: string[]; category: CpCategory; filiallararo: boolean;
+  pairName: string | null; pairBranch: string | null;
+  totals: { operatsiyalar: number; tranzaksiya: number; transfer: number; sotuv: number; kirim: number; chiqim: number; balans: number; capex: number; operation: number };
+  operations: OpRow[];
+}
+
 export const counterpartiesApi = {
   list: (params?: { category?: string; branchId?: string; search?: string; filiallararo?: string }) =>
     api.get<CounterpartyList>('/counterparties', { params }).then((r) => r.data),
+  entryDetail: (id: string) => api.get<EntryDetail>(`/counterparties/entries/${id}`).then((r) => r.data),
+  transferDetail: (pairId: string) => api.get<TransferDetail>(`/counterparties/transfers/${pairId}`).then((r) => r.data),
+  confirmTransfer: (pairId: string, confirm: boolean) =>
+    api.post(`/counterparties/transfers/${pairId}/confirm`, { confirm }).then((r) => r.data),
+  removeEntry: (id: string) => api.delete(`/counterparties/entries/${id}`).then((r) => r.data),
+  removeTransfer: (pairId: string) => api.delete(`/counterparties/transfers/${pairId}`).then((r) => r.data),
+  detail: (id: string) => api.get<EntityDetail>(`/counterparties/${id}/detail`).then((r) => r.data),
   entriesList: (params: { scope: string; from?: string; to?: string; search?: string; branchId?: string }) =>
     api.get<EntriesResp>('/counterparties/entries', { params }).then((r) => r.data),
   transfersList: (params?: { from?: string; to?: string; search?: string; branchId?: string }) =>

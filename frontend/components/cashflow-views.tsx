@@ -16,7 +16,7 @@ function TuriBadge({ dir }: { dir: 'IN' | 'OUT' }) {
 const signed = (dir: 'IN' | 'OUT', amount: number) => (dir === 'IN' ? `+${som(amount)}` : `−${som(amount)}`);
 
 /* ===== Yozuvlar jadvali (Oldi-berdilar / Investitsiyalar) ===== */
-export function EntriesTable({ rows, isInvestor, loading }: { rows: EntryRow[]; isInvestor: boolean; loading: boolean }) {
+export function EntriesTable({ rows, isInvestor, loading, onRow }: { rows: EntryRow[]; isInvestor: boolean; loading: boolean; onRow?: (id: string) => void }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -36,7 +36,7 @@ export function EntriesTable({ rows, isInvestor, loading }: { rows: EntryRow[]; 
               <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
             ) : rows.length ? (
               rows.map((e) => (
-                <tr key={e.id} className="border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
+                <tr key={e.id} onClick={() => onRow?.(e.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
                   <td className="whitespace-nowrap px-5 py-3.5">
                     <div className="text-slate-600">{fmtDate(e.date)}</div>
                     <div className="text-xs text-slate-400">{fmtTime(e.date)}</div>
@@ -82,7 +82,7 @@ export function EntriesTable({ rows, isInvestor, loading }: { rows: EntryRow[]; 
 }
 
 /* ===== Transferlar jadvali ===== */
-export function TransfersTable({ rows, loading }: { rows: TransferRow[]; loading: boolean }) {
+export function TransfersTable({ rows, loading, onRow }: { rows: TransferRow[]; loading: boolean; onRow?: (pairId: string) => void }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -102,7 +102,7 @@ export function TransfersTable({ rows, loading }: { rows: TransferRow[]; loading
               <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
             ) : rows.length ? (
               rows.map((t) => (
-                <tr key={t.id} className={`border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03] ${t.nosoz ? 'bg-rose-50/40' : ''}`}>
+                <tr key={t.id} onClick={() => onRow?.(t.id)} className={`cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03] ${t.nosoz ? 'bg-rose-50/40' : ''}`}>
                   <td className="whitespace-nowrap px-5 py-3.5">
                     <div className="text-slate-600">{fmtDate(t.date)}</div>
                     <div className="text-xs text-slate-400">{fmtTime(t.date)}</div>

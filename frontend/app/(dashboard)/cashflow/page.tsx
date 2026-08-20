@@ -1,15 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Users, ArrowDownLeft, ArrowUpRight, Scale, Wallet, ListOrdered, AlertTriangle, Trash2, Pencil } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { counterpartiesApi, som, CP_TABS, type CpCategory } from '@/lib/counterparties';
 import { StatCard } from '@/components/flow-ui';
-import { NewCounterpartyModal, NewTransactionModal, CounterpartyDetailModal } from '@/components/counterparty-modals';
+import { NewCounterpartyModal, NewTransactionModal } from '@/components/counterparty-modals';
 import { NewTransferModal, NewInvestorModal, NewInvestmentModal } from '@/components/investor-modals';
 import { FlowAccountsModal } from '@/components/flow-accounts-modal';
 import { EntriesTable, TransfersTable } from '@/components/cashflow-views';
+import { EntryDetailPanel, TransferDetailPanel } from '@/components/detail-panels';
 
 const ADD_LABEL: Record<CpCategory, string> = {
   OLDI_BERDICHI: 'Yangi oldi-berdichi',
@@ -29,13 +31,15 @@ const last30 = () => {
 
 export default function CashflowPage() {
   const qc = useQueryClient();
+  const router = useRouter();
   const [category, setCategory] = useState<CpCategory>('OLDI_BERDICHI');
   const [subFil, setSubFil] = useState<'false' | 'true'>('false');
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [modal, setModal] = useState<null | 'cp' | 'tx' | 'transfer' | 'investor' | 'investment'>(null);
   const [showAccounts, setShowAccounts] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [entryPanelId, setEntryPanelId] = useState<string | null>(null);
+  const [transferPanelId, setTransferPanelId] = useState<string | null>(null);
 
   const isOB = category === 'OLDI_BERDICHI';
   const isCp = category === 'OLDI_BERDICHI' || category === 'INVESTOR';
@@ -199,7 +203,7 @@ export default function CashflowPage() {
                   <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
                 ) : cpRows.length ? (
                   cpRows.map((c) => (
-                    <tr key={c.id} onClick={() => setDetailId(c.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
+                    <tr key={c.id} onClick={() => router.push(`/cashflow/${c.id}`)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-slate-800">{c.name}</span>
@@ -221,7 +225,7 @@ export default function CashflowPage() {
                       {category === 'INVESTOR' && (
                         <td className="px-5 py-3.5">
                           <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={() => setDetailId(c.id)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><Pencil size={14} /></button>
+                            <button onClick={() => router.push(`/cashflow/${c.id}`)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><Pencil size={14} /></button>
                             <button onClick={() => { if (confirm("Investor o'chirilsinmi?")) del.mutate(c.id); }} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={14} /></button>
                           </div>
                         </td>
@@ -236,8 +240,8 @@ export default function CashflowPage() {
           </div>
         </div>
       )}
-      {isEntries && <EntriesTable rows={entriesQuery.data?.data ?? []} isInvestor={isInvestitsiya} loading={entriesQuery.isLoading} />}
-      {isTransfer && <TransfersTable rows={transfersQuery.data?.data ?? []} loading={transfersQuery.isLoading} />}
+      {isEntries && <EntriesTable rows={entriesQuery.data?.data ?? []} isInvestor={isInvestitsiya} loading={entriesQuery.isLoading} onRow={setEntryPanelId} />}
+      {isTransfer && <TransfersTable rows={transfersQuery.data?.data ?? []} loading={transfersQuery.isLoading} onRow={setTransferPanelId} />}
 
       {modal === 'cp' && <NewCounterpartyModal category={category} defaultFiliallararo={isFiliallararo} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {modal === 'tx' && <NewTransactionModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
@@ -245,7 +249,8 @@ export default function CashflowPage() {
       {modal === 'investor' && <NewInvestorModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {modal === 'investment' && <NewInvestmentModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {showAccounts && <FlowAccountsModal onClose={() => setShowAccounts(false)} />}
-      {detailId && <CounterpartyDetailModal id={detailId} onClose={() => setDetailId(null)} onChanged={refresh} />}
+      {entryPanelId && <EntryDetailPanel id={entryPanelId} onClose={() => setEntryPanelId(null)} onChanged={refresh} />}
+      {transferPanelId && <TransferDetailPanel pairId={transferPanelId} onClose={() => setTransferPanelId(null)} onChanged={refresh} />}
     </div>
   );
 }

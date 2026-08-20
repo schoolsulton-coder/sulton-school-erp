@@ -526,6 +526,7 @@ export class CounterpartiesService {
       where: { id },
       include: {
         branch: { select: { name: true } },
+        branchLinks: { include: { branch: { select: { name: true } } } },
         pair: { select: { name: true, branch: { select: { name: true } } } },
         entries: {
           include: {
@@ -573,6 +574,7 @@ export class CounterpartiesService {
       id: c.id,
       name: c.name,
       branch: c.branch?.name ?? null,
+      branches: c.branchLinks.map((l) => l.branch.name),
       category: c.category,
       filiallararo: c.filiallararo,
       pairName: c.pair?.name ?? null,
