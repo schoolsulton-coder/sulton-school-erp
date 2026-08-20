@@ -111,22 +111,26 @@ export default function CashflowPage() {
       </div>
 
       {/* Tab'lar */}
-      <div className="mb-3 inline-flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
-        {CP_TABS.map((t) => (
-          <button key={t.key} onClick={() => setCategory(t.key)} className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${category === t.key ? 'bg-brand text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Ost-tab'lar (Oldi-berdichilar) */}
-      {isOB && (
-        <div className="mb-4 inline-flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
-          {([['false', 'Qarz oldi-berdi'], ['true', 'Filiallararo']] as const).map(([v, label]) => (
-            <button key={v} onClick={() => setSubFil(v)} className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${subFil === v ? 'bg-brand text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              {label}
+      <div className="mb-3">
+        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+          {CP_TABS.map((t) => (
+            <button key={t.key} onClick={() => setCategory(t.key)} className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${category === t.key ? 'bg-brand text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              {t.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Ost-tab'lar (Oldi-berdichilar) — alohida qatorda */}
+      {isOB && (
+        <div className="mb-4">
+          <div className="inline-flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+            {([['false', 'Qarz oldi-berdi'], ['true', 'Filiallararo']] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setSubFil(v)} className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${subFil === v ? 'bg-brand text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
