@@ -4,7 +4,6 @@ export type CpCategory =
   | 'OLDI_BERDICHI'
   | 'OLDI_BERDI'
   | 'TRANSFER'
-  | 'SOTUV'
   | 'INVESTOR'
   | 'INVESTITSIYA';
 
@@ -12,7 +11,6 @@ export const CP_TABS: { key: CpCategory; label: string }[] = [
   { key: 'OLDI_BERDICHI', label: 'Oldi-berdichilar' },
   { key: 'OLDI_BERDI', label: 'Oldi-berdilar' },
   { key: 'TRANSFER', label: 'Transferlar' },
-  { key: 'SOTUV', label: 'Sotuvlar' },
   { key: 'INVESTOR', label: 'Investorlar' },
   { key: 'INVESTITSIYA', label: 'Investitsiyalar' },
 ];

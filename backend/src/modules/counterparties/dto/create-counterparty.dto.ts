@@ -4,7 +4,6 @@ export const COUNTERPARTY_CATEGORIES = [
   'OLDI_BERDICHI',
   'OLDI_BERDI',
   'TRANSFER',
-  'SOTUV',
   'INVESTOR',
   'INVESTITSIYA',
 ] as const;

@@ -15,7 +15,6 @@ const ADD_LABEL: Record<CpCategory, string> = {
   OLDI_BERDICHI: 'Yangi oldi-berdichi',
   OLDI_BERDI: 'Qo\'shish',
   TRANSFER: 'Qo\'shish',
-  SOTUV: 'Yangi sotuv',
   INVESTOR: 'Yangi investor',
   INVESTITSIYA: 'Qo\'shish',
 };
@@ -76,8 +75,7 @@ export default function CashflowPage() {
     else if (category === 'OLDI_BERDI') setModal('tx');
     else if (category === 'TRANSFER') setModal('transfer');
     else if (category === 'INVESTOR') setModal('investor');
-    else if (category === 'INVESTITSIYA') setModal('investment');
-    else alert('Sotuvlar formasi keyinroq qo\'shiladi.');
+    else setModal('investment');
   };
 
   const cpTotals = cpQuery.data?.totals;
@@ -92,9 +90,7 @@ export default function CashflowPage() {
     ? `${count} ta tranzaksiya`
     : isTransfer
     ? `${count} ta transfer`
-    : isInvestitsiya
-    ? `${count} ta investitsiya`
-    : 'Sotuvlar';
+    : `${count} ta investitsiya`;
 
   return (
     <div className="min-h-full bg-slate-50/60 p-6">
@@ -108,11 +104,9 @@ export default function CashflowPage() {
           <button onClick={() => setShowAccounts(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50">
             <Wallet size={18} /> Hisoblar
           </button>
-          {category !== 'SOTUV' && (
-            <button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark">
-              <Plus size={18} /> {ADD_LABEL[category]}
-            </button>
-          )}
+          <button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark">
+            <Plus size={18} /> {ADD_LABEL[category]}
+          </button>
         </div>
       </div>
 
@@ -225,9 +219,6 @@ export default function CashflowPage() {
       )}
       {isEntries && <EntriesTable rows={entriesQuery.data?.data ?? []} isInvestor={isInvestitsiya} loading={entriesQuery.isLoading} />}
       {isTransfer && <TransfersTable rows={transfersQuery.data?.data ?? []} loading={transfersQuery.isLoading} />}
-      {category === 'SOTUV' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm">Sotuvlar — tez orada</div>
-      )}
 
       {modal === 'cp' && <NewCounterpartyModal category={category} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
       {modal === 'tx' && <NewTransactionModal onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
