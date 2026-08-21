@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ArrowDownLeft, ArrowUpRight, Scale, ListOrdered, AlertTriangle } from 'lucide-react';
+import { Plus, Search, ArrowDownLeft, ArrowUpRight, Scale, ListOrdered, AlertTriangle, Wallet } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { som } from '@/lib/counterparties';
 import { internalTransfersApi, usd, IT_TABS, type ItKind } from '@/lib/internal-transfers';
@@ -10,6 +10,7 @@ import { StatCard } from '@/components/flow-ui';
 import { TransferTable, ValyutaTable, PulTable } from '@/components/internal-views';
 import { InternalTransferForm } from '@/components/internal-transfer-form';
 import { InternalDetailPanel } from '@/components/internal-detail';
+import { FlowAccountsModal } from '@/components/flow-accounts-modal';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const last30 = () => {
@@ -25,6 +26,7 @@ export default function TransfersPage() {
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showAccounts, setShowAccounts] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const range = useMemo(last30, []);
   const rp = { from: `${range.from}T00:00:00`, to: `${range.to}T23:59:59.999` };
@@ -48,9 +50,14 @@ export default function TransfersPage() {
           <h1 className="text-2xl font-bold text-slate-800">Ichki pul oqimi</h1>
           <p className="text-sm text-slate-400">{subtitle}</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark">
-          <Plus size={18} /> Qo&apos;shish
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowAccounts(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50">
+            <Wallet size={18} /> Hisoblar
+          </button>
+          <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark">
+            <Plus size={18} /> Qo&apos;shish
+          </button>
+        </div>
       </div>
 
       {/* Ost-tab'lar */}
@@ -113,6 +120,7 @@ export default function TransfersPage() {
       {detailId && (
         <InternalDetailPanel id={detailId} onClose={() => setDetailId(null)} onChanged={() => qc.invalidateQueries({ queryKey: ['it'] })} />
       )}
+      {showAccounts && <FlowAccountsModal onClose={() => setShowAccounts(false)} />}
     </div>
   );
 }
