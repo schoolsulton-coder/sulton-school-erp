@@ -109,6 +109,58 @@ export class HrService {
     return { totals: { xodimlar, lavozimlar, telefonBor, kartaBor }, data };
   }
 
+  // ===== Maoshlar · Lavozimlar (bo'lim bo'yicha xodim-lavozim) =====
+  async lavozimlar(params: { search?: string; branchId?: string; departmentId?: string; status?: string }) {
+    const where: any = {};
+    if (params.branchId) where.branchId = params.branchId;
+    if (params.departmentId) where.departmentId = params.departmentId;
+    if (params.status) where.status = params.status;
+    if (params.search) {
+      where.OR = [
+        { user: { fullName: { contains: params.search, mode: 'insensitive' } } },
+        { position: { name: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const rows = await this.prisma.employee.findMany({
+      where,
+      include: {
+        user: { select: { fullName: true, phone: true } },
+        department: { select: { id: true, name: true } },
+        position: { select: { name: true } },
+        branch: { select: { name: true } },
+        salary: true,
+      },
+      orderBy: [{ department: { name: 'asc' } }, { createdAt: 'desc' }],
+      take: 2000,
+    });
+
+    const data = rows.map((e) => ({
+      id: e.id,
+      fio: e.user.fullName,
+      phone: e.user.phone,
+      position: e.position?.name ?? null,
+      department: e.department?.name ?? 'Boshqa',
+      branch: e.branch?.name ?? null,
+      hisobKitob: e.salary?.type ?? null,
+      stavka: e.salary?.baseRate ?? null,
+      formal: e.formal,
+      status: e.status,
+    }));
+
+    const [jamiLavozimlar, faolXodimlar, boshagan, asosiyHisobKitob] = await Promise.all([
+      this.prisma.employee.count(),
+      this.prisma.employee.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.employee.count({ where: { status: 'TERMINATED' } }),
+      this.prisma.salary.count(),
+    ]);
+
+    return {
+      totals: { jamiLavozimlar, faolLavozimlar: faolXodimlar, faolXodimlar, boshagan, asosiyHisobKitob },
+      data,
+    };
+  }
+
   async getEmployee(id: string) {
     const emp = await this.prisma.employee.findUnique({
       where: { id },

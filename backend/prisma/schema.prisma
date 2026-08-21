@@ -830,6 +830,7 @@ model Employee {
   branch       Branch?        @relation(fields: [branchId], references: [id])
   gender       Gender?
   cardNumber   String?
+  formal       Boolean        @default(false) // rasmiy / norasmiy
   hireDate     DateTime
   fireDate     DateTime?
   status       EmployeeStatus @default(ACTIVE)

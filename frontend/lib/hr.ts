@@ -51,11 +51,30 @@ export interface XodimlarResp {
 }
 export const GENDER_LABEL: Record<string, string> = { MALE: 'Erkak', FEMALE: 'Ayol' };
 
+export interface LavozimRow {
+  id: string;
+  fio: string;
+  phone: string;
+  position: string | null;
+  department: string;
+  branch: string | null;
+  hisobKitob: SalaryType | null;
+  stavka: number | null;
+  formal: boolean;
+  status: EmployeeStatus;
+}
+export interface LavozimlarResp {
+  totals: { jamiLavozimlar: number; faolLavozimlar: number; faolXodimlar: number; boshagan: number; asosiyHisobKitob: number };
+  data: LavozimRow[];
+}
+
 export const hrApi = {
   employees: (params?: { status?: string; departmentId?: string }) =>
     api.get<Employee[]>('/hr/employees', { params }).then((r) => r.data),
   xodimlar: (params?: { search?: string; branchId?: string }) =>
     api.get<XodimlarResp>('/hr/xodimlar', { params }).then((r) => r.data),
+  lavozimlar: (params?: { search?: string; branchId?: string; departmentId?: string; status?: string }) =>
+    api.get<LavozimlarResp>('/hr/lavozimlar', { params }).then((r) => r.data),
   employee: (id: string) => api.get(`/hr/employees/${id}`).then((r) => r.data),
   hire: (data: {
     fullName: string;
