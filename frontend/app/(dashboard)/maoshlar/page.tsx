@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { XodimlarTab, LavozimlarTab, ShartnomalarTab, TolovlarTab } from '@/components/maoshlar-tabs';
 import { OylikHisobTab } from '@/components/oylik-hisob';
+import { Oylik10Tab, UmumiyTab } from '@/components/oylik-report';
 
 const TABS = ['Umumiy', 'Xodimlar', 'Lavozimlar', 'Oylik hisob', '10 oylik', "To'lovlar", 'Shartnomalar'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function MaoshlarPage() {
-  const [tab, setTab] = useState<Tab>('Xodimlar');
+  const [tab, setTab] = useState<Tab>('Umumiy');
 
   return (
     <div className="min-h-full bg-slate-50/60 p-6">
@@ -24,20 +25,20 @@ export default function MaoshlarPage() {
         </div>
       </div>
 
-      {tab === 'Xodimlar' ? (
+      {tab === 'Umumiy' ? (
+        <UmumiyTab />
+      ) : tab === 'Xodimlar' ? (
         <XodimlarTab />
       ) : tab === 'Oylik hisob' ? (
         <OylikHisobTab />
+      ) : tab === '10 oylik' ? (
+        <Oylik10Tab />
       ) : tab === 'Lavozimlar' ? (
         <LavozimlarTab />
       ) : tab === 'Shartnomalar' ? (
         <ShartnomalarTab />
-      ) : tab === "To'lovlar" ? (
-        <TolovlarTab />
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm">
-          «{tab}» — keyingi bosqichda tayyor bo&apos;ladi
-        </div>
+        <TolovlarTab />
       )}
     </div>
   );

@@ -128,6 +128,18 @@ export class HrController {
     return this.service.oylikConfirm(id, confirm !== false);
   }
 
+  @Get('oylik-10')
+  @Permissions('hr.view')
+  oylik10(@Query('academicYear') academicYear: string, @Query('branchId') branchId?: string) {
+    return this.service.oylik10(academicYear, branchId);
+  }
+
+  @Get('maosh-umumiy')
+  @Permissions('hr.view')
+  umumiy(@Query('period') period: string, @Query('branchId') branchId?: string) {
+    return this.service.umumiy(period, branchId);
+  }
+
   @Get('employees/:id')
   @Permissions('hr.view')
   getEmployee(@Param('id') id: string) {

@@ -159,6 +159,26 @@ export interface OylikDetail {
   payments: { id: string; date: string; amount: number }[];
 }
 
+export interface Oylik10Month {
+  period: string;
+  xodim: number;
+  hisoblangan: number;
+  tasdiqlangan: number;
+  tasdiqlashga: number;
+}
+export interface Oylik10Resp {
+  totals: { jami: number; ortacha: number; xodimlar: number; toldirilgan: number };
+  months: Oylik10Month[];
+}
+export interface UmumiyResp {
+  xodimlar: number;
+  hisoblangan: number;
+  berilgan: number;
+  qoldiq: number;
+  shartnomalar: number;
+  period: string;
+}
+
 export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
   YARATILGAN: { label: 'Yaratilgan', cls: 'bg-emerald-50 text-emerald-600' },
   OZGARTIRILGAN: { label: "O'zgartirilgan", cls: 'bg-amber-50 text-amber-600' },
@@ -183,6 +203,10 @@ export const hrApi = {
   oylikDetail: (id: string) => api.get<OylikDetail>(`/hr/oylik/${id}`).then((r) => r.data),
   oylikConfirm: (id: string, confirm: boolean) =>
     api.post(`/hr/oylik/${id}/confirm`, { confirm }).then((r) => r.data),
+  oylik10: (academicYear: string, branchId?: string) =>
+    api.get<Oylik10Resp>('/hr/oylik-10', { params: { academicYear, branchId } }).then((r) => r.data),
+  maoshUmumiy: (period: string, branchId?: string) =>
+    api.get<UmumiyResp>('/hr/maosh-umumiy', { params: { period, branchId } }).then((r) => r.data),
   employee: (id: string) => api.get(`/hr/employees/${id}`).then((r) => r.data),
   hire: (data: {
     fullName: string;

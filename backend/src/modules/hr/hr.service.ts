@@ -408,6 +408,55 @@ export class HrService {
     return this.prisma.payrollRecord.update({ where: { id }, data: { confirmed: confirm } });
   }
 
+  // ===== Maoshlar · 10 oylik (o'quv yili: Sentabr–Iyun) =====
+  async oylik10(academicYear: string, branchId?: string) {
+    const [y1, y2] = academicYear.split('-').map(Number);
+    const periods: string[] = [];
+    for (let m = 9; m <= 12; m++) periods.push(`${y1}-${String(m).padStart(2, '0')}`);
+    for (let m = 1; m <= 6; m++) periods.push(`${y2}-${String(m).padStart(2, '0')}`);
+
+    const where: any = { period: { in: periods } };
+    if (branchId) where.employee = { branchId };
+    const records = await this.prisma.payrollRecord.findMany({ where });
+
+    const g: Record<string, { xodim: Set<string>; hisoblangan: number; tasdiqlangan: number; tasdiqlashga: number }> = {};
+    periods.forEach((p) => (g[p] = { xodim: new Set(), hisoblangan: 0, tasdiqlangan: 0, tasdiqlashga: 0 }));
+    const allEmp = new Set<string>();
+    for (const r of records) {
+      const c = this.calcJami(r);
+      const gg = g[r.period];
+      if (!gg) continue;
+      gg.xodim.add(r.employeeId);
+      allEmp.add(r.employeeId);
+      gg.hisoblangan += c.jami;
+      if (r.confirmed) gg.tasdiqlangan += c.jami;
+      else gg.tasdiqlashga += c.jami;
+    }
+    const months = periods.map((p) => ({ period: p, xodim: g[p].xodim.size, hisoblangan: g[p].hisoblangan, tasdiqlangan: g[p].tasdiqlangan, tasdiqlashga: g[p].tasdiqlashga }));
+    const jami = months.reduce((s, m) => s + m.hisoblangan, 0);
+    const toldirilgan = months.filter((m) => m.xodim > 0).length;
+    return { totals: { jami, ortacha: jami / 10, xodimlar: allEmp.size, toldirilgan }, months };
+  }
+
+  // ===== Maoshlar · Umumiy (dashboard) =====
+  async umumiy(period: string, branchId?: string) {
+    const empWhere: any = { status: 'ACTIVE' };
+    if (branchId) empWhere.branchId = branchId;
+    const [xodimlar, oyRes, contracts] = await Promise.all([
+      this.prisma.employee.count({ where: empWhere }),
+      this.oylikList({ period, branchId }),
+      this.prisma.employmentContract.count(),
+    ]);
+    return {
+      xodimlar,
+      hisoblangan: oyRes.totals.jamiSumma,
+      berilgan: oyRes.totals.berilgan,
+      qoldiq: oyRes.totals.jamiSumma - oyRes.totals.berilgan,
+      shartnomalar: contracts,
+      period,
+    };
+  }
+
   async getEmployee(id: string) {
     const emp = await this.prisma.employee.findUnique({
       where: { id },
