@@ -68,6 +68,28 @@ export interface LavozimlarResp {
   data: LavozimRow[];
 }
 
+export interface ShartnomaRow {
+  id: string;
+  date: string;
+  number: string;
+  xodim: string;
+  position: string | null;
+  type: string;
+  employment: string | null;
+  stavka: number | null;
+  branch: string | null;
+  status: string;
+}
+export interface ShartnomalarResp {
+  totals: { jami: number; yaratilgan: number; ozgartirilgan: number; bekor: number };
+  data: ShartnomaRow[];
+}
+export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
+  YARATILGAN: { label: 'Yaratilgan', cls: 'bg-emerald-50 text-emerald-600' },
+  OZGARTIRILGAN: { label: "O'zgartirilgan", cls: 'bg-amber-50 text-amber-600' },
+  BEKOR: { label: 'Bekor qilingan', cls: 'bg-rose-50 text-rose-600' },
+};
+
 export const hrApi = {
   employees: (params?: { status?: string; departmentId?: string }) =>
     api.get<Employee[]>('/hr/employees', { params }).then((r) => r.data),
@@ -75,6 +97,8 @@ export const hrApi = {
     api.get<XodimlarResp>('/hr/xodimlar', { params }).then((r) => r.data),
   lavozimlar: (params?: { search?: string; branchId?: string; departmentId?: string; status?: string }) =>
     api.get<LavozimlarResp>('/hr/lavozimlar', { params }).then((r) => r.data),
+  shartnomalar: (params?: { search?: string; branchId?: string; type?: string; employment?: string }) =>
+    api.get<ShartnomalarResp>('/hr/shartnomalar', { params }).then((r) => r.data),
   employee: (id: string) => api.get(`/hr/employees/${id}`).then((r) => r.data),
   hire: (data: {
     fullName: string;

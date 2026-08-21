@@ -161,6 +161,52 @@ export class HrService {
     };
   }
 
+  // ===== Maoshlar · Shartnomalar =====
+  async shartnomalar(params: { search?: string; branchId?: string; type?: string; employment?: string }) {
+    const where: any = {};
+    if (params.branchId) where.branchId = params.branchId;
+    if (params.type) where.type = params.type;
+    if (params.employment) where.employment = params.employment;
+    if (params.search) {
+      where.OR = [
+        { number: { contains: params.search, mode: 'insensitive' } },
+        { employee: { user: { fullName: { contains: params.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const rows = await this.prisma.employmentContract.findMany({
+      where,
+      include: {
+        employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } } } },
+        branch: { select: { name: true } },
+      },
+      orderBy: { date: 'desc' },
+      take: 500,
+    });
+
+    const data = rows.map((c) => ({
+      id: c.id,
+      date: c.date,
+      number: c.number,
+      xodim: c.employee.user.fullName,
+      position: c.employee.position?.name ?? null,
+      type: c.type,
+      employment: c.employment,
+      stavka: c.stavka,
+      branch: c.branch?.name ?? null,
+      status: c.status,
+    }));
+
+    const [jami, yaratilgan, ozgartirilgan, bekor] = await Promise.all([
+      this.prisma.employmentContract.count(),
+      this.prisma.employmentContract.count({ where: { status: 'YARATILGAN' } }),
+      this.prisma.employmentContract.count({ where: { status: 'OZGARTIRILGAN' } }),
+      this.prisma.employmentContract.count({ where: { status: 'BEKOR' } }),
+    ]);
+
+    return { totals: { jami, yaratilgan, ozgartirilgan, bekor }, data };
+  }
+
   async getEmployee(id: string) {
     const emp = await this.prisma.employee.findUnique({
       where: { id },

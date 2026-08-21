@@ -80,6 +80,17 @@ export class HrController {
     return this.service.lavozimlar({ search, branchId, departmentId, status });
   }
 
+  @Get('shartnomalar')
+  @Permissions('hr.view')
+  shartnomalar(
+    @Query('search') search?: string,
+    @Query('branchId') branchId?: string,
+    @Query('type') type?: string,
+    @Query('employment') employment?: string,
+  ) {
+    return this.service.shartnomalar({ search, branchId, type, employment });
+  }
+
   @Get('employees/:id')
   @Permissions('hr.view')
   getEmployee(@Param('id') id: string) {

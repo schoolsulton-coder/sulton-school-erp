@@ -446,6 +446,7 @@ model Branch {
   flowAccounts FlowAccount[]
   internalTransfers InternalTransfer[]
   employees Employee[]
+  employmentContracts EmploymentContract[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -838,11 +839,33 @@ model Employee {
   salary       Salary?
   payrollItems PayrollItem[]
   documents    EmployeeDocument[]
+  contracts    EmploymentContract[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("employees")
+}
+
+// Mehnat shartnomasi (Maoshlar · Shartnomalar)
+model EmploymentContract {
+  id         String   @id @default(uuid())
+  number     String   // raqam (60/2, 35/3...)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime @default(now())
+  type       String   // shartnoma turi (masalan: Ishga qabul, Ishdan bo'shash...)
+  employment String?  // bandlik
+  stavka     Float?
+  branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  status     String   @default("YARATILGAN") // YARATILGAN | OZGARTIRILGAN | BEKOR
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([date])
+  @@map("employment_contracts")
 }
 
 model EmployeeDocument {
