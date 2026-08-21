@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { XodimlarTab, LavozimlarTab, ShartnomalarTab, TolovlarTab } from '@/components/maoshlar-tabs';
+import { OylikHisobTab } from '@/components/oylik-hisob';
 
 const TABS = ['Umumiy', 'Xodimlar', 'Lavozimlar', 'Oylik hisob', '10 oylik', "To'lovlar", 'Shartnomalar'] as const;
 type Tab = (typeof TABS)[number];
@@ -25,6 +26,8 @@ export default function MaoshlarPage() {
 
       {tab === 'Xodimlar' ? (
         <XodimlarTab />
+      ) : tab === 'Oylik hisob' ? (
+        <OylikHisobTab />
       ) : tab === 'Lavozimlar' ? (
         <LavozimlarTab />
       ) : tab === 'Shartnomalar' ? (

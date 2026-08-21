@@ -103,6 +103,31 @@ export class HrController {
     return this.service.tolovlar({ search, branchId, kassa, year, month });
   }
 
+  // ---- Oylik hisob ----
+  @Post('oylik/hisoblash')
+  @Permissions('payroll.create')
+  oylikHisoblash(@Query('period') period: string, @Query('branchId') branchId?: string) {
+    return this.service.oylikHisoblash(period, branchId);
+  }
+
+  @Get('oylik')
+  @Permissions('hr.view')
+  oylikList(@Query('period') period: string, @Query('branchId') branchId?: string, @Query('search') search?: string) {
+    return this.service.oylikList({ period, branchId, search });
+  }
+
+  @Get('oylik/:id')
+  @Permissions('hr.view')
+  oylikDetail(@Param('id') id: string) {
+    return this.service.oylikDetail(id);
+  }
+
+  @Post('oylik/:id/confirm')
+  @Permissions('payroll.create')
+  oylikConfirm(@Param('id') id: string, @Body('confirm') confirm?: boolean) {
+    return this.service.oylikConfirm(id, confirm !== false);
+  }
+
   @Get('employees/:id')
   @Permissions('hr.view')
   getEmployee(@Param('id') id: string) {

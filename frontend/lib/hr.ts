@@ -102,6 +102,63 @@ export interface TolovlarResp {
   data: TolovRow[];
 }
 
+export interface OylikRow {
+  id: string;
+  xodim: string;
+  position: string | null;
+  branch: string | null;
+  department: string | null;
+  ishlagan: number;
+  bonusJarima: number;
+  ovqat: number;
+  jami: number;
+  berildi: number;
+  qoldiq: number;
+  naqd: number;
+  karta: number;
+  confirmed: boolean;
+}
+export interface OylikListResp {
+  totals: { jamiHisoblar: number; jamiSumma: number; naqd: number; karta: number; berilgan: number; ortiqcha: number; ovqatUshlanma: number };
+  data: OylikRow[];
+}
+export interface OylikDetail {
+  id: string;
+  period: string;
+  xodim: string;
+  position: string | null;
+  branch: string | null;
+  department: string | null;
+  ishchiKunlar: number;
+  ishlaganKun: number;
+  ishlaganSoat: number;
+  asosiyOylik: number;
+  kunlik: number;
+  soatlikNarx: number;
+  asosiyHisob: number;
+  soatlikHisob: number;
+  rasmiyHisob: number;
+  soliqKim: string | null;
+  kpi: number;
+  bonus: number;
+  ovqatPuli: number;
+  tatilKartaga: number;
+  tatilNaqd: number;
+  ijara: number;
+  transport: number;
+  jarima: number;
+  soliq: number;
+  naqd: number;
+  karta: number;
+  hisoblangan: number;
+  berildi: number;
+  buOyBalansi: number;
+  avvalgiQoldiq: number;
+  oyYakuniBalans: number;
+  confirmed: boolean;
+  payments: { id: string; date: string; amount: number }[];
+}
+
 export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
   YARATILGAN: { label: 'Yaratilgan', cls: 'bg-emerald-50 text-emerald-600' },
   OZGARTIRILGAN: { label: "O'zgartirilgan", cls: 'bg-amber-50 text-amber-600' },
@@ -119,6 +176,13 @@ export const hrApi = {
     api.get<ShartnomalarResp>('/hr/shartnomalar', { params }).then((r) => r.data),
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
+  oylikList: (params: { period: string; branchId?: string; search?: string }) =>
+    api.get<OylikListResp>('/hr/oylik', { params }).then((r) => r.data),
+  oylikHisoblash: (period: string, branchId?: string) =>
+    api.post('/hr/oylik/hisoblash', null, { params: { period, branchId } }).then((r) => r.data),
+  oylikDetail: (id: string) => api.get<OylikDetail>(`/hr/oylik/${id}`).then((r) => r.data),
+  oylikConfirm: (id: string, confirm: boolean) =>
+    api.post(`/hr/oylik/${id}/confirm`, { confirm }).then((r) => r.data),
   employee: (id: string) => api.get(`/hr/employees/${id}`).then((r) => r.data),
   hire: (data: {
     fullName: string;

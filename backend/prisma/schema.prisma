@@ -842,11 +842,50 @@ model Employee {
   documents    EmployeeDocument[]
   contracts    EmploymentContract[]
   salaryPayments SalaryPayment[]
+  payrollRecords PayrollRecord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("employees")
+}
+
+// Oylik hisob yozuvi (Maoshlar · Oylik hisob) — bir xodim, bir oy
+model PayrollRecord {
+  id           String   @id @default(uuid())
+  period       String   // "2026-07"
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  // Hisob-kitob
+  ishchiKunlar Int      @default(0)
+  ishlaganKun  Int      @default(0)
+  ishlaganSoat Float    @default(0)
+  asosiyOylik  Float    @default(0)
+  soatlikNarx  Float    @default(0)
+  rasmiyHisob  Float    @default(0)
+  soliqKim     String?  // O'zi to'laydi / Kompaniya
+  // Qo'shimcha
+  kpi          Float    @default(0)
+  bonus        Float    @default(0)
+  ovqatPuli    Float    @default(0)
+  tatilKartaga Float    @default(0)
+  tatilNaqd    Float    @default(0)
+  ijara        Float    @default(0)
+  transport    Float    @default(0)
+  jarima       Float    @default(0)
+  soliq        Float    @default(0)
+  // Taqsimot
+  naqd         Float    @default(0)
+  karta        Float    @default(0)
+  jami         Float    @default(0) // hisoblangan
+  confirmed    Boolean  @default(false)
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([period, employeeId])
+  @@index([period])
+  @@map("payroll_records")
 }
 
 // Maosh to'lovi (Maoshlar · To'lovlar)

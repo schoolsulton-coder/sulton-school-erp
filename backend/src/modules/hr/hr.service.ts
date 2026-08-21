@@ -265,6 +265,149 @@ export class HrService {
     };
   }
 
+  // ===== Maoshlar · Oylik hisob =====
+  private workdays(period: string) {
+    const [y, m] = period.split('-').map(Number);
+    const days = new Date(y, m, 0).getDate();
+    let wd = 0;
+    for (let d = 1; d <= days; d++) if (new Date(y, m - 1, d).getDay() !== 0) wd++; // yakshanba emas
+    return wd;
+  }
+
+  private calcJami(r: any) {
+    const asosiyHisob = r.ishchiKunlar > 0 ? (r.asosiyOylik * r.ishlaganKun) / r.ishchiKunlar : r.asosiyOylik;
+    const soatlikHisob = (r.soatlikNarx || 0) * (r.ishlaganSoat || 0);
+    const qoshimcha = r.kpi + r.bonus + r.ovqatPuli + r.tatilKartaga + r.tatilNaqd + r.ijara + r.transport;
+    const ushlanma = r.jarima + r.soliq;
+    const jami = asosiyHisob + soatlikHisob + r.rasmiyHisob + qoshimcha - ushlanma;
+    const kunlik = r.ishchiKunlar > 0 ? r.asosiyOylik / r.ishchiKunlar : 0;
+    return { asosiyHisob, soatlikHisob, kunlik, jami };
+  }
+
+  private async paidByEmployee(period: string, employeeIds: string[]) {
+    const [y, m] = period.split('-').map(Number);
+    const pays = await this.prisma.salaryPayment.findMany({
+      where: { periodYear: y, periodMonth: m, employeeId: { in: employeeIds } },
+    });
+    const map: Record<string, number> = {};
+    for (const p of pays) map[p.employeeId] = (map[p.employeeId] ?? 0) + (p.somAmount ?? 0) + (p.dollarAmount ?? 0) * (p.dollarRate ?? 0);
+    return map;
+  }
+
+  // Jamoaga oylik hisoblash — faol xodimlar uchun yozuv yaratadi (mavjudini o'zgartirmaydi)
+  async oylikHisoblash(period: string, branchId?: string) {
+    const emps = await this.prisma.employee.findMany({
+      where: { status: 'ACTIVE', ...(branchId ? { branchId } : {}) },
+      include: { salary: true },
+    });
+    const ishchiKunlar = this.workdays(period);
+    let yaratildi = 0;
+    for (const e of emps) {
+      const existing = await this.prisma.payrollRecord.findUnique({ where: { period_employeeId: { period, employeeId: e.id } } });
+      if (existing) continue;
+      const hourly = e.salary?.type === 'HOURLY';
+      const asosiyOylik = hourly ? 0 : e.salary?.baseRate ?? 0;
+      const soatlikNarx = hourly ? e.salary?.baseRate ?? 0 : 0;
+      const draft: any = { ishchiKunlar, ishlaganKun: ishchiKunlar, ishlaganSoat: 0, asosiyOylik, soatlikNarx, rasmiyHisob: 0, kpi: 0, bonus: 0, ovqatPuli: 0, tatilKartaga: 0, tatilNaqd: 0, ijara: 0, transport: 0, jarima: 0, soliq: 0 };
+      const { jami } = this.calcJami(draft);
+      await this.prisma.payrollRecord.create({ data: { period, employeeId: e.id, ...draft, jami, naqd: jami, karta: 0 } });
+      yaratildi++;
+    }
+    return { ok: true, yaratildi, jami: emps.length };
+  }
+
+  async oylikList(params: { period: string; branchId?: string; search?: string }) {
+    const where: any = { period: params.period };
+    const empFilter: any = {};
+    if (params.branchId) empFilter.branchId = params.branchId;
+    if (params.search) empFilter.user = { fullName: { contains: params.search, mode: 'insensitive' } };
+    if (Object.keys(empFilter).length) where.employee = empFilter;
+
+    const records = await this.prisma.payrollRecord.findMany({
+      where,
+      include: { employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } }, branch: { select: { name: true } }, department: { select: { name: true } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const paid = await this.paidByEmployee(params.period, records.map((r) => r.employeeId));
+
+    const data = records.map((r) => {
+      const c = this.calcJami(r);
+      const berildi = paid[r.employeeId] ?? 0;
+      return {
+        id: r.id,
+        xodim: r.employee.user.fullName,
+        position: r.employee.position?.name ?? null,
+        branch: r.employee.branch?.name ?? null,
+        department: r.employee.department?.name ?? null,
+        ishlagan: r.ishlaganKun,
+        bonusJarima: r.bonus - r.jarima,
+        ovqat: r.ovqatPuli,
+        jami: c.jami,
+        berildi,
+        qoldiq: c.jami - berildi,
+        naqd: r.naqd,
+        karta: r.karta,
+        confirmed: r.confirmed,
+      };
+    });
+
+    const sum = (f: (d: (typeof data)[number]) => number) => data.reduce((s, d) => s + f(d), 0);
+    return {
+      totals: {
+        jamiHisoblar: data.length,
+        jamiSumma: sum((d) => d.jami),
+        naqd: sum((d) => d.naqd),
+        karta: sum((d) => d.karta),
+        berilgan: sum((d) => d.berildi),
+        ortiqcha: sum((d) => (d.qoldiq < 0 ? d.qoldiq : 0)),
+        ovqatUshlanma: sum((d) => d.ovqat),
+      },
+      data,
+    };
+  }
+
+  async oylikDetail(id: string) {
+    const r = await this.prisma.payrollRecord.findUnique({
+      where: { id },
+      include: { employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } }, branch: { select: { name: true } }, department: { select: { name: true } } } } },
+    });
+    if (!r) throw new NotFoundException('Topilmadi');
+    const c = this.calcJami(r);
+    const [y, m] = r.period.split('-').map(Number);
+    const pays = await this.prisma.salaryPayment.findMany({ where: { employeeId: r.employeeId, periodYear: y, periodMonth: m }, orderBy: { date: 'desc' } });
+    const berildi = pays.reduce((s, p) => s + (p.somAmount ?? 0) + (p.dollarAmount ?? 0) * (p.dollarRate ?? 0), 0);
+
+    // Avvalgi oydan qoldiq: shu xodimning oldingi davrlardagi (jami − to'langan) yig'indisi
+    const prev = await this.prisma.payrollRecord.findMany({ where: { employeeId: r.employeeId, period: { lt: r.period } } });
+    let avvalgiQoldiq = 0;
+    for (const p of prev) {
+      const pc = this.calcJami(p);
+      const pp = await this.paidByEmployee(p.period, [r.employeeId]);
+      avvalgiQoldiq += pc.jami - (pp[r.employeeId] ?? 0);
+    }
+
+    return {
+      ...r,
+      xodim: r.employee.user.fullName,
+      position: r.employee.position?.name ?? null,
+      branch: r.employee.branch?.name ?? null,
+      department: r.employee.department?.name ?? null,
+      kunlik: c.kunlik,
+      asosiyHisob: c.asosiyHisob,
+      soatlikHisob: c.soatlikHisob,
+      hisoblangan: c.jami,
+      berildi,
+      buOyBalansi: c.jami - berildi,
+      avvalgiQoldiq,
+      oyYakuniBalans: avvalgiQoldiq + (c.jami - berildi),
+      payments: pays.map((p) => ({ id: p.id, date: p.date, amount: (p.somAmount ?? 0) + (p.dollarAmount ?? 0) * (p.dollarRate ?? 0) })),
+    };
+  }
+
+  async oylikConfirm(id: string, confirm: boolean) {
+    return this.prisma.payrollRecord.update({ where: { id }, data: { confirmed: confirm } });
+  }
+
   async getEmployee(id: string) {
     const emp = await this.prisma.employee.findUnique({
       where: { id },
