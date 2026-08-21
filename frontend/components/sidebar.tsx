@@ -44,7 +44,7 @@ const MENU: Item[] = [
   { href: '/expenses', label: 'Xarajatlar', icon: TrendingDown, perm: 'finance.view' },
   { href: '/cashflow', label: 'Tashqi pul oqimi', icon: ArrowUpDown, perm: 'finance.view' },
   { href: '/transfers', label: 'Ichki pul oqimi', icon: ArrowLeftRight, perm: 'finance.view' },
-  { href: '/payroll', label: 'Maoshlar', icon: Users, perm: 'payroll.view' },
+  { href: '/maoshlar', label: 'Maoshlar', icon: Users, perm: 'payroll.view' },
   { href: '/accounts', label: 'Hisoblar', icon: Briefcase, perm: 'finance.view' },
   { href: '/reports', label: 'Hisobotlar', icon: BarChart3, perm: 'reports.view' },
 ];

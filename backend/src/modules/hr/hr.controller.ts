@@ -63,6 +63,12 @@ export class HrController {
     return this.service.listEmployees({ status, departmentId });
   }
 
+  @Get('xodimlar')
+  @Permissions('hr.view')
+  xodimlar(@Query('search') search?: string, @Query('branchId') branchId?: string) {
+    return this.service.xodimlar({ search, branchId });
+  }
+
   @Get('employees/:id')
   @Permissions('hr.view')
   getEmployee(@Param('id') id: string) {

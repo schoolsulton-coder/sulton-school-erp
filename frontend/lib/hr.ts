@@ -32,9 +32,30 @@ export const EMP_STATUS: Record<EmployeeStatus, { label: string; cls: string }> 
   TERMINATED: { label: "Bo'shagan", cls: 'bg-red-100 text-red-700' },
 };
 
+export interface XodimRow {
+  id: string;
+  fio: string;
+  gender: 'MALE' | 'FEMALE' | null;
+  phone: string;
+  branch: string | null;
+  department: string | null;
+  position: string | null;
+  card: string | null;
+  status: EmployeeStatus;
+  salaryType: SalaryType | null;
+  baseRate: number | null;
+}
+export interface XodimlarResp {
+  totals: { xodimlar: number; lavozimlar: number; telefonBor: number; kartaBor: number };
+  data: XodimRow[];
+}
+export const GENDER_LABEL: Record<string, string> = { MALE: 'Erkak', FEMALE: 'Ayol' };
+
 export const hrApi = {
   employees: (params?: { status?: string; departmentId?: string }) =>
     api.get<Employee[]>('/hr/employees', { params }).then((r) => r.data),
+  xodimlar: (params?: { search?: string; branchId?: string }) =>
+    api.get<XodimlarResp>('/hr/xodimlar', { params }).then((r) => r.data),
   employee: (id: string) => api.get(`/hr/employees/${id}`).then((r) => r.data),
   hire: (data: {
     fullName: string;

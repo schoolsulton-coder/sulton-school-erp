@@ -60,6 +60,55 @@ export class HrService {
     });
   }
 
+  // ===== Maoshlar · Xodimlar (boy ro'yxat + jamlanma) =====
+  async xodimlar(params: { search?: string; branchId?: string }) {
+    const where: any = {};
+    if (params.branchId) where.branchId = params.branchId;
+    if (params.search) {
+      where.user = {
+        OR: [
+          { fullName: { contains: params.search, mode: 'insensitive' } },
+          { phone: { contains: params.search } },
+        ],
+      };
+    }
+
+    const [rows, xodimlar, lavozimlar, kartaBor, telefonBor] = await Promise.all([
+      this.prisma.employee.findMany({
+        where,
+        include: {
+          user: { select: { fullName: true, phone: true } },
+          department: { select: { name: true } },
+          position: { select: { name: true } },
+          branch: { select: { id: true, name: true } },
+          salary: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+      }),
+      this.prisma.employee.count(),
+      this.prisma.position.count(),
+      this.prisma.employee.count({ where: { cardNumber: { not: null } } }),
+      this.prisma.employee.count({ where: { user: { phone: { not: '' } } } }),
+    ]);
+
+    const data = rows.map((e) => ({
+      id: e.id,
+      fio: e.user.fullName,
+      gender: e.gender,
+      phone: e.user.phone,
+      branch: e.branch?.name ?? null,
+      department: e.department?.name ?? null,
+      position: e.position?.name ?? null,
+      card: e.cardNumber,
+      status: e.status,
+      salaryType: e.salary?.type ?? null,
+      baseRate: e.salary?.baseRate ?? null,
+    }));
+
+    return { totals: { xodimlar, lavozimlar, telefonBor, kartaBor }, data };
+  }
+
   async getEmployee(id: string) {
     const emp = await this.prisma.employee.findUnique({
       where: { id },

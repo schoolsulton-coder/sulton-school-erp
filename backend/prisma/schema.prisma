@@ -445,6 +445,7 @@ model Branch {
   counterpartyLinks CounterpartyBranch[]
   flowAccounts FlowAccount[]
   internalTransfers InternalTransfer[]
+  employees Employee[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -825,6 +826,10 @@ model Employee {
   department   Department?    @relation(fields: [departmentId], references: [id])
   positionId   String?
   position     Position?      @relation(fields: [positionId], references: [id])
+  branchId     String?
+  branch       Branch?        @relation(fields: [branchId], references: [id])
+  gender       Gender?
+  cardNumber   String?
   hireDate     DateTime
   fireDate     DateTime?
   status       EmployeeStatus @default(ACTIVE)
