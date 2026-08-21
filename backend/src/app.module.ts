@@ -26,6 +26,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { DebtorsModule } from './modules/debtors/debtors.module';
 import { CounterpartiesModule } from './modules/counterparties/counterparties.module';
 import { FlowAccountsModule } from './modules/flow-accounts/flow-accounts.module';
+import { InternalTransfersModule } from './modules/internal-transfers/internal-transfers.module';
 
 /**
  * AppModule — barcha ERP/LMS modullarini birlashtiradi.
@@ -65,6 +66,7 @@ import { FlowAccountsModule } from './modules/flow-accounts/flow-accounts.module
     DebtorsModule,
     CounterpartiesModule,
     FlowAccountsModule,
+    InternalTransfersModule,
     // Barcha asosiy modullar ulandi 🎉
     // GradesModule, AttendanceModule, HomeworkModule, BehaviorModule,
     // NotificationsModule, TelegramModule, EsmaktabModule, ReportsModule

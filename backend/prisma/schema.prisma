@@ -182,6 +182,9 @@ model User {
   cpEntriesCreated   CounterpartyEntry[] @relation("CpEntryCreatedBy")
   cpEntriesUpdated   CounterpartyEntry[] @relation("CpEntryUpdatedBy")
   cpEntriesConfirmed CounterpartyEntry[] @relation("CpEntryConfirmedBy")
+  itCreated          InternalTransfer[] @relation("ITCreatedBy")
+  itUpdated          InternalTransfer[] @relation("ITUpdatedBy")
+  itConfirmed        InternalTransfer[] @relation("ITConfirmedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -441,6 +444,7 @@ model Branch {
   counterparties Counterparty[]
   counterpartyLinks CounterpartyBranch[]
   flowAccounts FlowAccount[]
+  internalTransfers InternalTransfer[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -1148,9 +1152,43 @@ model FlowAccount {
   active    Boolean  @default(true)
   entrySom    CounterpartyEntry[] @relation("EntrySomFlow")
   entryDollar CounterpartyEntry[] @relation("EntryDollarFlow")
+  itFrom      InternalTransfer[]  @relation("ITFrom")
+  itTo        InternalTransfer[]  @relation("ITTo")
   createdAt DateTime @default(now())
 
   @@index([branchId])
   @@index([currency])
   @@map("flow_accounts")
+}
+
+// Ichki pul oqimi — hisoblar orasidagi o'tkazma (so'm/dollar/valyuta/pul)
+model InternalTransfer {
+  id            String   @id @default(uuid())
+  date          DateTime @default(now())
+  kind          String   // SOM | DOLLAR | VALYUTA | PUL
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  fromAccountId String?
+  fromAccount   FlowAccount? @relation("ITFrom", fields: [fromAccountId], references: [id])
+  toAccountId   String?
+  toAccount     FlowAccount? @relation("ITTo", fields: [toAccountId], references: [id])
+  kassaTuri     String?
+  somAmount     Float?
+  dollarAmount  Float?
+  dollarRate    Float?
+  loss          Float?   // yo'qotish (Pul)
+  confirmedAt   DateTime?
+  confirmedById String?
+  confirmedBy   User?    @relation("ITConfirmedBy", fields: [confirmedById], references: [id])
+  createdById   String?
+  createdBy     User?    @relation("ITCreatedBy", fields: [createdById], references: [id])
+  updatedById   String?
+  updatedBy     User?    @relation("ITUpdatedBy", fields: [updatedById], references: [id])
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([kind])
+  @@index([date])
+  @@map("internal_transfers")
 }
