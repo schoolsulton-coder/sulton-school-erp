@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { XodimlarTab, LavozimlarTab, ShartnomalarTab } from '@/components/maoshlar-tabs';
+import { XodimlarTab, LavozimlarTab, ShartnomalarTab, TolovlarTab } from '@/components/maoshlar-tabs';
 
 const TABS = ['Umumiy', 'Xodimlar', 'Lavozimlar', 'Oylik hisob', '10 oylik', "To'lovlar", 'Shartnomalar'] as const;
 type Tab = (typeof TABS)[number];
@@ -29,6 +29,8 @@ export default function MaoshlarPage() {
         <LavozimlarTab />
       ) : tab === 'Shartnomalar' ? (
         <ShartnomalarTab />
+      ) : tab === "To'lovlar" ? (
+        <TolovlarTab />
       ) : (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm">
           «{tab}» — keyingi bosqichda tayyor bo&apos;ladi

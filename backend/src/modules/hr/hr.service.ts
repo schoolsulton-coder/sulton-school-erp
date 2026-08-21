@@ -207,6 +207,64 @@ export class HrService {
     return { totals: { jami, yaratilgan, ozgartirilgan, bekor }, data };
   }
 
+  // ===== Maoshlar · To'lovlar =====
+  async tolovlar(params: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) {
+    const where: any = {};
+    if (params.branchId) where.branchId = params.branchId;
+    if (params.kassa) where.kassa = params.kassa;
+    if (params.year) where.periodYear = Number(params.year);
+    if (params.month) where.periodMonth = Number(params.month);
+    if (params.search) {
+      where.OR = [
+        { employee: { user: { fullName: { contains: params.search, mode: 'insensitive' } } } },
+        { note: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const rows = await this.prisma.salaryPayment.findMany({
+      where,
+      include: {
+        employee: { include: { user: { select: { fullName: true } } } },
+        branch: { select: { name: true } },
+      },
+      orderBy: { date: 'desc' },
+      take: 800,
+    });
+
+    const data = rows.map((p) => {
+      const som = p.somAmount ?? 0;
+      const usd = p.dollarAmount ?? 0;
+      const rate = p.dollarRate ?? 0;
+      return {
+        id: p.id,
+        date: p.date,
+        xodim: p.employee.user.fullName,
+        branch: p.branch?.name ?? null,
+        kassa: p.kassa,
+        somAmount: som,
+        dollarAmount: usd,
+        dollarRate: rate,
+        jami: som + usd * rate,
+        periodYear: p.periodYear,
+        periodMonth: p.periodMonth,
+      };
+    });
+
+    const sumIf = (f: (d: (typeof data)[number]) => number) => data.reduce((s, d) => s + f(d), 0);
+    return {
+      totals: {
+        somdaBerilgan: sumIf((d) => d.somAmount),
+        naqd: sumIf((d) => (d.kassa === 'Naqd' ? d.somAmount : 0)),
+        karta: sumIf((d) => (d.kassa === 'Karta' ? d.somAmount : 0)),
+        bank: sumIf((d) => (d.kassa === 'Bank' ? d.somAmount : 0)),
+        dollar: sumIf((d) => d.dollarAmount),
+        jami: sumIf((d) => d.jami),
+        count: data.length,
+      },
+      data,
+    };
+  }
+
   async getEmployee(id: string) {
     const emp = await this.prisma.employee.findUnique({
       where: { id },

@@ -84,6 +84,24 @@ export interface ShartnomalarResp {
   totals: { jami: number; yaratilgan: number; ozgartirilgan: number; bekor: number };
   data: ShartnomaRow[];
 }
+export interface TolovRow {
+  id: string;
+  date: string;
+  xodim: string;
+  branch: string | null;
+  kassa: string;
+  somAmount: number;
+  dollarAmount: number;
+  dollarRate: number;
+  jami: number;
+  periodYear: number | null;
+  periodMonth: number | null;
+}
+export interface TolovlarResp {
+  totals: { somdaBerilgan: number; naqd: number; karta: number; bank: number; dollar: number; jami: number; count: number };
+  data: TolovRow[];
+}
+
 export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
   YARATILGAN: { label: 'Yaratilgan', cls: 'bg-emerald-50 text-emerald-600' },
   OZGARTIRILGAN: { label: "O'zgartirilgan", cls: 'bg-amber-50 text-amber-600' },
@@ -99,6 +117,8 @@ export const hrApi = {
     api.get<LavozimlarResp>('/hr/lavozimlar', { params }).then((r) => r.data),
   shartnomalar: (params?: { search?: string; branchId?: string; type?: string; employment?: string }) =>
     api.get<ShartnomalarResp>('/hr/shartnomalar', { params }).then((r) => r.data),
+  tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
+    api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
   employee: (id: string) => api.get(`/hr/employees/${id}`).then((r) => r.data),
   hire: (data: {
     fullName: string;

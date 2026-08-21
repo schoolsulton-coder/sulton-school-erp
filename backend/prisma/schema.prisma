@@ -447,6 +447,7 @@ model Branch {
   internalTransfers InternalTransfer[]
   employees Employee[]
   employmentContracts EmploymentContract[]
+  salaryPayments SalaryPayment[]
   createdAt DateTime  @default(now())
 
   @@map("branches")
@@ -840,11 +841,34 @@ model Employee {
   payrollItems PayrollItem[]
   documents    EmployeeDocument[]
   contracts    EmploymentContract[]
+  salaryPayments SalaryPayment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("employees")
+}
+
+// Maosh to'lovi (Maoshlar · To'lovlar)
+model SalaryPayment {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime @default(now())
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  kassa        String   // Naqd | Karta | Bank
+  somAmount    Float    @default(0)
+  dollarAmount Float?
+  dollarRate   Float?
+  periodYear   Int?
+  periodMonth  Int?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([date])
+  @@map("salary_payments")
 }
 
 // Mehnat shartnomasi (Maoshlar · Shartnomalar)

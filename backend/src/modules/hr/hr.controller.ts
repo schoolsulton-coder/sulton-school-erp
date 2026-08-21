@@ -91,6 +91,18 @@ export class HrController {
     return this.service.shartnomalar({ search, branchId, type, employment });
   }
 
+  @Get('tolovlar')
+  @Permissions('hr.view')
+  tolovlar(
+    @Query('search') search?: string,
+    @Query('branchId') branchId?: string,
+    @Query('kassa') kassa?: string,
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.service.tolovlar({ search, branchId, kassa, year, month });
+  }
+
   @Get('employees/:id')
   @Permissions('hr.view')
   getEmployee(@Param('id') id: string) {
