@@ -159,6 +159,21 @@ export interface OylikDetail {
   payments: { id: string; date: string; amount: number }[];
 }
 
+export interface OylikPreviewRow {
+  id: string;
+  fio: string;
+  position: string | null;
+  hisobKitob: SalaryType | null;
+  stavka: number | null;
+  exists: boolean;
+}
+export interface OylikPreviewResp {
+  ishchiKunlar: number;
+  yaratiladi: number;
+  allaqachonBor: number;
+  data: OylikPreviewRow[];
+}
+
 export interface Oylik10Month {
   period: string;
   xodim: number;
@@ -179,6 +194,24 @@ export interface UmumiyResp {
   period: string;
 }
 
+export const SHARTNOMA_TURLARI = [
+  'Mehnat shartnomasi',
+  'Ishga qabul qilish',
+  "Ishdan bo'shash to'g'risida",
+  "Qo'shimcha kelishuv",
+  "Boshqa lavozimga o'tkazish",
+  "Boshqa Stavkaga o'tkazish",
+  "Homiladorlik va tug'ruq ta'tili berish",
+  'Fuqarolik shartnomasi',
+];
+export const SHARTNOMA_HOLATLARI: { label: string; value: string }[] = [
+  { label: 'Yaratish', value: 'YARATILGAN' },
+  { label: "O'zgartirish", value: 'OZGARTIRILGAN' },
+  { label: 'Bekor qilish', value: 'BEKOR' },
+];
+export const BANDLIK_TURLARI = ["To'liq stavka", 'Yarim stavka', '0.25 stavka', "O'rindoshlik"];
+export const SHARTNOMA_TILLARI = ["O'zbekcha", 'Ruscha', 'Inglizcha'];
+
 export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
   YARATILGAN: { label: 'Yaratilgan', cls: 'bg-emerald-50 text-emerald-600' },
   OZGARTIRILGAN: { label: "O'zgartirilgan", cls: 'bg-amber-50 text-amber-600' },
@@ -194,12 +227,15 @@ export const hrApi = {
     api.get<LavozimlarResp>('/hr/lavozimlar', { params }).then((r) => r.data),
   shartnomalar: (params?: { search?: string; branchId?: string; type?: string; employment?: string }) =>
     api.get<ShartnomalarResp>('/hr/shartnomalar', { params }).then((r) => r.data),
+  createShartnoma: (data: any) => api.post('/hr/shartnomalar', data).then((r) => r.data),
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
   oylikList: (params: { period: string; branchId?: string; search?: string }) =>
     api.get<OylikListResp>('/hr/oylik', { params }).then((r) => r.data),
-  oylikHisoblash: (period: string, branchId?: string) =>
-    api.post('/hr/oylik/hisoblash', null, { params: { period, branchId } }).then((r) => r.data),
+  oylikPreview: (params: { period: string; branchId?: string; departmentId?: string }) =>
+    api.get<OylikPreviewResp>('/hr/oylik-preview', { params }).then((r) => r.data),
+  oylikHisoblash: (dto: { period: string; branchId?: string; departmentId?: string; ishchiKunlar?: number; employeeIds?: string[] }) =>
+    api.post('/hr/oylik/hisoblash', dto).then((r) => r.data),
   oylikDetail: (id: string) => api.get<OylikDetail>(`/hr/oylik/${id}`).then((r) => r.data),
   oylikConfirm: (id: string, confirm: boolean) =>
     api.post(`/hr/oylik/${id}/confirm`, { confirm }).then((r) => r.data),

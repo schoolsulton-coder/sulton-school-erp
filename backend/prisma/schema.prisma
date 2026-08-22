@@ -917,12 +917,22 @@ model EmploymentContract {
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   date       DateTime @default(now())
-  type       String   // shartnoma turi (masalan: Ishga qabul, Ishdan bo'shash...)
-  employment String?  // bandlik
+  type       String   // shartnoma turi
+  employment String?  // bandlik turi
   stavka     Float?
   branchId   String?
   branch     Branch?  @relation(fields: [branchId], references: [id])
   status     String   @default("YARATILGAN") // YARATILGAN | OZGARTIRILGAN | BEKOR
+  date2         DateTime? // tugash / o'zgartirish sanasi
+  kelishSana    DateTime? // kelish sanasi (K.SANA)
+  kKuni         String?
+  til           String?   // shartnoma tili
+  qoshimchaLavozim String?
+  qoshimchaStavka  Float?
+  modda         String?
+  fayl1         String?
+  fayl2         String?
+  fayl3         String?
   note       String?
   createdAt  DateTime @default(now())
 

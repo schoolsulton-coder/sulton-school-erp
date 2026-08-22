@@ -1,9 +1,10 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, ShieldCheck } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
+import { ShartnomaModal } from '@/components/shartnoma-form';
 import { hrApi, GENDER_LABEL, SALARY_LABEL, EMP_STATUS, CONTRACT_STATUS, type XodimRow, type LavozimRow, type ShartnomaRow, type TolovRow, type SalaryType } from '@/lib/hr';
 
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -173,8 +174,10 @@ export function LavozimlarTab() {
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('uz-UZ');
 
 export function ShartnomalarTab() {
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data, isLoading } = useQuery({
     queryKey: ['shartnomalar', search, branchId],
@@ -193,8 +196,9 @@ export function ShartnomalarTab() {
         <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={selCls}><option value="">Barcha filiallar</option>{branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
       </div>
       <div className="mb-4 flex justify-end">
-        <button className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi shartnoma</button>
+        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi shartnoma</button>
       </div>
+      {showForm && <ShartnomaModal onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['shartnomalar'] }); }} />}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Jami shartnomalar" value={t?.jami ?? 0} />
         <Stat label="Yaratilgan" value={t?.yaratilgan ?? 0} tone="bg-emerald-50/40" />

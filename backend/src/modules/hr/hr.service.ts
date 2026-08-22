@@ -207,6 +207,32 @@ export class HrService {
     return { totals: { jami, yaratilgan, ozgartirilgan, bekor }, data };
   }
 
+  async createShartnoma(dto: any) {
+    return this.prisma.employmentContract.create({
+      data: {
+        number: dto.number || '—',
+        employeeId: dto.employeeId,
+        date: dto.date ? new Date(dto.date) : new Date(),
+        type: dto.type,
+        status: dto.status || 'YARATILGAN',
+        employment: dto.employment ?? null,
+        stavka: dto.stavka ?? null,
+        branchId: dto.branchId ?? null,
+        date2: dto.date2 ? new Date(dto.date2) : null,
+        kelishSana: dto.kelishSana ? new Date(dto.kelishSana) : null,
+        kKuni: dto.kKuni ?? null,
+        til: dto.til ?? null,
+        qoshimchaLavozim: dto.qoshimchaLavozim ?? null,
+        qoshimchaStavka: dto.qoshimchaStavka ?? null,
+        modda: dto.modda ?? null,
+        fayl1: dto.fayl1 ?? null,
+        fayl2: dto.fayl2 ?? null,
+        fayl3: dto.fayl3 ?? null,
+        note: dto.note ?? null,
+      },
+    });
+  }
+
   // ===== Maoshlar · To'lovlar =====
   async tolovlar(params: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) {
     const where: any = {};
@@ -294,23 +320,50 @@ export class HrService {
     return map;
   }
 
-  // Jamoaga oylik hisoblash — faol xodimlar uchun yozuv yaratadi (mavjudini o'zgartirmaydi)
-  async oylikHisoblash(period: string, branchId?: string) {
+  // Oylik hisoblash oldidan — faol xodimlar + shu davrda yozuvi bor-yo'qligi
+  async oylikPreview(params: { period: string; branchId?: string; departmentId?: string }) {
+    const where: any = { status: 'ACTIVE' };
+    if (params.branchId) where.branchId = params.branchId;
+    if (params.departmentId) where.departmentId = params.departmentId;
     const emps = await this.prisma.employee.findMany({
-      where: { status: 'ACTIVE', ...(branchId ? { branchId } : {}) },
-      include: { salary: true },
+      where,
+      include: { user: { select: { fullName: true } }, position: { select: { name: true } }, salary: true },
+      orderBy: { createdAt: 'desc' },
     });
-    const ishchiKunlar = this.workdays(period);
+    const existing = await this.prisma.payrollRecord.findMany({ where: { period: params.period, employeeId: { in: emps.map((e) => e.id) } }, select: { employeeId: true } });
+    const has = new Set(existing.map((x) => x.employeeId));
+    const data = emps.map((e) => ({
+      id: e.id,
+      fio: e.user.fullName,
+      position: e.position?.name ?? null,
+      hisobKitob: e.salary?.type ?? null,
+      stavka: e.salary?.baseRate ?? null,
+      exists: has.has(e.id),
+    }));
+    return { ishchiKunlar: this.workdays(params.period), yaratiladi: data.filter((d) => !d.exists).length, allaqachonBor: data.filter((d) => d.exists).length, data };
+  }
+
+  // Jamoaga oylik hisoblash — tanlangan xodimlar uchun yozuv yaratadi (mavjudini o'zgartirmaydi)
+  async oylikHisoblash(dto: { period: string; branchId?: string; departmentId?: string; ishchiKunlar?: number; employeeIds?: string[] }) {
+    let ids = dto.employeeIds ?? [];
+    if (!ids.length) {
+      const where: any = { status: 'ACTIVE' };
+      if (dto.branchId) where.branchId = dto.branchId;
+      if (dto.departmentId) where.departmentId = dto.departmentId;
+      ids = (await this.prisma.employee.findMany({ where, select: { id: true } })).map((e) => e.id);
+    }
+    const emps = await this.prisma.employee.findMany({ where: { id: { in: ids } }, include: { salary: true } });
+    const ishchiKunlar = dto.ishchiKunlar && dto.ishchiKunlar > 0 ? dto.ishchiKunlar : this.workdays(dto.period);
     let yaratildi = 0;
     for (const e of emps) {
-      const existing = await this.prisma.payrollRecord.findUnique({ where: { period_employeeId: { period, employeeId: e.id } } });
+      const existing = await this.prisma.payrollRecord.findUnique({ where: { period_employeeId: { period: dto.period, employeeId: e.id } } });
       if (existing) continue;
       const hourly = e.salary?.type === 'HOURLY';
       const asosiyOylik = hourly ? 0 : e.salary?.baseRate ?? 0;
       const soatlikNarx = hourly ? e.salary?.baseRate ?? 0 : 0;
       const draft: any = { ishchiKunlar, ishlaganKun: ishchiKunlar, ishlaganSoat: 0, asosiyOylik, soatlikNarx, rasmiyHisob: 0, kpi: 0, bonus: 0, ovqatPuli: 0, tatilKartaga: 0, tatilNaqd: 0, ijara: 0, transport: 0, jarima: 0, soliq: 0 };
       const { jami } = this.calcJami(draft);
-      await this.prisma.payrollRecord.create({ data: { period, employeeId: e.id, ...draft, jami, naqd: jami, karta: 0 } });
+      await this.prisma.payrollRecord.create({ data: { period: dto.period, employeeId: e.id, ...draft, jami, naqd: jami, karta: 0 } });
       yaratildi++;
     }
     return { ok: true, yaratildi, jami: emps.length };

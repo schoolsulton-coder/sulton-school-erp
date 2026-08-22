@@ -91,6 +91,12 @@ export class HrController {
     return this.service.shartnomalar({ search, branchId, type, employment });
   }
 
+  @Post('shartnomalar')
+  @Permissions('hr.create')
+  createShartnoma(@Body() dto: any) {
+    return this.service.createShartnoma(dto);
+  }
+
   @Get('tolovlar')
   @Permissions('hr.view')
   tolovlar(
@@ -104,10 +110,16 @@ export class HrController {
   }
 
   // ---- Oylik hisob ----
+  @Get('oylik-preview')
+  @Permissions('hr.view')
+  oylikPreview(@Query('period') period: string, @Query('branchId') branchId?: string, @Query('departmentId') departmentId?: string) {
+    return this.service.oylikPreview({ period, branchId, departmentId });
+  }
+
   @Post('oylik/hisoblash')
   @Permissions('payroll.create')
-  oylikHisoblash(@Query('period') period: string, @Query('branchId') branchId?: string) {
-    return this.service.oylikHisoblash(period, branchId);
+  oylikHisoblash(@Body() dto: { period: string; branchId?: string; departmentId?: string; ishchiKunlar?: number; employeeIds?: string[] }) {
+    return this.service.oylikHisoblash(dto);
   }
 
   @Get('oylik')
