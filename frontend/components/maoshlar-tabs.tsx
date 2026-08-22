@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, ShieldCheck } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { ShartnomaModal } from '@/components/shartnoma-form';
+import { TolovModal } from '@/components/tolov-form';
 import { hrApi, GENDER_LABEL, SALARY_LABEL, EMP_STATUS, CONTRACT_STATUS, type XodimRow, type LavozimRow, type ShartnomaRow, type TolovRow, type SalaryType } from '@/lib/hr';
 
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -240,9 +241,11 @@ export function ShartnomalarTab() {
 const KASSA_CLS: Record<string, string> = { Naqd: 'bg-emerald-50 text-emerald-600', Karta: 'bg-amber-50 text-amber-600', Bank: 'bg-sky-50 text-sky-600' };
 
 export function TolovlarTab() {
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [kassa, setKassa] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data, isLoading } = useQuery({
     queryKey: ['tolovlar', search, branchId, kassa],
@@ -265,9 +268,10 @@ export function TolovlarTab() {
       </div>
       <div className="mb-4 flex justify-end gap-2">
         <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50">Jamoaviy tahrirlash</button>
-        <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50"><Plus size={16} /> Yolg&apos;iz</button>
+        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50"><Plus size={16} /> Yolg&apos;iz</button>
         <button className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={16} /> Jamoa</button>
       </div>
+      {showForm && <TolovModal onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['tolovlar'] }); }} />}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-6">
         <Stat label="So'mda berilgan" value={numFmt(t?.somdaBerilgan ?? 0)} />
         <Stat label="Naqd" value={numFmt(t?.naqd ?? 0)} tone="bg-emerald-50/40" />

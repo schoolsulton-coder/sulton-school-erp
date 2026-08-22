@@ -291,6 +291,39 @@ export class HrService {
     };
   }
 
+  async createTolov(dto: any) {
+    return this.prisma.salaryPayment.create({
+      data: {
+        employeeId: dto.employeeId,
+        date: dto.date ? new Date(dto.date) : new Date(),
+        branchId: dto.branchId ?? null,
+        kassa: dto.kassa || 'Naqd',
+        somAmount: dto.somAmount ?? 0,
+        somAccountId: dto.somAccountId ?? null,
+        dollarAmount: dto.dollarAmount ?? null,
+        dollarRate: dto.dollarRate ?? null,
+        dollarKassa: dto.dollarKassa ?? null,
+        dollarAccountId: dto.dollarAccountId ?? null,
+        periodYear: dto.periodYear ?? null,
+        periodMonth: dto.periodMonth ?? null,
+        note: dto.note ?? null,
+      },
+    });
+  }
+
+  // Bitta xodim+davr uchun oylik holati (To'lov formasi preview)
+  async oylikStatus(employeeId: string, period: string) {
+    const r = await this.prisma.payrollRecord.findUnique({ where: { period_employeeId: { period, employeeId } } });
+    const hisoblangan = r ? this.calcJami(r).jami : 0;
+    const olingan = (await this.paidByEmployee(period, [employeeId]))[employeeId] ?? 0;
+    const prev = await this.prisma.payrollRecord.findMany({ where: { employeeId, period: { lt: period } } });
+    let avvalgi = 0;
+    for (const p of prev) {
+      avvalgi += this.calcJami(p).jami - ((await this.paidByEmployee(p.period, [employeeId]))[employeeId] ?? 0);
+    }
+    return { hisoblangan, olingan, qoldiq: hisoblangan - olingan, avvalgi, oyYakuni: avvalgi + (hisoblangan - olingan) };
+  }
+
   // ===== Maoshlar · Oylik hisob =====
   private workdays(period: string) {
     const [y, m] = period.split('-').map(Number);

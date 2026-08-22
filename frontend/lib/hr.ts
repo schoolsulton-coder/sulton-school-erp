@@ -101,6 +101,13 @@ export interface TolovlarResp {
   totals: { somdaBerilgan: number; naqd: number; karta: number; bank: number; dollar: number; jami: number; count: number };
   data: TolovRow[];
 }
+export interface OylikStatus {
+  hisoblangan: number;
+  olingan: number;
+  qoldiq: number;
+  avvalgi: number;
+  oyYakuni: number;
+}
 
 export interface OylikRow {
   id: string;
@@ -230,6 +237,9 @@ export const hrApi = {
   createShartnoma: (data: any) => api.post('/hr/shartnomalar', data).then((r) => r.data),
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
+  createTolov: (data: any) => api.post('/hr/tolovlar', data).then((r) => r.data),
+  oylikStatus: (employeeId: string, period: string) =>
+    api.get<OylikStatus>('/hr/oylik-status', { params: { employeeId, period } }).then((r) => r.data),
   oylikList: (params: { period: string; branchId?: string; search?: string }) =>
     api.get<OylikListResp>('/hr/oylik', { params }).then((r) => r.data),
   oylikPreview: (params: { period: string; branchId?: string; departmentId?: string }) =>

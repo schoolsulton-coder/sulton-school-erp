@@ -896,10 +896,15 @@ model SalaryPayment {
   date         DateTime @default(now())
   branchId     String?
   branch       Branch?  @relation(fields: [branchId], references: [id])
-  kassa        String   // Naqd | Karta | Bank
+  kassa        String   // so'm kassa turi: Naqd | Karta | Bank
   somAmount    Float    @default(0)
+  somAccountId String?
+  somAccount   FlowAccount? @relation("SalarySomAccount", fields: [somAccountId], references: [id])
   dollarAmount Float?
   dollarRate   Float?
+  dollarKassa  String?
+  dollarAccountId String?
+  dollarAccount FlowAccount? @relation("SalaryDollarAccount", fields: [dollarAccountId], references: [id])
   periodYear   Int?
   periodMonth  Int?
   note         String?
@@ -1256,6 +1261,8 @@ model FlowAccount {
   entryDollar CounterpartyEntry[] @relation("EntryDollarFlow")
   itFrom      InternalTransfer[]  @relation("ITFrom")
   itTo        InternalTransfer[]  @relation("ITTo")
+  salarySom    SalaryPayment[]    @relation("SalarySomAccount")
+  salaryDollar SalaryPayment[]    @relation("SalaryDollarAccount")
   createdAt DateTime @default(now())
 
   @@index([branchId])

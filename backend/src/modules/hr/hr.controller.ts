@@ -109,6 +109,18 @@ export class HrController {
     return this.service.tolovlar({ search, branchId, kassa, year, month });
   }
 
+  @Post('tolovlar')
+  @Permissions('payroll.create')
+  createTolov(@Body() dto: any) {
+    return this.service.createTolov(dto);
+  }
+
+  @Get('oylik-status')
+  @Permissions('hr.view')
+  oylikStatus(@Query('employeeId') employeeId: string, @Query('period') period: string) {
+    return this.service.oylikStatus(employeeId, period);
+  }
+
   // ---- Oylik hisob ----
   @Get('oylik-preview')
   @Permissions('hr.view')
