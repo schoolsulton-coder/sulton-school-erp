@@ -291,6 +291,70 @@ export class HrService {
     };
   }
 
+  // ===== Maoshlar · Yangi xodim (ERP karta) =====
+  async createXodim(dto: any) {
+    if (dto.phone) {
+      const exists = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+      if (exists) throw new ConflictException('Bu telefon allaqachon mavjud');
+    }
+    const fullName = [dto.familiya, dto.ism, dto.middleName].filter(Boolean).join(' ').trim();
+    const hashed = await argon2.hash(dto.password || 'parol123');
+    const branchIds = (dto.branchIds ?? []).filter(Boolean);
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({ data: { fullName, phone: dto.phone, password: hashed, roleId: dto.roleId } });
+      const employee = await tx.employee.create({
+        data: {
+          userId: user.id,
+          gender: dto.gender ?? null,
+          cardNumber: dto.cardNumber ?? null,
+          middleName: dto.middleName ?? null,
+          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+          passportSeriya: dto.passportSeriya ?? null,
+          passportRaqam: dto.passportRaqam ?? null,
+          passportBerilgan: dto.passportBerilgan ? new Date(dto.passportBerilgan) : null,
+          passportOrgan: dto.passportOrgan ?? null,
+          stir: dto.stir ?? null,
+          address: dto.address ?? null,
+          mapLink: dto.mapLink ?? null,
+          branchId: branchIds[0] ?? null,
+          hireDate: new Date(),
+          ...(branchIds.length ? { branchLinks: { create: branchIds.map((branchId: string) => ({ branchId })) } } : {}),
+        },
+      });
+      return employee;
+    });
+  }
+
+  // ===== Maoshlar · Yangi lavozim (+ birinchi kelishuv) =====
+  async createLavozim(dto: any) {
+    let positionId = dto.positionId;
+    if (!positionId && dto.lavozim) {
+      const pos = await this.prisma.position.create({ data: { name: dto.lavozim, departmentId: dto.departmentId || null } });
+      positionId = pos.id;
+    }
+    await this.prisma.employee.update({
+      where: { id: dto.employeeId },
+      data: {
+        branchId: dto.branchId ?? undefined,
+        departmentId: dto.departmentId ?? undefined,
+        positionId: positionId ?? undefined,
+        formal: typeof dto.formal === 'boolean' ? dto.formal : undefined,
+        employment: dto.employment ?? undefined,
+        kimIshlaydi: dto.kimIshlaydi ?? undefined,
+        ...(dto.boshlanish ? { hireDate: new Date(dto.boshlanish) } : {}),
+      },
+    });
+    if (dto.hisobKitob) {
+      const map: Record<string, any> = { Soatbay: 'HOURLY', Ishbay: 'PER_LESSON', Kunbay: 'MONTHLY', KPI: 'MONTHLY' };
+      await this.prisma.salary.upsert({
+        where: { employeeId: dto.employeeId },
+        update: { hisobKitob: dto.hisobKitob, type: map[dto.hisobKitob] ?? 'MONTHLY' },
+        create: { employeeId: dto.employeeId, hisobKitob: dto.hisobKitob, type: map[dto.hisobKitob] ?? 'MONTHLY', baseRate: 0 },
+      });
+    }
+    return { ok: true };
+  }
+
   async createTolov(dto: any) {
     return this.prisma.salaryPayment.create({
       data: {

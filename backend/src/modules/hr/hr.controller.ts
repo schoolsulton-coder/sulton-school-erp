@@ -97,6 +97,18 @@ export class HrController {
     return this.service.createShartnoma(dto);
   }
 
+  @Post('xodim')
+  @Permissions('hr.create')
+  createXodim(@Body() dto: any) {
+    return this.service.createXodim(dto);
+  }
+
+  @Post('lavozim')
+  @Permissions('hr.create')
+  createLavozim(@Body() dto: any) {
+    return this.service.createLavozim(dto);
+  }
+
   @Get('tolovlar')
   @Permissions('hr.view')
   tolovlar(

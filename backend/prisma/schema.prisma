@@ -446,6 +446,7 @@ model Branch {
   flowAccounts FlowAccount[]
   internalTransfers InternalTransfer[]
   employees Employee[]
+  employeeLinks EmployeeBranch[]
   employmentContracts EmploymentContract[]
   salaryPayments SalaryPayment[]
   createdAt DateTime  @default(now())
@@ -830,9 +831,21 @@ model Employee {
   position     Position?      @relation(fields: [positionId], references: [id])
   branchId     String?
   branch       Branch?        @relation(fields: [branchId], references: [id])
+  branchLinks  EmployeeBranch[]
   gender       Gender?
   cardNumber   String?
   formal       Boolean        @default(false) // rasmiy / norasmiy
+  middleName   String?        // otasining ismi
+  birthDate    DateTime?
+  passportSeriya String?
+  passportRaqam  String?
+  passportBerilgan DateTime?
+  passportOrgan  String?
+  stir         String?
+  address      String?
+  mapLink      String?
+  employment   String?        // bandlik
+  kimIshlaydi  String?        // kim ishlaydi (Shaxsan ishlaydi...)
   hireDate     DateTime
   fireDate     DateTime?
   status       EmployeeStatus @default(ACTIVE)
@@ -964,8 +977,21 @@ model Salary {
   employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   type       SalaryType
   baseRate   Float
+  hisobKitob String?    // Kunbay | Soatbay | Ishbay | KPI
 
   @@map("salaries")
+}
+
+// Xodim ↔ Filial (ko'p-filial)
+model EmployeeBranch {
+  employeeId String
+  branchId   String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([employeeId, branchId])
+  @@index([branchId])
+  @@map("employee_branches")
 }
 
 model PayrollRun {

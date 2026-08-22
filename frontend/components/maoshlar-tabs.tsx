@@ -6,6 +6,7 @@ import { Search, Plus, ShieldCheck } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { ShartnomaModal } from '@/components/shartnoma-form';
 import { TolovModal } from '@/components/tolov-form';
+import { XodimModal, LavozimModal } from '@/components/xodim-lavozim-forms';
 import { hrApi, GENDER_LABEL, SALARY_LABEL, EMP_STATUS, CONTRACT_STATUS, type XodimRow, type LavozimRow, type ShartnomaRow, type TolovRow, type SalaryType } from '@/lib/hr';
 
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -32,8 +33,10 @@ const selCls = 'rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5 te
 
 /* ===== Xodimlar ===== */
 export function XodimlarTab() {
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data, isLoading } = useQuery({ queryKey: ['xodimlar', search, branchId], queryFn: () => hrApi.xodimlar({ search: search || undefined, branchId: branchId || undefined }) });
   const t = data?.totals;
@@ -53,8 +56,9 @@ export function XodimlarTab() {
       </div>
       <div className="mb-4 flex justify-end gap-2">
         <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50"><ShieldCheck size={16} /> Nomlarni tekshirish</button>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi xodim</button>
+        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi xodim</button>
       </div>
+      {showForm && <XodimModal onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['xodimlar'] }); }} />}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Xodimlar" value={t?.xodimlar ?? 0} />
         <Stat label="Lavozimlar" value={t?.lavozimlar ?? 0} />
@@ -96,10 +100,12 @@ export function XodimlarTab() {
 
 /* ===== Lavozimlar (bo'lim bo'yicha) ===== */
 export function LavozimlarTab() {
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [status, setStatus] = useState('ACTIVE');
+  const [showForm, setShowForm] = useState(false);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: depts } = useQuery({ queryKey: ['hr-departments'], queryFn: hrApi.departments });
   const { data, isLoading } = useQuery({
@@ -127,8 +133,9 @@ export function LavozimlarTab() {
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={selCls}><option value="ACTIVE">Faol</option><option value="TERMINATED">Bo&apos;shagan</option><option value="">Hammasi</option></select>
       </div>
       <div className="mb-4 flex justify-end">
-        <button className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi lavozim</button>
+        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi lavozim</button>
       </div>
+      {showForm && <LavozimModal onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['lavozimlar'] }); }} />}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <Stat label="Jami lavozimlar" value={t?.jamiLavozimlar ?? 0} />
         <Stat label="Faol lavozimlar" value={t?.faolLavozimlar ?? 0} tone="bg-emerald-50/40" />

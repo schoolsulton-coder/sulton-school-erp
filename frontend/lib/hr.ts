@@ -217,6 +217,7 @@ export const SHARTNOMA_HOLATLARI: { label: string; value: string }[] = [
   { label: 'Bekor qilish', value: 'BEKOR' },
 ];
 export const BANDLIK_TURLARI = ["To'liq stavka", 'Yarim stavka', '0.25 stavka', "O'rindoshlik"];
+export const HISOB_KITOB_TURLARI = ['Kunbay', 'Soatbay', 'Ishbay', 'KPI'];
 export const SHARTNOMA_TILLARI = ["O'zbekcha", 'Ruscha', 'Inglizcha'];
 
 export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
@@ -235,6 +236,8 @@ export const hrApi = {
   shartnomalar: (params?: { search?: string; branchId?: string; type?: string; employment?: string }) =>
     api.get<ShartnomalarResp>('/hr/shartnomalar', { params }).then((r) => r.data),
   createShartnoma: (data: any) => api.post('/hr/shartnomalar', data).then((r) => r.data),
+  createXodim: (data: any) => api.post('/hr/xodim', data).then((r) => r.data),
+  createLavozim: (data: any) => api.post('/hr/lavozim', data).then((r) => r.data),
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
   createTolov: (data: any) => api.post('/hr/tolovlar', data).then((r) => r.data),
