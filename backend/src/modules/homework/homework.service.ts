@@ -4,13 +4,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
 
+type JwtUser = { id: string; role: string };
+const ADMIN_ROLES = ['superadmin', 'admin'];
+
 @Injectable()
 export class HomeworkService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   /** Vazifa turlari ro'yxati (qayta ishlatish uchun) */
   listTypes() {
@@ -29,7 +36,11 @@ export class HomeworkService {
   }
 
   /** Vazifa yaratish — butun sinf yoki tanlangan o'quvchilarga ASSIGNED yoziladi */
-  async create(teacherId: string, dto: CreateHomeworkDto) {
+  async create(user: JwtUser, dto: CreateHomeworkDto) {
+    // Ustoz: faqat admin/owner boshqa ustozni tanlay oladi, aks holda o'zi
+    const isAdmin = ADMIN_ROLES.includes(user.role);
+    const teacherId = isAdmin && dto.teacherId ? dto.teacherId : user.id;
+
     // O'quvchilar: tanlanган bo'lsa faqat ular (sinfga tegishlilari), aks holda butun sinf
     let students: { id: string }[];
     if (dto.studentIds?.length) {
@@ -53,7 +64,7 @@ export class HomeworkService {
       .upsert({ where: { name: type }, update: {}, create: { name: type } })
       .catch(() => undefined);
 
-    return this.prisma.homework.create({
+    const hw = await this.prisma.homework.create({
       data: {
         classId: dto.classId,
         subjectId: dto.subjectId,
@@ -72,19 +83,45 @@ export class HomeworkService {
       },
       include: { subject: true, class: true },
     });
+
+    // Vasiyга Telegram bildirishnoma (faqat Telegram — SMS emas)
+    const dueLabel = new Date(dto.dueDate).toLocaleDateString('uz-UZ');
+    const notifyTitle = `📚 Yangi vazifa — ${hw.subject.name}`;
+    const notifyBody = `${dto.title} (${type})\nMuddat: ${dueLabel}`;
+    for (const s of students) {
+      void this.notifications.notifyGuardians(s.id, notifyTitle, notifyBody, {
+        telegramOnly: true,
+      });
+    }
+
+    return hw;
   }
 
-  async findAll(params: { classId?: string; subjectId?: string; teacherId?: string }) {
+  async findAll(params: {
+    classId?: string;
+    subjectId?: string;
+    teacherId?: string;
+    studentId?: string;
+    from?: string;
+    to?: string;
+  }) {
     const where: any = {};
     if (params.classId) where.classId = params.classId;
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.teacherId) where.teacherId = params.teacherId;
+    if (params.studentId) where.submissions = { some: { studentId: params.studentId } };
+    if (params.from || params.to) {
+      where.dueDate = {};
+      if (params.from) where.dueDate.gte = new Date(params.from);
+      if (params.to) where.dueDate.lte = new Date(`${params.to}T23:59:59`);
+    }
 
     const rows = await this.prisma.homework.findMany({
       where,
       include: {
         subject: true,
         class: { select: { name: true } },
+        teacher: { select: { fullName: true } },
         _count: { select: { submissions: true } },
         submissions: { select: { status: true } },
       },
@@ -96,16 +133,19 @@ export class HomeworkService {
         ['SUBMITTED', 'CHECKED', 'LATE'].includes(s.status),
       ).length;
       const checked = h.submissions.filter((s) => s.status === 'CHECKED').length;
+      const total = h._count.submissions;
       return {
         id: h.id,
         title: h.title,
         type: h.type,
         subject: h.subject,
         className: h.class.name,
+        teacher: h.teacher?.fullName ?? null,
         dueDate: h.dueDate,
-        total: h._count.submissions,
+        total,
         submitted,
         checked,
+        done: total > 0 && checked === total, // hammasi tekshirilgan
       };
     });
   }

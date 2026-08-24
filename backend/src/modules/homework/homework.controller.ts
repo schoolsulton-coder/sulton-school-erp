@@ -31,8 +31,11 @@ export class HomeworkController {
     @Query('classId') classId?: string,
     @Query('subjectId') subjectId?: string,
     @Query('teacherId') teacherId?: string,
+    @Query('studentId') studentId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.service.findAll({ classId, subjectId, teacherId });
+    return this.service.findAll({ classId, subjectId, teacherId, studentId, from, to });
   }
 
   // Vazifa turlari (":id" dan OLDIN bo'lishi shart — aks holda "types" -> :id)
@@ -56,8 +59,11 @@ export class HomeworkController {
 
   @Post()
   @Permissions('homework.create')
-  create(@CurrentUser('id') teacherId: string, @Body() dto: CreateHomeworkDto) {
-    return this.service.create(teacherId, dto);
+  create(
+    @CurrentUser() user: { id: string; role: string },
+    @Body() dto: CreateHomeworkDto,
+  ) {
+    return this.service.create(user, dto);
   }
 
   // Topshirish (ustoz/admin qayd etadi; o'quvchi portali keyin)

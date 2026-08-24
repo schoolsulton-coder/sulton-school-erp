@@ -13,10 +13,21 @@ export interface HomeworkListItem {
   type: string;
   subject: { name: string };
   className: string;
+  teacher: string | null;
   dueDate: string;
   total: number;
   submitted: number;
   checked: number;
+  done: boolean;
+}
+
+export interface HomeworkFilters {
+  classId?: string;
+  subjectId?: string;
+  teacherId?: string;
+  studentId?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface HomeworkType {
@@ -73,7 +84,7 @@ export const SUB_STATUS: Record<SubmissionStatus, { label: string; cls: string }
 };
 
 export const homeworkApi = {
-  list: (params?: { classId?: string }) =>
+  list: (params?: HomeworkFilters) =>
     api.get<HomeworkListItem[]>('/homework', { params }).then((r) => r.data),
   get: (id: string) =>
     api.get<HomeworkDetail>(`/homework/${id}`).then((r) => r.data),
@@ -82,6 +93,7 @@ export const homeworkApi = {
     subjectId: string;
     title: string;
     type?: string;
+    teacherId?: string;
     description?: string;
     dueDate: string;
     attachments?: string[];

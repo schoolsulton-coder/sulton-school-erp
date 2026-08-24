@@ -19,6 +19,11 @@ export class CreateHomeworkDto {
   @IsNotEmpty()
   title: string;
 
+  // Faqat admin/owner boshqa ustozni tanlay oladi; aks holda o'zi biriktiriladi
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
+
   @IsOptional()
   @IsString()
   type?: string; // vazifa turi (bo'sh bo'lsa "Uyga vazifa")

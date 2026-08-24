@@ -3,21 +3,37 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, X, Paperclip, Users } from 'lucide-react';
-import { homeworkApi, type HomeworkListItem, type HwFile } from '@/lib/homework';
+import { Plus, X, Paperclip, Users, Filter } from 'lucide-react';
+import { homeworkApi, type HomeworkListItem, type HomeworkFilters, type HwFile } from '@/lib/homework';
 import { classesApi } from '@/lib/classes';
 import { studentsApi } from '@/lib/students';
+import { usersApi } from '@/lib/users';
+import { useAuthStore } from '@/store/auth';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand';
+const selCls = 'rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand';
 
 export default function HomeworkPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const { data: list } = useQuery({ queryKey: ['homework'], queryFn: () => homeworkApi.list() });
+  const [f, setF] = useState<HomeworkFilters>({});
+
+  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => usersApi.list() });
+  const teachers = useMemo(() => (staff ?? []).filter((u) => !['student', 'guardian'].includes(u.role.slug)), [staff]);
+  const { data: roster } = useQuery({
+    queryKey: ['class-students', f.classId],
+    queryFn: () => studentsApi.list({ classId: f.classId, status: 'ACTIVE', limit: 500 }),
+    enabled: !!f.classId,
+  });
+
+  const { data: list } = useQuery({ queryKey: ['homework', f], queryFn: () => homeworkApi.list(f) });
+
+  const active = f.teacherId || f.classId || f.studentId || f.from || f.to;
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Vazifalar</h1>
           <p className="text-sm text-slate-500">Uy vazifasi berish va tekshirish</p>
@@ -25,6 +41,28 @@ export default function HomeworkPage() {
         <button onClick={() => setShowForm(true)} className="rounded-lg bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark">
           + Yangi vazifa
         </button>
+      </div>
+
+      {/* Filtrlar */}
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5">
+        <Filter size={16} className="text-slate-400" />
+        <select value={f.teacherId ?? ''} onChange={(e) => setF({ ...f, teacherId: e.target.value || undefined })} className={selCls}>
+          <option value="">Barcha ustozlar</option>
+          {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+        </select>
+        <select value={f.classId ?? ''} onChange={(e) => setF({ ...f, classId: e.target.value || undefined, studentId: undefined })} className={selCls}>
+          <option value="">Barcha sinflar</option>
+          {classes?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select value={f.studentId ?? ''} onChange={(e) => setF({ ...f, studentId: e.target.value || undefined })} disabled={!f.classId} className={`${selCls} disabled:bg-slate-50 disabled:text-slate-400`}>
+          <option value="">{f.classId ? 'Barcha o‘quvchilar' : 'Avval sinf'}</option>
+          {roster?.data.map((s: any) => <option key={s.id} value={s.id}>{s.lastName} {s.firstName}</option>)}
+        </select>
+        <span className="text-sm text-slate-400">Sana:</span>
+        <input type="date" value={f.from ?? ''} onChange={(e) => setF({ ...f, from: e.target.value || undefined })} className={selCls} />
+        <span className="text-slate-400">—</span>
+        <input type="date" value={f.to ?? ''} onChange={(e) => setF({ ...f, to: e.target.value || undefined })} className={selCls} />
+        {active && <button onClick={() => setF({})} className="px-2 py-1 text-sm text-slate-500 hover:text-slate-700">Tozalash</button>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -36,16 +74,21 @@ export default function HomeworkPage() {
                 <h2 className="font-semibold">{h.title}</h2>
                 <span className="shrink-0 rounded bg-blue-50 px-2 py-0.5 text-xs text-brand">{h.subject.name}</span>
               </div>
-              <div className="mt-1 flex items-center gap-2">
+              <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{h.type}</span>
                 <p className="text-sm text-slate-500">{h.className}</p>
+                {h.teacher && <span className="text-xs text-slate-400">· {h.teacher}</span>}
               </div>
               <p className={`mt-1 text-xs ${overdue ? 'text-red-500' : 'text-slate-400'}`}>
                 Muddat: {new Date(h.dueDate).toLocaleString('uz-UZ')}
               </p>
-              <div className="mt-3 flex gap-3 text-xs">
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-slate-500">Topshirgan: <b>{h.submitted}/{h.total}</b></span>
-                <span className="text-green-600">Tekshirilgan: <b>{h.checked}</b></span>
+                {h.done ? (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700">✓ Bajarildi</span>
+                ) : (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">Tekshirilmoqda {h.checked}/{h.total}</span>
+                )}
               </div>
             </Link>
           );
@@ -57,6 +100,7 @@ export default function HomeworkPage() {
 
       {showForm && (
         <NewHomeworkModal
+          teachers={teachers}
           onClose={() => setShowForm(false)}
           onCreated={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['homework'] }); }}
         />
@@ -65,9 +109,13 @@ export default function HomeworkPage() {
   );
 }
 
-function NewHomeworkModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewHomeworkModal({ teachers, onClose, onCreated }: { teachers: { id: string; fullName: string }[]; onClose: () => void; onCreated: () => void }) {
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+
   const [form, setForm] = useState({ classId: '', subjectId: '', title: '', description: '', dueDate: '' });
+  const [teacherId, setTeacherId] = useState('');
   const [type, setType] = useState('Uyga vazifa');
   const [addingType, setAddingType] = useState(false);
   const [newType, setNewType] = useState('');
@@ -85,7 +133,6 @@ function NewHomeworkModal({ onClose, onCreated }: { onClose: () => void; onCreat
   });
   const students = roster?.data ?? [];
 
-  // Joriy tur ro'yxatda bo'lmasa ham select uni ko'rsatsin
   const typeOptions = useMemo(() => {
     const names = (types ?? []).map((t) => t.name);
     return names.includes(type) ? names : [type, ...names];
@@ -93,22 +140,17 @@ function NewHomeworkModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   const addType = useMutation({
     mutationFn: () => homeworkApi.addType(newType.trim()),
-    onSuccess: (t) => {
-      qc.invalidateQueries({ queryKey: ['hw-types'] });
-      setType(t.name);
-      setNewType('');
-      setAddingType(false);
-    },
+    onSuccess: (t) => { qc.invalidateQueries({ queryKey: ['hw-types'] }); setType(t.name); setNewType(''); setAddingType(false); },
     onError: (e: any) => alert(e?.response?.data?.message ?? 'Tur qo‘shishda xatolik'),
   });
 
   const onFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = Array.from(e.target.files ?? []);
-    chosen.forEach((f) => {
-      if (f.size > 5 * 1024 * 1024) { alert(`${f.name}: fayl 5MB dan katta`); return; }
+    chosen.forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) { alert(`${file.name}: fayl 5MB dan katta`); return; }
       const reader = new FileReader();
-      reader.onload = () => setFiles((p) => [...p, { n: f.name, t: f.type, d: reader.result as string }]);
-      reader.readAsDataURL(f);
+      reader.onload = () => setFiles((p) => [...p, { n: file.name, t: file.type, d: reader.result as string }]);
+      reader.readAsDataURL(file);
     });
     e.target.value = '';
   };
@@ -118,13 +160,11 @@ function NewHomeworkModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   const create = useMutation({
     mutationFn: () => homeworkApi.create({
-      classId: form.classId,
-      subjectId: form.subjectId,
-      title: form.title,
-      type,
+      classId: form.classId, subjectId: form.subjectId, title: form.title, type,
+      teacherId: isAdmin ? (teacherId || undefined) : undefined,
       description: form.description || undefined,
       dueDate: new Date(form.dueDate).toISOString(),
-      attachments: files.map((f) => JSON.stringify(f)),
+      attachments: files.map((file) => JSON.stringify(file)),
       studentIds: mode === 'some' ? selected : undefined,
     }),
     onSuccess: onCreated,
@@ -151,6 +191,19 @@ function NewHomeworkModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <option value="">Fan</option>
             {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
+        </div>
+
+        {/* Ustoz — faqat admin/owner o'zgartira oladi */}
+        <div>
+          <label className="mb-1 block text-sm text-slate-500">Ustoz</label>
+          {isAdmin ? (
+            <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className={inputCls}>
+              <option value="">{user?.fullName ? `${user.fullName} (o‘zim)` : "O'zim"}</option>
+              {teachers.filter((t) => t.id !== user?.id).map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+            </select>
+          ) : (
+            <input value={user?.fullName ?? ''} disabled title="Faqat admin o'zgartira oladi" className={`${inputCls} bg-slate-50 text-slate-500`} />
+          )}
         </div>
 
         {/* Vazifa turi */}
@@ -225,9 +278,9 @@ function NewHomeworkModal({ onClose, onCreated }: { onClose: () => void; onCreat
           </label>
           {files.length > 0 && (
             <ul className="mt-2 space-y-1">
-              {files.map((f, i) => (
+              {files.map((file, i) => (
                 <li key={i} className="flex items-center justify-between rounded bg-slate-50 px-2 py-1 text-sm">
-                  <span className="truncate">{f.n}</span>
+                  <span className="truncate">{file.n}</span>
                   <button type="button" onClick={() => setFiles((p) => p.filter((_, x) => x !== i))} className="ml-2 text-slate-400 hover:text-red-500">
                     <X size={14} />
                   </button>
