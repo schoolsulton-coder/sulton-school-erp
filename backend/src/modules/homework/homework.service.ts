@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
@@ -8,12 +12,46 @@ import { GradeSubmissionDto } from './dto/grade-submission.dto';
 export class HomeworkService {
   constructor(private prisma: PrismaService) {}
 
-  /** Vazifa yaratish — sinf o'quvchilariga ASSIGNED topshiriq yozuvlari ochiladi */
-  async create(teacherId: string, dto: CreateHomeworkDto) {
-    const students = await this.prisma.student.findMany({
-      where: { classId: dto.classId, status: 'ACTIVE' },
-      select: { id: true },
+  /** Vazifa turlari ro'yxati (qayta ishlatish uchun) */
+  listTypes() {
+    return this.prisma.homeworkType.findMany({ orderBy: { createdAt: 'asc' } });
+  }
+
+  /** Yangi tur qo'shish — dedup (unique name orqali 2 marta yozilmaydi) */
+  async addType(name: string) {
+    const n = (name ?? '').trim();
+    if (!n) throw new BadRequestException('Tur nomi bo‘sh bo‘lishi mumkin emas');
+    return this.prisma.homeworkType.upsert({
+      where: { name: n },
+      update: {},
+      create: { name: n },
     });
+  }
+
+  /** Vazifa yaratish — butun sinf yoki tanlangan o'quvchilarga ASSIGNED yoziladi */
+  async create(teacherId: string, dto: CreateHomeworkDto) {
+    // O'quvchilar: tanlanган bo'lsa faqat ular (sinfga tegishlilari), aks holda butun sinf
+    let students: { id: string }[];
+    if (dto.studentIds?.length) {
+      students = await this.prisma.student.findMany({
+        where: { id: { in: dto.studentIds }, classId: dto.classId },
+        select: { id: true },
+      });
+      if (!students.length) {
+        throw new BadRequestException('Tanlangan o‘quvchilar sinfga tegishli emas');
+      }
+    } else {
+      students = await this.prisma.student.findMany({
+        where: { classId: dto.classId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+    }
+
+    const type = (dto.type ?? '').trim() || 'Uyga vazifa';
+    // Turni ro'yxatga saqlab qo'yamiz (dedup) — keyingi safar tanlash uchun
+    await this.prisma.homeworkType
+      .upsert({ where: { name: type }, update: {}, create: { name: type } })
+      .catch(() => undefined);
 
     return this.prisma.homework.create({
       data: {
@@ -21,6 +59,7 @@ export class HomeworkService {
         subjectId: dto.subjectId,
         teacherId,
         title: dto.title,
+        type,
         description: dto.description,
         dueDate: new Date(dto.dueDate),
         attachments: dto.attachments ?? [],
@@ -60,6 +99,7 @@ export class HomeworkService {
       return {
         id: h.id,
         title: h.title,
+        type: h.type,
         subject: h.subject,
         className: h.class.name,
         dueDate: h.dueDate,

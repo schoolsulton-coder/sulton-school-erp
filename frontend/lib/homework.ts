@@ -10,12 +10,34 @@ export type SubmissionStatus =
 export interface HomeworkListItem {
   id: string;
   title: string;
+  type: string;
   subject: { name: string };
   className: string;
   dueDate: string;
   total: number;
   submitted: number;
   checked: number;
+}
+
+export interface HomeworkType {
+  id: string;
+  name: string;
+}
+
+/** Biriktirilgan fayl — attachments[] ichida JSON string sifatida saqlanadi */
+export interface HwFile {
+  n: string; // nom
+  t: string; // mime
+  d: string; // data URI (base64)
+}
+export function parseAttachment(s: string): HwFile | null {
+  try {
+    const o = JSON.parse(s);
+    if (o && typeof o.d === 'string') return o as HwFile;
+  } catch {
+    /* eski oddiy yo'l bo'lishi mumkin */
+  }
+  return null;
 }
 
 export interface Submission {
@@ -32,6 +54,7 @@ export interface Submission {
 export interface HomeworkDetail {
   id: string;
   title: string;
+  type: string;
   description?: string | null;
   dueDate: string;
   attachments: string[];
@@ -58,9 +81,15 @@ export const homeworkApi = {
     classId: string;
     subjectId: string;
     title: string;
+    type?: string;
     description?: string;
     dueDate: string;
+    attachments?: string[];
+    studentIds?: string[];
   }) => api.post('/homework', data).then((r) => r.data),
+  types: () => api.get<HomeworkType[]>('/homework/types').then((r) => r.data),
+  addType: (name: string) =>
+    api.post<HomeworkType>('/homework/types', { name }).then((r) => r.data),
   submit: (id: string, data: { studentId: string; comment?: string; files?: string[] }) =>
     api.post(`/homework/${id}/submit`, data).then((r) => r.data),
   grade: (

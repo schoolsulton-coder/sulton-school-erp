@@ -35,6 +35,19 @@ export class HomeworkController {
     return this.service.findAll({ classId, subjectId, teacherId });
   }
 
+  // Vazifa turlari (":id" dan OLDIN bo'lishi shart — aks holda "types" -> :id)
+  @Get('types')
+  @Permissions('homework.view')
+  listTypes() {
+    return this.service.listTypes();
+  }
+
+  @Post('types')
+  @Permissions('homework.create')
+  addType(@Body('name') name: string) {
+    return this.service.addType(name);
+  }
+
   @Get(':id')
   @Permissions('homework.view')
   findOne(@Param('id') id: string) {

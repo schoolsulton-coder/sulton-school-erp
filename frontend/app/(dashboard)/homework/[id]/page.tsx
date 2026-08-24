@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { homeworkApi, SUB_STATUS, type Submission } from '@/lib/homework';
+import { Paperclip } from 'lucide-react';
+import { homeworkApi, SUB_STATUS, parseAttachment, type Submission } from '@/lib/homework';
 
 export default function HomeworkDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,12 +21,29 @@ export default function HomeworkDetailPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{hw.title}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold">{hw.title}</h1>
+          {hw.type && <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{hw.type}</span>}
+        </div>
         <p className="text-sm text-slate-500">
           {hw.class.name} · {hw.subject.name} · Muddat:{' '}
           {new Date(hw.dueDate).toLocaleString('uz-UZ')}
         </p>
         {hw.description && <p className="mt-2 text-sm text-slate-600">{hw.description}</p>}
+        {hw.attachments?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {hw.attachments.map((raw, i) => {
+              const f = parseAttachment(raw);
+              if (!f) return null;
+              return (
+                <a key={i} href={f.d} download={f.n}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-brand hover:bg-slate-50">
+                  <Paperclip size={14} /> {f.n}
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Statistika */}

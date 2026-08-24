@@ -1070,8 +1070,9 @@ model Homework {
   teacherId   String
   teacher     User     @relation("HomeworkTeacher", fields: [teacherId], references: [id])
   title       String
+  type        String   @default("Uyga vazifa") // vazifa turi (HomeworkType.name)
   description String?
-  attachments String[] // fayl yo'llari
+  attachments String[] // biriktirilgan fayllar (JSON: {n,t,d})
   dueDate     DateTime
   createdAt   DateTime @default(now())
 
@@ -1079,6 +1080,15 @@ model Homework {
 
   @@index([classId])
   @@map("homeworks")
+}
+
+/// Vazifa turlari — qayta ishlatiladigan ro'yxat (Uyga vazifa, Ijodiy ish, ...)
+model HomeworkType {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("homework_types")
 }
 
 model HomeworkSubmission {

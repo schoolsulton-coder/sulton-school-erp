@@ -21,6 +21,10 @@ export class CreateHomeworkDto {
 
   @IsOptional()
   @IsString()
+  type?: string; // vazifa turi (bo'sh bo'lsa "Uyga vazifa")
+
+  @IsOptional()
+  @IsString()
   description?: string;
 
   @IsDateString()
@@ -29,5 +33,11 @@ export class CreateHomeworkDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  attachments?: string[]; // fayl/URL yo'llari
+  attachments?: string[]; // biriktirilgan fayllar (JSON: {n,t,d})
+
+  // Bo'sh bo'lsa — butun sinf; to'ldirilsa — faqat shu o'quvchilar
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  studentIds?: string[];
 }

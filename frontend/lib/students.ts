@@ -82,7 +82,7 @@ export interface AccountResult {
 }
 
 export const studentsApi = {
-  list: (params: { page?: number; search?: string; classId?: string; status?: string; branchId?: string }) =>
+  list: (params: { page?: number; limit?: number; search?: string; classId?: string; status?: string; branchId?: string }) =>
     api
       .get<StudentListResponse>('/students', { params })
       .then((r) => r.data),
