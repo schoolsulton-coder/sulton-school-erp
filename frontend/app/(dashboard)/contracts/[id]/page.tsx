@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronDown, FileText, Pencil, Trash2, Plus, X } from 'luc
 import { contractsApi } from '@/lib/contracts';
 import { contractTemplatesApi } from '@/lib/contract-templates';
 import { crmApi, type ClassForm } from '@/lib/crm';
+import { StudentRecords } from '@/components/student-records';
 
 const num = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
 const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -282,6 +283,9 @@ export default function ContractDetailPage() {
           <InfoRow label="Oxirgi o'zgarish" value={fmtDateTime(c.updatedAt)} />
         </div>
       </div>
+
+      {/* O'QUVCHI FAOLIYATI — davomat, baholar, ahloqiy, vazifalar */}
+      {c.student?.id && <StudentRecords studentId={c.student.id} />}
 
       {payOpen && (
         <PaymentModal contractId={id} onClose={() => setPayOpen(false)} onPaid={() => { setPayOpen(false); qc.invalidateQueries({ queryKey: ['contract', id] }); }} />
