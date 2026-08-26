@@ -113,6 +113,8 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
   const [local, setLocal] = useState<Record<string, any>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const timers = useRef<Record<string, any>>({});
+  const localRef = useRef<Record<string, any>>({});
+  useEffect(() => { localRef.current = local; }, [local]);
   const rowsKey = rows.map((r) => r.id).join(',');
   useEffect(() => { setLocal(Object.fromEntries(rows.map((r) => [r.id, { ...r }]))); }, [rowsKey]);
 
@@ -120,9 +122,10 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
     const v = value === '' ? 0 : Number(value) || 0;
     setLocal((p) => ({ ...p, [id]: { ...p[id], [key]: v } }));
     clearTimeout(timers.current[id]);
-    const merged = { ...local[id], [key]: v };
     timers.current[id] = setTimeout(async () => {
-      const patch = Object.fromEntries(EDIT_COLS.map((c) => [c.key, merged[c.key] ?? 0]));
+      // Eng so'nggi holatdan patch quramiz (tez ketma-ket tahrir yo'qolmasin)
+      const cur = localRef.current[id] ?? {};
+      const patch = Object.fromEntries(EDIT_COLS.map((c) => [c.key, cur[c.key] ?? 0]));
       try {
         const u: any = await hrApi.updateOylik(id, patch);
         setLocal((p) => ({ ...p, [id]: { ...p[id], jami: u.jami, naqd: u.naqd } }));
