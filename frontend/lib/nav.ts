@@ -33,6 +33,7 @@ export const SECTIONS: NavSection[] = [
       { href: '/attendance/statistics', label: 'Davomat statistikasi', perm: 'attendance.view' },
       { href: '/homework', label: 'Vazifalar', perm: 'homework.view' },
       { href: '/behavior', label: 'Ahloqiy baho', perm: 'behavior.view' },
+      { href: '/behavior/statistics', label: 'Ahloqiy statistikasi', perm: 'behavior.view' },
     ],
   },
   {

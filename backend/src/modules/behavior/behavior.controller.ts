@@ -25,8 +25,14 @@ export class BehaviorController {
 
   @Get()
   @Permissions('behavior.view')
-  list(@Query('studentId') studentId?: string, @Query('type') type?: string) {
-    return this.service.list({ studentId, type });
+  list(
+    @Query('studentId') studentId?: string,
+    @Query('type') type?: string,
+    @Query('classId') classId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.list({ studentId, type, classId, from, to });
   }
 
   @Get('student/:studentId')
@@ -39,6 +45,16 @@ export class BehaviorController {
   @Permissions('behavior.view')
   classRanking(@Param('classId') classId: string) {
     return this.service.classRanking(classId);
+  }
+
+  @Get('class/:classId/stats')
+  @Permissions('behavior.view')
+  classStats(
+    @Param('classId') classId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.classStats(classId, from, to);
   }
 
   @Post()

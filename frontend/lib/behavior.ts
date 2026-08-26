@@ -6,8 +6,19 @@ export interface BehaviorRecord {
   points: number;
   description: string;
   date: string;
-  student: { id: string; firstName: string; lastName: string };
+  createdAt?: string;
+  student: { id: string; firstName: string; lastName: string; class?: { name: string } | null };
   author?: { fullName: string } | null;
+}
+
+export interface BehaviorStats {
+  total: number;
+  posCount: number;
+  negCount: number;
+  posPoints: number;
+  negPoints: number;
+  net: number;
+  students: { id: string; name: string; positive: number; negative: number; score: number }[];
 }
 
 export interface RankingItem {
@@ -20,8 +31,10 @@ export interface RankingItem {
 }
 
 export const behaviorApi = {
-  list: (params?: { studentId?: string; type?: string }) =>
+  list: (params?: { studentId?: string; type?: string; classId?: string; from?: string; to?: string }) =>
     api.get<BehaviorRecord[]>('/behavior', { params }).then((r) => r.data),
+  classStats: (classId: string, from?: string, to?: string) =>
+    api.get<BehaviorStats>(`/behavior/class/${classId}/stats`, { params: { from, to } }).then((r) => r.data),
   create: (data: {
     studentId: string;
     type: 'POSITIVE' | 'NEGATIVE';
