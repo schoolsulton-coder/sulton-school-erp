@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
-import { gradesApi, GRADE_TYPES, gradeColor, gradeBg } from '@/lib/grades';
+import { gradesApi, GRADE_TYPES, CHORAK_OPTIONS, gradeColor, gradeBg } from '@/lib/grades';
 import { StudentDetailModal } from '@/components/student-detail';
 
 const sel = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
@@ -13,9 +13,11 @@ export default function GradeStatsPage() {
   const [classId, setClassId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [type, setType] = useState('');
+  const [period, setPeriod] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
+  const isPeriodType = type === 'QUARTER' || type === 'YEAR';
 
   const { data: my } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
   const subjectOptions = useMemo(() => {
@@ -25,14 +27,15 @@ export default function GradeStatsPage() {
     return s.length ? s : my.subjects;
   }, [my, classId]);
 
-  const { data: stats } = useQuery({
-    queryKey: ['grade-stats', classId, subjectId, type, from, to],
+  const { data: stats, isLoading, isError } = useQuery({
+    queryKey: ['grade-stats', classId, subjectId, type, from, to, period],
     queryFn: () =>
       gradesApi.classStats(classId, {
         subjectId: subjectId || undefined,
         type: type || undefined,
         from: from || undefined,
         to: to || undefined,
+        period: isPeriodType ? period || undefined : undefined,
       }),
     enabled: !!classId,
   });
@@ -80,21 +83,31 @@ export default function GradeStatsPage() {
           <option value="">Barcha fanlar</option>
           {subjectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select value={type} onChange={(e) => setType(e.target.value)} className={sel}>
+        <select value={type} onChange={(e) => { setType(e.target.value); setPeriod(''); }} className={sel}>
           <option value="">Barcha turlar</option>
           {GRADE_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
         </select>
+        {isPeriodType && (
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} className={sel}>
+            <option value="">Barcha choraklar</option>
+            {CHORAK_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
         <span className="text-sm text-slate-400">Sana:</span>
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={sel} />
         <span className="text-slate-400">—</span>
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={sel} />
-        {(from || to || subjectId || type) && (
-          <button onClick={() => { setSubjectId(''); setType(''); setFrom(''); setTo(''); }} className="px-2 py-1 text-sm text-slate-500 hover:text-slate-700">Tozalash</button>
+        {(from || to || subjectId || type || period) && (
+          <button onClick={() => { setSubjectId(''); setType(''); setPeriod(''); setFrom(''); setTo(''); }} className="px-2 py-1 text-sm text-slate-500 hover:text-slate-700">Tozalash</button>
         )}
       </div>
 
       {!classId ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">Sinfni tanlang</div>
+      ) : isLoading ? (
+        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">Yuklanmoqda…</div>
+      ) : isError ? (
+        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-red-300 bg-red-50 text-red-500">Statistikani yuklab bo‘lmadi</div>
       ) : !stats || stats.count === 0 ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">Baho topilmadi</div>
       ) : (
@@ -103,8 +116,8 @@ export default function GradeStatsPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Kpi label="O'rtacha ball" value={stats.average || '—'} valueClass={gradeColor(stats.average)} />
             <Kpi label="Jami baho" value={stats.count} />
-            <Kpi label="A'lochilar (4.5+)" value={`${stats.excellentPct}%`} valueClass="text-green-600" />
-            <Kpi label="Past (3 dan past)" value={`${stats.failPct}%`} valueClass="text-red-600" />
+            <Kpi label="A'lo baho ulushi (5)" value={`${stats.excellentPct}%`} valueClass="text-green-600" />
+            <Kpi label="Past baho ulushi (3<)" value={`${stats.failPct}%`} valueClass="text-red-600" />
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

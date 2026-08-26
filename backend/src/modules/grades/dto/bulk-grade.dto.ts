@@ -37,8 +37,8 @@ export class BulkGradeDto {
   classId?: string; // ustoz ko'lamini tekshirish uchun
 
   @IsOptional()
-  @IsEnum(['DAILY', 'QUARTER', 'SEMESTER', 'YEAR', 'EXAM'])
-  type?: 'DAILY' | 'QUARTER' | 'SEMESTER' | 'YEAR' | 'EXAM';
+  @IsEnum(['DAILY', 'HOMEWORK', 'QUARTER', 'SEMESTER', 'YEAR', 'EXAM'])
+  type?: 'DAILY' | 'HOMEWORK' | 'QUARTER' | 'SEMESTER' | 'YEAR' | 'EXAM';
 
   @IsOptional()
   @IsString()

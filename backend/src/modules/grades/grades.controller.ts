@@ -58,8 +58,9 @@ export class GradesController {
     @Param('classId') classId: string,
     @Param('subjectId') subjectId: string,
     @Query('type') type?: string,
+    @Query('period') period?: string,
   ) {
-    return this.service.classGradebook(classId, subjectId, type);
+    return this.service.classGradebook(classId, subjectId, type, period);
   }
 
   @Get('class/:classId/stats')

@@ -24,6 +24,16 @@ const fmtDay = (iso: string) => {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '' : `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 };
+const fmtDateTime = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+// class-validator massiv qaytarsa ham tushunarli xabar
+const errText = (e: any) => {
+  const m = e?.response?.data?.message;
+  return Array.isArray(m) ? m[0] : (m ?? 'Xatolik yuz berdi');
+};
 
 export default function GradesPage() {
   const qc = useQueryClient();
@@ -39,6 +49,7 @@ export default function GradesPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [edit, setEdit] = useState<GradeCell | null>(null);
   const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
+  const [errMsg, setErrMsg] = useState('');
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   const { data: my } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
@@ -51,16 +62,17 @@ export default function GradesPage() {
     return s.length ? s : my.subjects;
   }, [my, classId]);
 
-  const { data: gradebook } = useQuery({
-    queryKey: ['gradebook', classId, subjectId, type],
-    queryFn: () => gradesApi.gradebook(classId, subjectId, type),
+  const isPeriodType = type === 'QUARTER' || type === 'YEAR';
+  const { data: gradebook, isLoading: gbLoading } = useQuery({
+    queryKey: ['gradebook', classId, subjectId, type, period],
+    queryFn: () => gradesApi.gradebook(classId, subjectId, type, isPeriodType ? period || undefined : undefined),
     enabled: !!classId && !!subjectId,
   });
-  const gbKey = ['gradebook', classId, subjectId, type];
+  const gbKey = ['gradebook', classId, subjectId, type, period];
 
   // Kontekst (sinf/fan/tur/sana) o'zgarganda mavjud baholarni yuklaymiz.
   // Fon-refetch (bir xil kontekst) foydalanuvchi kiritgan yangi baholarni O'CHIRMAYDI.
-  const ctxKey = `${classId}|${subjectId}|${type}|${date}`;
+  const ctxKey = `${classId}|${subjectId}|${type}|${date}|${period}`;
   const loadedCtx = useRef('');
   useEffect(() => {
     if (!gradebook) return;
@@ -68,11 +80,12 @@ export default function GradesPage() {
     loadedCtx.current = ctxKey;
     const next: Record<string, string> = {};
     for (const s of gradebook) {
-      const g = s.grades.find((x) => x.date.slice(0, 10) === date);
+      // Chorak/Yillik — period bo'yicha (bitta baho); qolganlari — sana bo'yicha
+      const g = isPeriodType ? s.grades[0] : s.grades.find((x) => x.date.slice(0, 10) === date);
       if (g) next[s.id] = String(g.value);
     }
     setValues(next);
-  }, [gradebook, ctxKey, date]);
+  }, [gradebook, ctxKey, date, isPeriodType]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -87,19 +100,19 @@ export default function GradesPage() {
           .filter(([, v]) => v !== '')
           .map(([studentId, v]) => ({ studentId, value: Number(v) })),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: gbKey }),
-    onError: (e: any) => alert(e?.response?.data?.message ?? 'Saqlashda xatolik'),
+    onSuccess: () => { setErrMsg(''); qc.invalidateQueries({ queryKey: gbKey }); },
+    onError: (e: any) => setErrMsg(errText(e)),
   });
 
   const patch = useMutation({
     mutationFn: (d: { id: string; value: number }) => gradesApi.update(d.id, { value: d.value }),
-    onSuccess: () => { setEdit(null); qc.invalidateQueries({ queryKey: gbKey }); },
-    onError: (e: any) => alert(e?.response?.data?.message ?? 'Xatolik'),
+    onSuccess: () => { setEdit(null); setErrMsg(''); qc.invalidateQueries({ queryKey: gbKey }); },
+    onError: (e: any) => setErrMsg(errText(e)),
   });
   const del = useMutation({
     mutationFn: (id: string) => gradesApi.remove(id),
-    onSuccess: () => { setEdit(null); qc.invalidateQueries({ queryKey: gbKey }); },
-    onError: (e: any) => alert(e?.response?.data?.message ?? 'Xatolik'),
+    onSuccess: () => { setEdit(null); setErrMsg(''); qc.invalidateQueries({ queryKey: gbKey }); },
+    onError: (e: any) => setErrMsg(errText(e)),
   });
 
   const rows: GradebookRow[] = gradebook ?? [];
@@ -171,6 +184,13 @@ export default function GradesPage() {
         </div>
       </div>
 
+      {errMsg && (
+        <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <span>{errMsg}</span>
+          <button onClick={() => setErrMsg('')} className="shrink-0 text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+
       {!classId || !subjectId ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
           {my && !my.classes.length ? 'Sizga fan biriktirilmagan' : 'Sinf va fanni tanlang'}
@@ -228,7 +248,7 @@ export default function GradesPage() {
                             key={g.id}
                             onClick={() => canUpdate && setEdit(g)}
                             disabled={!canUpdate}
-                            title={canUpdate ? `${fmtDay(g.date)} · bosib tahrirlang` : fmtDay(g.date)}
+                            title={`${fmtDay(g.date)}${g.teacherName ? ' · ' + g.teacherName : ''}${canUpdate ? ' · bosib tahrirlang' : ''}`}
                             className={`h-6 min-w-6 rounded px-1.5 text-xs font-bold ${gradeBg(g.value)} ${canUpdate ? 'hover:ring-2 hover:ring-brand/40' : 'cursor-default'}`}
                           >
                             {g.value}
@@ -254,7 +274,7 @@ export default function GradesPage() {
                     </td>
                   </tr>
                 ))}
-                {!filteredRows.length && <tr><td colSpan={5} className="px-3 py-10 text-center text-slate-400">{q ? 'Qidiruvga mos o\'quvchi yo\'q' : 'O\'quvchi topilmadi'}</td></tr>}
+                {!filteredRows.length && <tr><td colSpan={5} className="px-3 py-10 text-center text-slate-400">{gbLoading ? 'Yuklanmoqda…' : q ? 'Qidiruvga mos o\'quvchi yo\'q' : 'O\'quvchi topilmadi'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -288,7 +308,11 @@ function EditGradeModal({ grade, canDelete, onClose, onSave, onDelete, busy }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xs space-y-4 rounded-2xl bg-white p-5 shadow-xl">
         <h2 className="text-lg font-bold">Bahoni tahrirlash</h2>
-        <p className="text-sm text-slate-500">Sana: {fmtDay(grade.date)}</p>
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          <div>Sana: <b className="text-slate-700">{fmtDay(grade.date)}</b></div>
+          {grade.teacherName && <div>Kim qo&apos;ygan: <b className="text-slate-700">{grade.teacherName}</b></div>}
+          {grade.createdAt && <div>Qachon: <b className="text-slate-700">{fmtDateTime(grade.createdAt)}</b></div>}
+        </div>
         <div className="flex justify-center gap-2">
           {['5', '4', '3', '2', '1'].map((n) => (
             <button key={n} onClick={() => setV(n)} className={`h-11 w-11 rounded-lg text-lg font-bold ${v === n ? gradeBg(Number(n)) + ' ring-2 ring-brand' : 'bg-slate-100 text-slate-500'}`}>{n}</button>

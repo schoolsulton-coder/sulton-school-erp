@@ -8,6 +8,8 @@ export interface GradeCell {
   type: GradeType;
   date: string;
   comment?: string | null;
+  createdAt?: string;
+  teacherName?: string | null;
 }
 
 export interface GradebookRow {
@@ -68,9 +70,9 @@ export const gradesApi = {
     classId: string,
     params: { subjectId?: string; type?: string; from?: string; to?: string; period?: string },
   ) => api.get<ClassStats>(`/grades/class/${classId}/stats`, { params }).then((r) => r.data),
-  gradebook: (classId: string, subjectId: string, type?: string) =>
+  gradebook: (classId: string, subjectId: string, type?: string, period?: string) =>
     api
-      .get<GradebookRow[]>(`/grades/class/${classId}/subject/${subjectId}`, { params: { type } })
+      .get<GradebookRow[]>(`/grades/class/${classId}/subject/${subjectId}`, { params: { type, period } })
       .then((r) => r.data),
   studentReport: (studentId: string) =>
     api.get<StudentGradeReport>(`/grades/student/${studentId}/report`).then((r) => r.data),

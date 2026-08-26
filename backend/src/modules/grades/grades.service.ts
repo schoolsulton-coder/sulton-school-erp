@@ -346,7 +346,7 @@ export class GradesService {
     classId: string,
     params: { subjectId?: string; type?: string; from?: string; to?: string; period?: string },
   ) {
-    const where: any = { student: { classId, contracts: ENROLLED_CONTRACT } };
+    const where: any = { student: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT } };
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.type) where.type = params.type;
     if (params.period) where.period = params.period;
@@ -409,7 +409,7 @@ export class GradesService {
   }
 
   /** Sinf jurnali: bir fan (+ tur) bo'yicha o'quvchilar va baholari */
-  async classGradebook(classId: string, subjectId: string, type?: string) {
+  async classGradebook(classId: string, subjectId: string, type?: string, period?: string) {
     const students = await this.prisma.student.findMany({
       // Faqat o'qiyotgan (shartnomasi faol/to'langan/band) o'quvchilar jurnalga kiradi
       where: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT },
@@ -418,9 +418,17 @@ export class GradesService {
         firstName: true,
         lastName: true,
         grades: {
-          where: { subjectId, ...(type ? { type: type as any } : {}) },
+          where: { subjectId, ...(type ? { type: type as any } : {}), ...(period ? { period } : {}) },
           orderBy: { date: 'desc' },
-          select: { id: true, value: true, type: true, date: true, comment: true },
+          select: {
+            id: true,
+            value: true,
+            type: true,
+            date: true,
+            comment: true,
+            createdAt: true,
+            teacher: { select: { fullName: true } },
+          },
         },
       },
       orderBy: { lastName: 'asc' },
@@ -429,7 +437,15 @@ export class GradesService {
       id: s.id,
       firstName: s.firstName,
       lastName: s.lastName,
-      grades: s.grades,
+      grades: s.grades.map((g) => ({
+        id: g.id,
+        value: g.value,
+        type: g.type,
+        date: g.date,
+        comment: g.comment,
+        createdAt: g.createdAt,
+        teacherName: g.teacher?.fullName ?? null,
+      })),
       average: avg(s.grades.map((g) => g.value)),
     }));
   }

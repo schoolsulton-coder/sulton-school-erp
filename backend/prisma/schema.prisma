@@ -178,6 +178,7 @@ model User {
   telegramLink    TelegramLink?
   auditLogs       AuditLog[]
   debtorContacts  DebtorContact[]  @relation("DebtorContactAuthor")
+  markedAttendances Attendance[]   @relation("AttendanceMarker")
   flowAccounts    FlowAccount[]
   cpEntriesCreated   CounterpartyEntry[] @relation("CpEntryCreatedBy")
   cpEntriesUpdated   CounterpartyEntry[] @relation("CpEntryUpdatedBy")
@@ -1038,6 +1039,8 @@ model Grade {
   period    String?   // "1-chorak", "2-chorak", ... (Chorak/Yillik uchun asosiy ajratuvchi)
   comment   String?
   date      DateTime  @default(now())
+  createdAt DateTime  @default(now()) // qachon qo'yilgan (audit)
+  updatedAt DateTime  @updatedAt
 
   @@index([studentId])
   @@index([subjectId])
@@ -1047,14 +1050,18 @@ model Grade {
 }
 
 model Attendance {
-  id        String           @id @default(uuid())
-  studentId String
-  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  classId   String?
-  class     Class?           @relation(fields: [classId], references: [id])
-  date      DateTime
-  status    AttendanceStatus @default(PRESENT)
-  note      String?
+  id         String           @id @default(uuid())
+  studentId  String
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId    String?
+  class      Class?           @relation(fields: [classId], references: [id])
+  date       DateTime
+  status     AttendanceStatus @default(PRESENT)
+  note       String?
+  markedById String?          // kim belgilagan (audit)
+  markedBy   User?            @relation("AttendanceMarker", fields: [markedById], references: [id])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@unique([studentId, date])
   @@index([date])
@@ -1118,6 +1125,8 @@ model BehaviorRecord {
   points      Int          @default(0)
   description String
   date        DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([studentId])
   @@map("behavior_records")

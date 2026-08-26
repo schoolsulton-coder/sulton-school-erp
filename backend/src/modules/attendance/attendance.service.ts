@@ -105,8 +105,8 @@ export class AttendanceService {
       dto.records.map((r) =>
         this.prisma.attendance.upsert({
           where: { studentId_date: { studentId: r.studentId, date } },
-          update: { status: r.status, note: r.note, classId: dto.classId },
-          create: { studentId: r.studentId, classId: dto.classId, date, status: r.status, note: r.note },
+          update: { status: r.status, note: r.note, classId: dto.classId, markedById: user.id },
+          create: { studentId: r.studentId, classId: dto.classId, date, status: r.status, note: r.note, markedById: user.id },
         }),
       ),
     );
