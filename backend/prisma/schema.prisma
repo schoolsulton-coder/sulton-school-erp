@@ -977,8 +977,14 @@ model Salary {
   employeeId String     @unique
   employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   type       SalaryType
-  baseRate   Float
+  baseRate   Float // asosiy stavka: Kunbay/Ishbay/KPI = o'zgarmas oylik, Soatbay = soat narxi
   hisobKitob String?    // Kunbay | Soatbay | Ishbay | KPI
+  // Kelishuv (joriy) qo'shimcha maydonlari
+  rasmiyOyligi Float?   // rasmiy (hujjatdagi, soliq uchun) oylik — Rasmiy bo'lsa
+  soliqKim     String?  // Ishchi | Ish beruvchi
+  startDate    DateTime? // kelishuv boshlanish sanasi
+  endDate      DateTime? // kelishuv tugash sanasi (bo'sh = joriy)
+  note         String?   // izoh
 
   @@map("salaries")
 }

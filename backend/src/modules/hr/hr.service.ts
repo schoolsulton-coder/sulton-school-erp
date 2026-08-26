@@ -325,6 +325,22 @@ export class HrService {
     });
   }
 
+  // Kelishuv (Salary) maydonlarini dto'dan quradi — create/update uchun umumiy
+  private salaryFields(dto: any) {
+    const map: Record<string, any> = { Soatbay: 'HOURLY', Ishbay: 'PER_LESSON', Kunbay: 'MONTHLY', KPI: 'MONTHLY' };
+    const num = (v: any) => (v === '' || v == null ? null : Number(v));
+    return {
+      hisobKitob: dto.hisobKitob,
+      type: map[dto.hisobKitob] ?? 'MONTHLY',
+      baseRate: num(dto.baseRate) ?? 0,
+      rasmiyOyligi: num(dto.rasmiyOyligi),
+      soliqKim: dto.soliqKim || null,
+      startDate: dto.startDate ? new Date(dto.startDate) : dto.boshlanish ? new Date(dto.boshlanish) : null,
+      endDate: dto.endDate ? new Date(dto.endDate) : null,
+      note: dto.note ?? null,
+    };
+  }
+
   // ===== Maoshlar · Yangi lavozim (+ birinchi kelishuv) =====
   async createLavozim(dto: any) {
     let positionId = dto.positionId;
@@ -345,11 +361,27 @@ export class HrService {
       },
     });
     if (dto.hisobKitob) {
-      const map: Record<string, any> = { Soatbay: 'HOURLY', Ishbay: 'PER_LESSON', Kunbay: 'MONTHLY', KPI: 'MONTHLY' };
+      const sf = this.salaryFields(dto);
       await this.prisma.salary.upsert({
         where: { employeeId: dto.employeeId },
-        update: { hisobKitob: dto.hisobKitob, type: map[dto.hisobKitob] ?? 'MONTHLY' },
-        create: { employeeId: dto.employeeId, hisobKitob: dto.hisobKitob, type: map[dto.hisobKitob] ?? 'MONTHLY', baseRate: 0 },
+        update: sf,
+        create: { employeeId: dto.employeeId, ...sf },
+      });
+    }
+    return { ok: true };
+  }
+
+  // ===== Maoshlar · Kelishuvni tahrirlash (joriy) =====
+  async updateKelishuv(employeeId: string, dto: any) {
+    if (typeof dto.formal === 'boolean') {
+      await this.prisma.employee.update({ where: { id: employeeId }, data: { formal: dto.formal } });
+    }
+    if (dto.hisobKitob) {
+      const sf = this.salaryFields(dto);
+      await this.prisma.salary.upsert({
+        where: { employeeId },
+        update: sf,
+        create: { employeeId, ...sf },
       });
     }
     return { ok: true };

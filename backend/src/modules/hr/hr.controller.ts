@@ -109,6 +109,12 @@ export class HrController {
     return this.service.createLavozim(dto);
   }
 
+  @Patch('kelishuv/:employeeId')
+  @Permissions('hr.update')
+  updateKelishuv(@Param('employeeId') employeeId: string, @Body() dto: any) {
+    return this.service.updateKelishuv(employeeId, dto);
+  }
+
   @Get('tolovlar')
   @Permissions('hr.view')
   tolovlar(

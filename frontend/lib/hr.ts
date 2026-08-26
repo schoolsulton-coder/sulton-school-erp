@@ -218,7 +218,20 @@ export const SHARTNOMA_HOLATLARI: { label: string; value: string }[] = [
 ];
 export const BANDLIK_TURLARI = ["To'liq stavka", 'Yarim stavka', '0.25 stavka', "O'rindoshlik"];
 export const HISOB_KITOB_TURLARI = ['Kunbay', 'Soatbay', 'Ishbay', 'KPI'];
+export const SOLIQ_KIM = ['Ishchi', 'Ish beruvchi'];
 export const SHARTNOMA_TILLARI = ["O'zbekcha", 'Ruscha', 'Inglizcha'];
+
+// Bitta kelishuv (joriy) maydonlari — create/edit uchun umumiy
+export interface KelishuvForm {
+  startDate: string;
+  endDate: string;
+  formal: boolean;
+  hisobKitob: string; // Kunbay | Soatbay | Ishbay | KPI
+  baseRate: string; // Kunbay/Ishbay/KPI = o'zgarmas oylik, Soatbay = soat narxi
+  rasmiyOyligi: string;
+  soliqKim: string;
+  note: string;
+}
 
 export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
   YARATILGAN: { label: 'Yaratilgan', cls: 'bg-emerald-50 text-emerald-600' },
@@ -238,6 +251,7 @@ export const hrApi = {
   createShartnoma: (data: any) => api.post('/hr/shartnomalar', data).then((r) => r.data),
   createXodim: (data: any) => api.post('/hr/xodim', data).then((r) => r.data),
   createLavozim: (data: any) => api.post('/hr/lavozim', data).then((r) => r.data),
+  updateKelishuv: (employeeId: string, data: any) => api.patch(`/hr/kelishuv/${employeeId}`, data).then((r) => r.data),
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
   createTolov: (data: any) => api.post('/hr/tolovlar', data).then((r) => r.data),

@@ -5,7 +5,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { X, Search } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { usersApi } from '@/lib/users';
-import { hrApi, BANDLIK_TURLARI, HISOB_KITOB_TURLARI, type Employee } from '@/lib/hr';
+import { hrApi, BANDLIK_TURLARI, type Employee } from '@/lib/hr';
+import { KelishuvFields, emptyKelishuv, validateKelishuv } from '@/components/kelishuv-fields';
 
 const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
 const inp = 'w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm outline-none focus:border-brand focus:bg-white';
@@ -116,10 +117,7 @@ export function LavozimModal({ onClose, onSaved }: { onClose: () => void; onSave
   const [lavozim, setLavozim] = useState('');
   const [employment, setEmployment] = useState('');
   const [kimIshlaydi, setKim] = useState('Shaxsan ishlaydi');
-  const [boshlanish, setBoshlanish] = useState('');
-  const [formal, setFormal] = useState(false);
-  const [hisobKitob, setHK] = useState('');
-  const [note, setNote] = useState('');
+  const [kelishuv, setKelishuv] = useState(emptyKelishuv());
   const [error, setError] = useState('');
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
@@ -129,11 +127,30 @@ export function LavozimModal({ onClose, onSaved }: { onClose: () => void; onSave
   const selected = (employees ?? []).find((e) => e.id === employeeId);
 
   const save = useMutation({
-    mutationFn: () => hrApi.createLavozim({ employeeId, branchId: branchId || undefined, departmentId: departmentId || undefined, lavozim: lavozim || undefined, employment: employment || undefined, kimIshlaydi, boshlanish: boshlanish || undefined, formal, hisobKitob: hisobKitob || undefined, note: note || undefined }),
+    mutationFn: () => hrApi.createLavozim({
+      employeeId, branchId: branchId || undefined, departmentId: departmentId || undefined,
+      lavozim: lavozim || undefined, employment: employment || undefined, kimIshlaydi,
+      boshlanish: kelishuv.startDate || undefined,
+      startDate: kelishuv.startDate || undefined,
+      endDate: kelishuv.endDate || undefined,
+      formal: kelishuv.formal,
+      hisobKitob: kelishuv.hisobKitob || undefined,
+      baseRate: kelishuv.baseRate || undefined,
+      rasmiyOyligi: kelishuv.rasmiyOyligi || undefined,
+      soliqKim: kelishuv.soliqKim || undefined,
+      note: kelishuv.note || undefined,
+    }),
     onSuccess: onSaved,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
   });
-  const submit = () => { setError(''); if (!employeeId) return setError('Xodimni tanlang'); if (!lavozim) return setError('Lavozim nomini kiriting'); save.mutate(); };
+  const submit = () => {
+    setError('');
+    if (!employeeId) return setError('Xodimni tanlang');
+    if (!lavozim) return setError('Lavozim nomini kiriting');
+    const kErr = validateKelishuv(kelishuv);
+    if (kErr) return setError(kErr);
+    save.mutate();
+  };
 
   return (
     <Shell title="Yangi lavozim" sub="Lavozim + birinchi kelishuv birga yaratiladi" onClose={onClose}
@@ -160,16 +177,9 @@ export function LavozimModal({ onClose, onSaved }: { onClose: () => void; onSave
           <div><label className={lbl}>Bandlik <span className="text-rose-500">*</span></label><select value={employment} onChange={(e) => setEmployment(e.target.value)} className={inp}><option value="">—</option>{BANDLIK_TURLARI.map((b) => <option key={b} value={b}>{b}</option>)}</select></div>
           <div><label className={lbl}>Kim ishlaydi</label><select value={kimIshlaydi} onChange={(e) => setKim(e.target.value)} className={inp}><option>Shaxsan ishlaydi</option><option>O&apos;rinbosari ishlaydi</option></select></div>
         </div>
-        <div><label className={lbl}>Izoh</label><input value={note} onChange={(e) => setNote(e.target.value)} className={inp} /></div>
         <div className="border-t border-slate-100 pt-4">
-          <div className="mb-2 text-xs font-bold uppercase text-slate-500">Birinchi kelishuv</div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={lbl}>Boshlanish sanasi <span className="text-rose-500">*</span></label><input type="date" value={boshlanish} onChange={(e) => setBoshlanish(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Rasmiylik</label><select value={formal ? '1' : '0'} onChange={(e) => setFormal(e.target.value === '1')} className={inp}><option value="0">Norasmiy</option><option value="1">Rasmiy</option></select></div>
-          </div>
-          <div className="mt-3"><label className={lbl}>Hisob-kitob turi <span className="text-rose-500">*</span></label>
-            <div className="flex flex-wrap gap-2">{HISOB_KITOB_TURLARI.map((h) => <button key={h} type="button" onClick={() => setHK(h)} className={`rounded-lg border px-3 py-1.5 text-sm ${hisobKitob === h ? 'border-brand bg-brand/5 text-brand' : 'border-slate-200 text-slate-500'}`}>{h}</button>)}</div>
-          </div>
+          <div className="mb-3 text-xs font-bold uppercase text-slate-500">Birinchi kelishuv</div>
+          <KelishuvFields value={kelishuv} onChange={setKelishuv} />
         </div>
         {error && <p className="text-sm font-medium text-rose-500">{error}</p>}
       </div>
