@@ -578,7 +578,7 @@ export class HrService {
 
     const records = await this.prisma.payrollRecord.findMany({
       where,
-      include: { employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } }, branch: { select: { name: true } }, department: { select: { name: true } } } } },
+      include: { employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } }, branch: { select: { name: true } }, department: { select: { name: true } }, salary: { select: { hisobKitob: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
     const paid = await this.paidByEmployee(params.period, records.map((r) => r.employeeId));
@@ -592,6 +592,7 @@ export class HrService {
         position: r.employee.position?.name ?? null,
         branch: r.employee.branch?.name ?? null,
         department: r.employee.department?.name ?? null,
+        hisobKitob: r.employee.salary?.hisobKitob ?? null,
         ishlagan: r.ishlaganKun,
         bonusJarima: r.bonus - r.jarima,
         ovqat: r.ovqatPuli,
@@ -601,6 +602,18 @@ export class HrService {
         naqd: r.naqd,
         karta: r.karta,
         confirmed: r.confirmed,
+        // inline tahrir uchun xom maydonlar
+        ishlaganKun: r.ishlaganKun,
+        ishlaganSoat: r.ishlaganSoat,
+        asosiyOylik: r.asosiyOylik,
+        soatlikNarx: r.soatlikNarx,
+        kpi: r.kpi,
+        bonus: r.bonus,
+        ovqatPuli: r.ovqatPuli,
+        ijara: r.ijara,
+        transport: r.transport,
+        jarima: r.jarima,
+        note: r.note,
       };
     });
 
@@ -659,6 +672,30 @@ export class HrService {
 
   async oylikConfirm(id: string, confirm: boolean) {
     return this.prisma.payrollRecord.update({ where: { id }, data: { confirmed: confirm } });
+  }
+
+  // ===== Maoshlar · Oylik to'ldirish (inline tahrir + avtomat jami/naqd) =====
+  private static readonly OYLIK_NUM_FIELDS = [
+    'ishchiKunlar', 'ishlaganKun', 'ishlaganSoat', 'asosiyOylik', 'soatlikNarx', 'rasmiyHisob',
+    'kpi', 'bonus', 'ovqatPuli', 'tatilKartaga', 'tatilNaqd', 'ijara', 'transport', 'jarima', 'soliq', 'karta',
+  ];
+  async updateOylik(id: string, patch: any) {
+    const cur = await this.prisma.payrollRecord.findUnique({ where: { id } });
+    if (!cur) throw new NotFoundException('Oylik yozuvi topilmadi');
+
+    const data: any = {};
+    for (const k of HrService.OYLIK_NUM_FIELDS) {
+      if (k in patch) data[k] = patch[k] === '' || patch[k] == null ? 0 : Number(patch[k]) || 0;
+    }
+    if ('soliqKim' in patch) data.soliqKim = patch.soliqKim || null;
+    if ('note' in patch) data.note = patch.note || null;
+
+    const merged = { ...cur, ...data };
+    const { jami } = this.calcJami(merged);
+    data.jami = jami;
+    // Naqd = jami − karta (karta qo'lda kiritiladi, naqd avtomat)
+    data.naqd = jami - (merged.karta ?? 0);
+    return this.prisma.payrollRecord.update({ where: { id }, data });
   }
 
   // ===== Maoshlar · 10 oylik (o'quv yili: Sentabr–Iyun) =====

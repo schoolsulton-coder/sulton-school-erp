@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Calculator, ListChecks, CheckCircle2, XCircle, Search } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
@@ -30,6 +30,7 @@ export function OylikHisobTab() {
   const [search, setSearch] = useState('');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showJamoa, setShowJamoa] = useState(false);
+  const [filling, setFilling] = useState(false);
   const period = `${year}-${String(month).padStart(2, '0')}`;
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
@@ -46,7 +47,7 @@ export function OylikHisobTab() {
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Xodim..." className={`min-w-[180px] flex-1 ${selCls}`} />
       </div>
       <div className="mb-4 flex justify-end gap-2">
-        <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50"><ListChecks size={16} /> Oylik to&apos;ldirish</button>
+        <button onClick={() => { if (filling) qc.invalidateQueries({ queryKey: ['oylik'] }); setFilling((f) => !f); }} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm ${filling ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}><ListChecks size={16} /> {filling ? 'Tayyor' : "Oylik to'ldirish"}</button>
         <button onClick={() => setShowJamoa(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Calculator size={16} /> Jamoaga oylik hisoblash</button>
       </div>
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -56,6 +57,9 @@ export function OylikHisobTab() {
         <Stat label="Ortiqcha" value={numFmt(t?.ortiqcha ?? 0)} tone="bg-amber-50/40" />
         <Stat label="Ovqat ushlanma" value={numFmt(t?.ovqatUshlanma ?? 0)} tone="bg-sky-50/40" />
       </div>
+      {filling ? (
+        <OylikFillGrid rows={rows} isLoading={isLoading} onSaved={() => qc.invalidateQueries({ queryKey: ['oylik'] })} />
+      ) : (
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -84,10 +88,114 @@ export function OylikHisobTab() {
           </table>
         </div>
       </div>
+      )}
 
       {detailId && <OylikDetailPanel id={detailId} onClose={() => setDetailId(null)} onChanged={() => qc.invalidateQueries({ queryKey: ['oylik'] })} />}
       {showJamoa && <JamoaHisoblashModal year={year} month={month} branchId={branchId} onClose={() => setShowJamoa(false)} onDone={() => { setShowJamoa(false); qc.invalidateQueries({ queryKey: ['oylik'] }); }} />}
     </>
+  );
+}
+
+/* ===== Oylik to'ldirish (inline tahrir + avtomat saqlash) ===== */
+const EDIT_COLS: { key: string; label: string; hourly?: boolean }[] = [
+  { key: 'ishlaganKun', label: 'Ishl. kun' },
+  { key: 'ishlaganSoat', label: 'Ishl. soat', hourly: true },
+  { key: 'kpi', label: 'KPI' },
+  { key: 'bonus', label: 'Bonus' },
+  { key: 'ovqatPuli', label: 'Ovqat' },
+  { key: 'ijara', label: 'Ijara' },
+  { key: 'transport', label: 'Transport' },
+  { key: 'jarima', label: 'Jarima' },
+  { key: 'karta', label: 'Karta' },
+];
+
+function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoading: boolean; onSaved: () => void }) {
+  const [local, setLocal] = useState<Record<string, any>>({});
+  const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const timers = useRef<Record<string, any>>({});
+  const rowsKey = rows.map((r) => r.id).join(',');
+  useEffect(() => { setLocal(Object.fromEntries(rows.map((r) => [r.id, { ...r }]))); }, [rowsKey]);
+
+  const setField = (id: string, key: string, value: string) => {
+    const v = value === '' ? 0 : Number(value) || 0;
+    setLocal((p) => ({ ...p, [id]: { ...p[id], [key]: v } }));
+    clearTimeout(timers.current[id]);
+    const merged = { ...local[id], [key]: v };
+    timers.current[id] = setTimeout(async () => {
+      const patch = Object.fromEntries(EDIT_COLS.map((c) => [c.key, merged[c.key] ?? 0]));
+      try {
+        const u: any = await hrApi.updateOylik(id, patch);
+        setLocal((p) => ({ ...p, [id]: { ...p[id], jami: u.jami, naqd: u.naqd } }));
+        setSaved((s) => ({ ...s, [id]: true }));
+        onSaved();
+        setTimeout(() => setSaved((s) => ({ ...s, [id]: false })), 1500);
+      } catch { /* keyingi tahrirdaqayta urinadi */ }
+    }, 900);
+  };
+
+  const onKey = (e: React.KeyboardEvent, rowIdx: number, key: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const next = document.querySelector<HTMLInputElement>(`[data-cell="${rowIdx + 1}-${key}"]`);
+      next?.focus(); next?.select();
+    }
+  };
+
+  if (isLoading) return <div className="rounded-2xl border border-slate-200 bg-white py-10 text-center text-slate-400">Yuklanmoqda…</div>;
+  if (!rows.length) return <div className="rounded-2xl border border-dashed border-slate-300 py-10 text-center text-slate-400">Yozuv yo&apos;q — «Jamoaga oylik hisoblash» bilan yarating</div>;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="min-w-[900px] border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr className="bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <th className="sticky left-0 z-10 border-b border-slate-100 bg-slate-50/80 px-4 py-2.5 text-left">Xodim</th>
+              {EDIT_COLS.map((c) => <th key={c.key} className="border-b border-l border-slate-100 px-2 py-2.5 text-right">{c.label}</th>)}
+              <th className="border-b border-l border-slate-100 px-3 py-2.5 text-right">Jami</th>
+              <th className="border-b border-l border-slate-100 px-3 py-2.5 text-right">Naqd</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const row = local[r.id] ?? r;
+              const isHourly = r.hisobKitob === 'Soatbay';
+              return (
+                <tr key={r.id} className="hover:bg-slate-50/40">
+                  <td className="sticky left-0 z-10 border-b border-slate-50 bg-white px-4 py-2">
+                    <div className="font-medium text-slate-800">{r.xodim}</div>
+                    <div className="text-[11px] text-slate-400">{r.position ?? ''} {r.hisobKitob ? `· ${r.hisobKitob}` : ''} {saved[r.id] && <span className="ml-1 text-emerald-500">✓</span>}</div>
+                  </td>
+                  {EDIT_COLS.map((c) => (
+                    <td key={c.key} className="border-b border-l border-slate-50 px-1 py-1 text-right">
+                      {c.hourly && !isHourly ? (
+                        <span className="text-slate-300">—</span>
+                      ) : (
+                        <input
+                          type="number"
+                          data-cell={`${i}-${c.key}`}
+                          value={row[c.key] ?? 0}
+                          onChange={(e) => setField(r.id, c.key, e.target.value)}
+                          onKeyDown={(e) => onKey(e, i, c.key)}
+                          onFocus={(e) => e.target.select()}
+                          className="w-20 rounded border border-transparent px-2 py-1 text-right outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5"
+                        />
+                      )}
+                    </td>
+                  ))}
+                  <td className="border-b border-l border-slate-50 px-3 py-2 text-right font-semibold text-slate-800">{numFmt(row.jami)}</td>
+                  <td className="border-b border-l border-slate-50 px-3 py-2 text-right text-emerald-600">{numFmt(row.naqd)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-400">
+        <span>⌨ Tab — keyingi katak · Enter — pastga</span>
+        <span>O&apos;zgarishlar ~1 soniyada avtomat saqlanadi</span>
+      </div>
+    </div>
   );
 }
 

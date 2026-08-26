@@ -176,6 +176,12 @@ export class HrController {
     return this.service.oylikConfirm(id, confirm !== false);
   }
 
+  @Patch('oylik/:id')
+  @Permissions('payroll.create')
+  updateOylik(@Param('id') id: string, @Body() patch: any) {
+    return this.service.updateOylik(id, patch);
+  }
+
   @Get('oylik-10')
   @Permissions('hr.view')
   oylik10(@Query('academicYear') academicYear: string, @Query('branchId') branchId?: string) {

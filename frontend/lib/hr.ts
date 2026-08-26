@@ -124,6 +124,19 @@ export interface OylikRow {
   naqd: number;
   karta: number;
   confirmed: boolean;
+  hisobKitob: string | null;
+  // inline tahrir
+  ishlaganKun: number;
+  ishlaganSoat: number;
+  asosiyOylik: number;
+  soatlikNarx: number;
+  kpi: number;
+  bonus: number;
+  ovqatPuli: number;
+  ijara: number;
+  transport: number;
+  jarima: number;
+  note: string | null;
 }
 export interface OylikListResp {
   totals: { jamiHisoblar: number; jamiSumma: number; naqd: number; karta: number; berilgan: number; ortiqcha: number; ovqatUshlanma: number };
@@ -293,6 +306,8 @@ export const hrApi = {
   oylikDetail: (id: string) => api.get<OylikDetail>(`/hr/oylik/${id}`).then((r) => r.data),
   oylikConfirm: (id: string, confirm: boolean) =>
     api.post(`/hr/oylik/${id}/confirm`, { confirm }).then((r) => r.data),
+  updateOylik: (id: string, patch: Record<string, any>) =>
+    api.patch(`/hr/oylik/${id}`, patch).then((r) => r.data),
   oylik10: (academicYear: string, branchId?: string) =>
     api.get<Oylik10Resp>('/hr/oylik-10', { params: { academicYear, branchId } }).then((r) => r.data),
   maoshUmumiy: (period: string, branchId?: string) =>
