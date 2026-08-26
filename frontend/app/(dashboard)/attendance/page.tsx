@@ -24,9 +24,10 @@ export default function AttendancePage() {
   const [studentSearch, setStudentSearch] = useState('');
   const [marks, setMarks] = useState<Record<string, AttStatus>>({});
   const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
+  const [errMsg, setErrMsg] = useState('');
 
   const { data: my } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
-  const { data: rows } = useQuery({
+  const { data: rows, isLoading: rowsLoading } = useQuery({
     queryKey: ['attendance', classId, date],
     queryFn: () => attendanceApi.classDay(classId, date),
     enabled: !!classId,
@@ -46,7 +47,8 @@ export default function AttendancePage() {
     if (loadedCtx.current === ctxKey) return;
     loadedCtx.current = ctxKey;
     const init: Record<string, AttStatus> = {};
-    rows.forEach((r) => { if (r.status) init[r.id] = r.status; });
+    // Standart 'Bor' — ustoz faqat kelmaganlarni o'zgartiradi, qolganlar yozuvsiz qolmaydi
+    rows.forEach((r) => { init[r.id] = r.status ?? 'PRESENT'; });
     setMarks(init);
   }, [rows, ctxKey]);
 
@@ -59,11 +61,17 @@ export default function AttendancePage() {
         records: Object.entries(marks).map(([studentId, status]) => ({ studentId, status })),
       }),
     onSuccess: () => {
+      setErrMsg('');
       qc.invalidateQueries({ queryKey: ['attendance', classId, date] });
       qc.invalidateQueries({ queryKey: ['att-stats', classId] });
     },
-    onError: (e: any) => alert(e?.response?.data?.message ?? 'Saqlashda xatolik'),
+    onError: (e: any) => setErrMsg(Array.isArray(e?.response?.data?.message) ? e.response.data.message[0] : (e?.response?.data?.message ?? 'Saqlashda xatolik')),
   });
+
+  // Audit: shu kun oxirgi kim/qachon belgilagani
+  const lastMarked = (rows ?? [])
+    .filter((r) => r.markedAt)
+    .sort((a, b) => new Date(b.markedAt!).getTime() - new Date(a.markedAt!).getTime())[0];
 
   const list: ClassDayRow[] = rows ?? [];
   const q = studentSearch.trim().toLowerCase();
@@ -111,6 +119,19 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {errMsg && (
+        <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <span>{errMsg}</span>
+          <button onClick={() => setErrMsg('')} className="shrink-0 text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+      {classId && lastMarked?.markedBy && (
+        <div className="mb-2 text-xs text-slate-400">
+          Oxirgi belgilagan: <b className="text-slate-600">{lastMarked.markedBy}</b>
+          {lastMarked.markedAt ? ` · ${new Date(lastMarked.markedAt).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+        </div>
+      )}
+
       {!classId ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
           {my && !my.classes.length ? 'Sizga sinf biriktirilmagan' : 'Sinfni tanlang'}
@@ -143,7 +164,7 @@ export default function AttendancePage() {
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             {filtered.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 last:border-0">
-                <button onClick={() => setDetail({ id: r.id, name: `${r.lastName} ${r.firstName}` })} className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-800 hover:text-brand hover:underline">{r.lastName} {r.firstName}</button>
+                <button title={r.markedBy ? `Belgiladi: ${r.markedBy}` : ''} onClick={() => setDetail({ id: r.id, name: `${r.lastName} ${r.firstName}` })} className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-800 hover:text-brand hover:underline">{r.lastName} {r.firstName}</button>
                 <div className="flex shrink-0 gap-1">
                   {ORDER.map((st) => {
                     const active = marks[r.id] === st;
@@ -163,7 +184,7 @@ export default function AttendancePage() {
                 </div>
               </div>
             ))}
-            {!filtered.length && <div className="px-3 py-10 text-center text-slate-400">{q ? "Qidiruvga mos o'quvchi yo'q" : "O'quvchi topilmadi"}</div>}
+            {!filtered.length && <div className="px-3 py-10 text-center text-slate-400">{rowsLoading ? 'Yuklanmoqda…' : q ? "Qidiruvga mos o'quvchi yo'q" : "O'quvchi topilmadi"}</div>}
           </div>
 
           {canCreate && (

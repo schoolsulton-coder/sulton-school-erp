@@ -12,8 +12,16 @@ const ENROLLED_CONTRACT: any = {
   some: { status: { in: ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'] } },
 };
 
-// Sanani kun boshiga (00:00) keltiramiz — unique(studentId, date) uchun
-const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+// Sana stringidan (YYYY-MM-DD) barqaror UTC kun boshi — server zonasiga bog'liq emas
+const dayFromStr = (s: string) => new Date(`${s.slice(0, 10)}T00:00:00.000Z`);
+
+// Davomat foizi: kelgan(PRESENT)+kechikkan(LATE) hisobga olinadi;
+// sababli(EXCUSED) jazolanmaydi — maxrajdan chiqariladi.
+const attRate = (c: { present: number; late: number; excused: number; total: number }) => {
+  const denom = c.total - c.excused;
+  const attended = c.present + c.late;
+  return denom > 0 ? Math.round((attended / denom) * 100) : c.total > 0 ? 100 : 0;
+};
 
 @Injectable()
 export class AttendanceService {
@@ -83,7 +91,7 @@ export class AttendanceService {
     if (!this.canMarkAll(user.role) && day !== this.schoolToday()) {
       throw new ForbiddenException('Faqat bugungi davomatni belgilaysiz');
     }
-    const date = dayStart(new Date(dto.date));
+    const date = dayFromStr(dto.date);
 
     // O'quvchilar haqiqatan shu sinfga tegishlimi?
     if (!this.canMarkAll(user.role) && dto.records.length) {
@@ -94,27 +102,34 @@ export class AttendanceService {
       }
     }
 
-    // Mavjud holatni bilib olamiz — faqat O'ZGARGAN holatlarga xabar yuboramiz
+    // Mavjud holat — faqat O'ZGARGAN yozuvlarni yozamiz (audit/updatedAt behuda buzilmasin)
     const existing = await this.prisma.attendance.findMany({
       where: { date, studentId: { in: dto.records.map((r) => r.studentId) } },
-      select: { studentId: true, status: true },
+      select: { studentId: true, status: true, note: true },
     });
-    const prev = new Map(existing.map((e) => [e.studentId, e.status]));
+    const prev = new Map(existing.map((e) => [e.studentId, e]));
 
-    await this.prisma.$transaction(
-      dto.records.map((r) =>
-        this.prisma.attendance.upsert({
-          where: { studentId_date: { studentId: r.studentId, date } },
-          update: { status: r.status, note: r.note, classId: dto.classId, markedById: user.id },
-          create: { studentId: r.studentId, classId: dto.classId, date, status: r.status, note: r.note, markedById: user.id },
-        }),
-      ),
-    );
+    const changed = dto.records.filter((r) => {
+      const p = prev.get(r.studentId);
+      return !p || p.status !== r.status || (r.note ?? null) !== (p.note ?? null);
+    });
+
+    if (changed.length) {
+      await this.prisma.$transaction(
+        changed.map((r) =>
+          this.prisma.attendance.upsert({
+            where: { studentId_date: { studentId: r.studentId, date } },
+            update: { status: r.status, note: r.note, classId: dto.classId, markedById: user.id },
+            create: { studentId: r.studentId, classId: dto.classId, date, status: r.status, note: r.note, markedById: user.id },
+          }),
+        ),
+      );
+    }
 
     // Yo'q / kechikkan / sababli — vasiyga Telegram (bor bo'lsa xabar yubormaymiz; spam bo'lmasin)
-    const dateLabel = date.toLocaleDateString('uz-UZ');
-    const toNotify = dto.records.filter(
-      (r) => r.status !== 'PRESENT' && prev.get(r.studentId) !== r.status,
+    const dateLabel = date.toLocaleDateString('uz-UZ', { timeZone: 'Asia/Tashkent' });
+    const toNotify = changed.filter(
+      (r) => r.status !== 'PRESENT' && prev.get(r.studentId)?.status !== r.status,
     );
     for (const r of toNotify) {
       const label =
@@ -127,19 +142,27 @@ export class AttendanceService {
       );
     }
 
-    return { marked: dto.records.length, notified: toNotify.length };
+    return { marked: changed.length, notified: toNotify.length };
   }
 
-  /** Sinf kunlik varaqasi: o'qiyotgan o'quvchilar + shu kungi holati */
+  /** Sinf kunlik varaqasi: o'qiyotgan o'quvchilar + shu kungi holati (+ kim/qachon belgilagan) */
   async classDay(classId: string, dateStr?: string) {
-    const date = dayStart(dateStr ? new Date(dateStr) : new Date());
+    const date = dayFromStr(dateStr ?? this.schoolToday());
     const students = await this.prisma.student.findMany({
       where: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT },
       select: {
         id: true,
         firstName: true,
         lastName: true,
-        attendances: { where: { date }, select: { status: true, note: true } },
+        attendances: {
+          where: { date },
+          select: {
+            status: true,
+            note: true,
+            updatedAt: true,
+            markedBy: { select: { fullName: true } },
+          },
+        },
       },
       orderBy: { lastName: 'asc' },
     });
@@ -150,6 +173,8 @@ export class AttendanceService {
       lastName: s.lastName,
       status: s.attendances[0]?.status ?? null,
       note: s.attendances[0]?.note ?? null,
+      markedBy: s.attendances[0]?.markedBy?.fullName ?? null,
+      markedAt: s.attendances[0]?.updatedAt ?? null,
     }));
   }
 
@@ -163,25 +188,27 @@ export class AttendanceService {
     const records = await this.prisma.attendance.findMany({ where, orderBy: { date: 'desc' } });
     const count = (st: string) => records.filter((r) => r.status === st).length;
     const present = count('PRESENT');
+    const late = count('LATE');
+    const excused = count('EXCUSED');
     const total = records.length;
     return {
       total,
       present,
       absent: count('ABSENT'),
-      late: count('LATE'),
-      excused: count('EXCUSED'),
-      rate: total ? Math.round((present / total) * 100) : 0,
+      late,
+      excused,
+      rate: attRate({ present, late, excused, total }),
       records,
     };
   }
 
   /** Sinf statistikasi (davr bo'yicha) — umumiy + o'quvchilar reytingi (o'qiyotganlar) */
   async classStats(classId: string, from?: string, to?: string) {
-    const where: any = { classId, student: { contracts: ENROLLED_CONTRACT } };
+    const where: any = { classId, student: { status: 'ACTIVE', contracts: ENROLLED_CONTRACT } };
     if (from || to) {
       where.date = {};
-      if (from) where.date.gte = dayStart(new Date(from));
-      if (to) where.date.lte = dayStart(new Date(to));
+      if (from) where.date.gte = dayFromStr(from);
+      if (to) where.date.lte = dayFromStr(to);
     }
     const records = await this.prisma.attendance.findMany({
       where,
@@ -193,32 +220,38 @@ export class AttendanceService {
     });
     const count = (st: string) => records.filter((r) => r.status === st).length;
     const present = count('PRESENT');
+    const late = count('LATE');
+    const excused = count('EXCUSED');
     const total = records.length;
 
     // O'quvchilar bo'yicha davomat foizi (reyting)
-    const byStudent = new Map<string, { id: string; name: string; present: number; total: number }>();
+    const byStudent = new Map<string, { id: string; name: string; present: number; late: number; excused: number; total: number }>();
     for (const r of records) {
       const s = byStudent.get(r.studentId) ?? {
         id: r.studentId,
         name: `${r.student.lastName} ${r.student.firstName}`,
         present: 0,
+        late: 0,
+        excused: 0,
         total: 0,
       };
       s.total += 1;
       if (r.status === 'PRESENT') s.present += 1;
+      else if (r.status === 'LATE') s.late += 1;
+      else if (r.status === 'EXCUSED') s.excused += 1;
       byStudent.set(r.studentId, s);
     }
     const students = [...byStudent.values()]
-      .map((s) => ({ id: s.id, name: s.name, rate: s.total ? Math.round((s.present / s.total) * 100) : 0, present: s.present, total: s.total }))
-      .sort((a, b) => a.rate - b.rate); // eng ko'p qoldirganlar tepada
+      .map((s) => ({ id: s.id, name: s.name, rate: attRate(s), present: s.present, total: s.total }))
+      .sort((a, b) => a.rate - b.rate); // eng past davomatchilar tepada (e'tibor uchun)
 
     return {
       total,
       present,
       absent: count('ABSENT'),
-      late: count('LATE'),
-      excused: count('EXCUSED'),
-      rate: total ? Math.round((present / total) * 100) : 0,
+      late,
+      excused,
+      rate: attRate({ present, late, excused, total }),
       students,
     };
   }

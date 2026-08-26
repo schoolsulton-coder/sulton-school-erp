@@ -8,6 +8,8 @@ export interface ClassDayRow {
   lastName: string;
   status: AttStatus | null;
   note: string | null;
+  markedBy: string | null;
+  markedAt: string | null;
 }
 
 export interface AttReport {

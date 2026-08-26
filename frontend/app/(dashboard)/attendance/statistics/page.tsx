@@ -17,7 +17,7 @@ export default function AttendanceStatsPage() {
   const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
 
   const { data: my } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading, isError } = useQuery({
     queryKey: ['att-stats-page', classId, from, to],
     queryFn: () => attendanceApi.classStats(classId, from || undefined, to || undefined),
     enabled: !!classId,
@@ -70,6 +70,10 @@ export default function AttendanceStatsPage() {
 
       {!classId ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">Sinfni tanlang</div>
+      ) : isLoading ? (
+        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">Yuklanmoqda…</div>
+      ) : isError ? (
+        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-red-300 bg-red-50 text-red-500">Statistikani yuklab bo‘lmadi</div>
       ) : !stats || stats.total === 0 ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">Davomat topilmadi</div>
       ) : (
@@ -98,7 +102,7 @@ export default function AttendanceStatsPage() {
             </div>
 
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-500">O&apos;quvchilar (davomat bo&apos;yicha)</div>
+              <div className="border-b border-slate-100 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Past davomat — e&apos;tibor kerak (yuqorida eng past)</div>
               <div className="max-h-72 overflow-y-auto">
                 <table className="w-full text-sm">
                   <tbody>
