@@ -7,6 +7,7 @@ import { crmApi } from '@/lib/crm';
 import { ShartnomaModal } from '@/components/shartnoma-form';
 import { TolovModal } from '@/components/tolov-form';
 import { XodimModal, LavozimModal } from '@/components/xodim-lavozim-forms';
+import { LavozimDetailPanel } from '@/components/lavozim-detail';
 import { hrApi, GENDER_LABEL, SALARY_LABEL, EMP_STATUS, CONTRACT_STATUS, type XodimRow, type LavozimRow, type ShartnomaRow, type TolovRow, type SalaryType } from '@/lib/hr';
 
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -106,6 +107,7 @@ export function LavozimlarTab() {
   const [departmentId, setDepartmentId] = useState('');
   const [status, setStatus] = useState('ACTIVE');
   const [showForm, setShowForm] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: depts } = useQuery({ queryKey: ['hr-departments'], queryFn: hrApi.departments });
   const { data, isLoading } = useQuery({
@@ -158,7 +160,7 @@ export function LavozimlarTab() {
                 <Fragment key={dep}>
                   <tr className="bg-slate-50/60"><td colSpan={7} className="px-5 py-2 text-xs font-bold uppercase tracking-wide text-slate-500">{dep} <span className="ml-2 font-normal text-slate-400">{list.length} ta</span></td></tr>
                   {list.map((e) => (
-                    <tr key={e.id} className="border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
+                    <tr key={e.id} onClick={() => setDetailId(e.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
                       <td className="px-5 py-3.5"><span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${EMP_STATUS[e.status].cls}`}>{EMP_STATUS[e.status].label}</span></td>
                       <td className="px-5 py-3.5"><div className="font-semibold text-slate-800">{e.fio}</div><div className="text-xs text-slate-400">{e.phone || '—'}</div></td>
                       <td className="px-5 py-3.5 text-slate-600">{e.position ?? '—'}</td>
@@ -174,6 +176,7 @@ export function LavozimlarTab() {
           </table>
         </div>
       </div>
+      {detailId && <LavozimDetailPanel employeeId={detailId} onClose={() => setDetailId(null)} onChanged={() => qc.invalidateQueries({ queryKey: ['lavozimlar'] })} />}
     </>
   );
 }

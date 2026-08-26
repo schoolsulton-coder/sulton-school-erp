@@ -387,6 +387,77 @@ export class HrService {
     return { ok: true };
   }
 
+  // ===== Maoshlar · Lavozim (xodim) detali — rasm 1 =====
+  async lavozimDetail(employeeId: string) {
+    const e = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        user: { select: { fullName: true, phone: true } },
+        position: { select: { name: true } },
+        department: { select: { name: true } },
+        branch: { select: { name: true } },
+        salary: true,
+      },
+    });
+    if (!e) throw new NotFoundException('Xodim topilmadi');
+
+    const records = await this.prisma.payrollRecord.findMany({ where: { employeeId }, orderBy: { period: 'asc' } });
+    const payments = await this.prisma.salaryPayment.findMany({ where: { employeeId } });
+    const paidByPeriod: Record<string, number> = {};
+    for (const p of payments) {
+      if (p.periodYear && p.periodMonth) {
+        const per = `${p.periodYear}-${String(p.periodMonth).padStart(2, '0')}`;
+        paidByPeriod[per] = (paidByPeriod[per] ?? 0) + (p.somAmount ?? 0) + (p.dollarAmount ?? 0) * (p.dollarRate ?? 0);
+      }
+    }
+
+    let running = 0, jamiHisob = 0, jamiBerilgan = 0;
+    const oylar = records.map((r) => {
+      const hisoblangan = this.calcJami(r).jami;
+      const berilgan = paidByPeriod[r.period] ?? 0;
+      const qoldiq = hisoblangan - berilgan;
+      running += qoldiq;
+      jamiHisob += hisoblangan;
+      jamiBerilgan += berilgan;
+      return { id: r.id, period: r.period, hisoblangan, berilgan, qoldiq, davrBalansi: running, confirmed: r.confirmed };
+    });
+    oylar.reverse(); // eng yangi tepada
+
+    return {
+      id: e.id,
+      fio: e.user.fullName,
+      phone: e.user.phone,
+      position: e.position?.name ?? null,
+      department: e.department?.name ?? null,
+      branch: e.branch?.name ?? null,
+      formal: e.formal,
+      kimIshlaydi: e.kimIshlaydi ?? null,
+      employment: e.employment ?? null,
+      kelishuv: e.salary
+        ? {
+            hisobKitob: e.salary.hisobKitob,
+            type: e.salary.type,
+            baseRate: e.salary.baseRate,
+            rasmiyOyligi: e.salary.rasmiyOyligi,
+            soliqKim: e.salary.soliqKim,
+            startDate: e.salary.startDate,
+            endDate: e.salary.endDate,
+            note: e.salary.note,
+            formal: e.formal,
+          }
+        : null,
+      cards: {
+        stavka: e.salary?.baseRate ?? 0,
+        jamiHisob,
+        jamiBerilgan,
+        qoldiqBalans: running,
+        oyCount: oylar.length,
+        tolovCount: payments.length,
+      },
+      oylar,
+    };
+  }
+
   async createTolov(dto: any) {
     return this.prisma.salaryPayment.create({
       data: {

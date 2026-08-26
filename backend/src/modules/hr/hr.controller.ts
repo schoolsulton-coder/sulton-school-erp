@@ -115,6 +115,12 @@ export class HrController {
     return this.service.updateKelishuv(employeeId, dto);
   }
 
+  @Get('lavozim/:employeeId/detail')
+  @Permissions('hr.view')
+  lavozimDetail(@Param('employeeId') employeeId: string) {
+    return this.service.lavozimDetail(employeeId);
+  }
+
   @Get('tolovlar')
   @Permissions('hr.view')
   tolovlar(

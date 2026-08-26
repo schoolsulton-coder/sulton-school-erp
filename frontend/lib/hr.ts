@@ -221,6 +221,32 @@ export const HISOB_KITOB_TURLARI = ['Kunbay', 'Soatbay', 'Ishbay', 'KPI'];
 export const SOLIQ_KIM = ['Ishchi', 'Ish beruvchi'];
 export const SHARTNOMA_TILLARI = ["O'zbekcha", 'Ruscha', 'Inglizcha'];
 
+export interface LavozimKelishuv {
+  hisobKitob: string | null;
+  type: SalaryType;
+  baseRate: number;
+  rasmiyOyligi: number | null;
+  soliqKim: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  note: string | null;
+  formal: boolean;
+}
+export interface LavozimDetail {
+  id: string;
+  fio: string;
+  phone: string | null;
+  position: string | null;
+  department: string | null;
+  branch: string | null;
+  formal: boolean;
+  kimIshlaydi: string | null;
+  employment: string | null;
+  kelishuv: LavozimKelishuv | null;
+  cards: { stavka: number; jamiHisob: number; jamiBerilgan: number; qoldiqBalans: number; oyCount: number; tolovCount: number };
+  oylar: { id: string; period: string; hisoblangan: number; berilgan: number; qoldiq: number; davrBalansi: number; confirmed: boolean }[];
+}
+
 // Bitta kelishuv (joriy) maydonlari — create/edit uchun umumiy
 export interface KelishuvForm {
   startDate: string;
@@ -252,6 +278,7 @@ export const hrApi = {
   createXodim: (data: any) => api.post('/hr/xodim', data).then((r) => r.data),
   createLavozim: (data: any) => api.post('/hr/lavozim', data).then((r) => r.data),
   updateKelishuv: (employeeId: string, data: any) => api.patch(`/hr/kelishuv/${employeeId}`, data).then((r) => r.data),
+  lavozimDetail: (employeeId: string) => api.get<LavozimDetail>(`/hr/lavozim/${employeeId}/detail`).then((r) => r.data),
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
   createTolov: (data: any) => api.post('/hr/tolovlar', data).then((r) => r.data),
