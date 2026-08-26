@@ -134,6 +134,8 @@ export class HomeworkService {
       ).length;
       const checked = h.submissions.filter((s) => s.status === 'CHECKED').length;
       const total = h._count.submissions;
+      // Hammasi tekshirilgan yoki topshirmagan (MISSING) — ya'ni kutilayotgan yo'q
+      const pending = h.submissions.filter((s) => !['CHECKED', 'MISSING'].includes(s.status)).length;
       return {
         id: h.id,
         title: h.title,
@@ -145,7 +147,7 @@ export class HomeworkService {
         total,
         submitted,
         checked,
-        done: total > 0 && checked === total, // hammasi tekshirilgan
+        done: total > 0 && pending === 0,
       };
     });
   }
@@ -156,6 +158,7 @@ export class HomeworkService {
       include: {
         subject: true,
         class: { select: { id: true, name: true } },
+        teacher: { select: { fullName: true } },
         submissions: {
           include: {
             student: { select: { id: true, firstName: true, lastName: true } },
@@ -166,15 +169,18 @@ export class HomeworkService {
     });
     if (!hw) throw new NotFoundException('Vazifa topilmadi');
 
+    const total = hw.submissions.length;
+    const submitted = hw.submissions.filter((s) =>
+      ['SUBMITTED', 'CHECKED', 'LATE'].includes(s.status),
+    ).length;
     const counts = {
-      total: hw.submissions.length,
-      submitted: hw.submissions.filter((s) =>
-        ['SUBMITTED', 'CHECKED', 'LATE'].includes(s.status),
-      ).length,
+      total,
+      submitted,
       checked: hw.submissions.filter((s) => s.status === 'CHECKED').length,
       missing: hw.submissions.filter((s) => s.status === 'MISSING').length,
+      notSubmitted: total - submitted, // topshirmagan (ASSIGNED + MISSING)
     };
-    return { ...hw, counts };
+    return { ...hw, teacherName: hw.teacher?.fullName ?? null, counts };
   }
 
   /** Topshirish — muddatdan keyin bo'lsa LATE belgilanadi */

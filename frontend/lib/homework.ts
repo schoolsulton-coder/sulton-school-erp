@@ -68,11 +68,13 @@ export interface HomeworkDetail {
   type: string;
   description?: string | null;
   dueDate: string;
+  createdAt: string;
+  teacherName: string | null;
   attachments: string[];
   subject: { id: string; name: string };
   class: { id: string; name: string };
   submissions: Submission[];
-  counts: { total: number; submitted: number; checked: number; missing: number };
+  counts: { total: number; submitted: number; checked: number; missing: number; notSubmitted: number };
 }
 
 export const SUB_STATUS: Record<SubmissionStatus, { label: string; cls: string }> = {

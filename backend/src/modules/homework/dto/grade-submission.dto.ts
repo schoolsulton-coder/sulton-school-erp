@@ -10,9 +10,9 @@ import {
 export class GradeSubmissionDto {
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(100)
-  grade?: number;
+  @Min(1)
+  @Max(5)
+  grade?: number; // 5 balli tizim (butun ERP bilan bir xil)
 
   @IsOptional()
   @IsString()

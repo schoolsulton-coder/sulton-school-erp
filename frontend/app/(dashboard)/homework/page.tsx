@@ -27,7 +27,7 @@ export default function HomeworkPage() {
     enabled: !!f.classId,
   });
 
-  const { data: list } = useQuery({ queryKey: ['homework', f], queryFn: () => homeworkApi.list(f) });
+  const { data: list, isLoading } = useQuery({ queryKey: ['homework', f], queryFn: () => homeworkApi.list(f) });
 
   const active = f.teacherId || f.classId || f.studentId || f.from || f.to;
 
@@ -94,7 +94,7 @@ export default function HomeworkPage() {
           );
         })}
         {!list?.length && (
-          <p className="col-span-full py-8 text-center text-slate-400">Vazifa yo&apos;q</p>
+          <p className="col-span-full py-8 text-center text-slate-400">{isLoading ? 'Yuklanmoqda…' : 'Vazifa yo\'q'}</p>
         )}
       </div>
 
