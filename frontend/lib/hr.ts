@@ -126,6 +126,7 @@ export interface OylikRow {
   confirmed: boolean;
   hisobKitob: string | null;
   // inline tahrir
+  ishchiKunlar: number;
   ishlaganKun: number;
   ishlaganSoat: number;
   asosiyOylik: number;

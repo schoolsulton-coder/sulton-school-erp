@@ -603,6 +603,7 @@ export class HrService {
         karta: r.karta,
         confirmed: r.confirmed,
         // inline tahrir uchun xom maydonlar
+        ishchiKunlar: r.ishchiKunlar,
         ishlaganKun: r.ishlaganKun,
         ishlaganSoat: r.ishlaganSoat,
         asosiyOylik: r.asosiyOylik,
