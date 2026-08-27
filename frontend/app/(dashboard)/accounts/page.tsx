@@ -69,7 +69,21 @@ export default function AccountsPage() {
     );
   }, [data, q]);
 
-  const t = data?.totals;
+  const kpi = useMemo(() => {
+    const acc = { somStored: 0, usdStored: 0, somPendingOut: 0, somPendingNet: 0, usdPendingOut: 0, usdPendingNet: 0 };
+    for (const r of data?.registers ?? []) {
+      if (r.currency === 'USD') {
+        acc.usdStored += r.storedBalance;
+        acc.usdPendingOut += r.pendingOut;
+        acc.usdPendingNet += r.pendingNet;
+      } else {
+        acc.somStored += r.storedBalance;
+        acc.somPendingOut += r.pendingOut;
+        acc.somPendingNet += r.pendingNet;
+      }
+    }
+    return acc;
+  }, [data]);
 
   return (
     <div className="p-6">
@@ -125,12 +139,12 @@ export default function AccountsPage() {
 
       {/* KPI */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Jami so'm (tasdiqlangan)" value={money(t?.somConfirmed ?? 0)} tone="emerald" />
-        <Kpi label="Bank/terminal pending" value={money(t?.somPendingNet ?? 0)} tone="amber"
-          sub={`Chiqim: ${money(t?.somPendingOut ?? 0)} · Sof: ${money(t?.somPendingNet ?? 0)}`} />
-        <Kpi label="Jami dollar (tasdiqlangan)" value={money(t?.usdConfirmed ?? 0, 'USD')} tone="sky" />
-        <Kpi label="Bank/terminal pending $" value={money(t?.usdPendingNet ?? 0, 'USD')} tone="slate"
-          sub={`Chiqim: ${money(t?.usdPendingOut ?? 0, 'USD')} · Sof: ${money(t?.usdPendingNet ?? 0, 'USD')}`} />
+        <Kpi label="Jami so'm (joriy qoldiq)" value={money(kpi.somStored)} tone="emerald" />
+        <Kpi label="Bank/terminal pending" value={money(kpi.somPendingNet)} tone="amber"
+          sub={`Chiqim: ${money(kpi.somPendingOut)} · Sof: ${money(kpi.somPendingNet)}`} />
+        <Kpi label="Jami dollar (joriy qoldiq)" value={money(kpi.usdStored, 'USD')} tone="sky" />
+        <Kpi label="Bank/terminal pending $" value={money(kpi.usdPendingNet, 'USD')} tone="slate"
+          sub={`Chiqim: ${money(kpi.usdPendingOut, 'USD')} · Sof: ${money(kpi.usdPendingNet, 'USD')}`} />
       </div>
 
       {/* Jadval */}
@@ -142,7 +156,7 @@ export default function AccountsPage() {
                 <th className="px-5 py-3">Hisob</th>
                 <th className="px-5 py-3">Filial</th>
                 <th className="px-5 py-3">Kassa turi</th>
-                <th className="px-5 py-3 text-right">Tasdiqlangan qoldiq</th>
+                <th className="px-5 py-3 text-right">Joriy qoldiq</th>
                 <th className="px-5 py-3 text-right">Bank/terminal pending</th>
                 <th className="px-5 py-3 text-right">Tasdiq ta&apos;siri</th>
                 <th className="px-5 py-3">Oxirgi harakat</th>
@@ -160,7 +174,7 @@ export default function AccountsPage() {
                   </td>
                   <td className="px-5 py-3.5 text-slate-600">{r.branch ?? '—'}</td>
                   <td className="px-5 py-3.5"><span className="text-slate-600">{r.kassaTuri ?? '—'}</span> <span className="text-[11px] text-slate-400">{r.currency === 'USD' ? 'USD' : 'UZS'}</span>{!r.active && <span className="ml-1 text-[11px] text-rose-400">· nofaol</span>}</td>
-                  <td className={`px-5 py-3.5 text-right font-bold ${r.confirmedBalance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>{money(r.confirmedBalance, r.currency)}</td>
+                  <td className={`px-5 py-3.5 text-right font-bold ${r.storedBalance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>{money(r.storedBalance, r.currency)}</td>
                   <td className="px-5 py-3.5 text-right">{r.pendingNet ? <span className="font-medium text-amber-600">{money(r.pendingNet, r.currency)}</span> : <span className="text-slate-300">—</span>}</td>
                   <td className="px-5 py-3.5 text-right">{r.drift ? <span className="font-medium text-rose-500" title="Saqlangan balans harakatlar yig'indisiga mos emas">{money(r.drift, r.currency)}</span> : <span className="text-slate-300">—</span>}</td>
                   <td className="px-5 py-3.5 text-slate-500">{fmtDate(r.lastMovement)}</td>
@@ -348,7 +362,7 @@ function MoliyaModal({ edit, onClose, onSaved }: { edit: RegisterItem; onClose: 
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Boshlang&apos;ich qoldiq (o&apos;zgartirish uchun)</label>
-            <input type="number" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder={`Hozirgi: ${fmt(edit.confirmedBalance)}`} className={inp} />
+            <input type="number" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder={`Hozirgi qoldiq: ${fmt(edit.storedBalance)}`} className={inp} />
             <p className="mt-1 text-[11px] text-slate-400">Bo&apos;sh qoldirsangiz — o&apos;zgarmaydi. O&apos;zgartirilsa, joriy qoldiq ham shu farqqa suriladi.</p>
           </div>
         </div>
