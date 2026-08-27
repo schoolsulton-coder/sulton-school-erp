@@ -184,6 +184,12 @@ export class HrController {
     return this.service.updateOylik(id, patch);
   }
 
+  @Delete('oylik/:id')
+  @Permissions('payroll.create')
+  deleteOylik(@Param('id') id: string) {
+    return this.service.deleteOylik(id);
+  }
+
   @Get('oylik-10')
   @Permissions('hr.view')
   oylik10(@Query('academicYear') academicYear: string, @Query('branchId') branchId?: string) {

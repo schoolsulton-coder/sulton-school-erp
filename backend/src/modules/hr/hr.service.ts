@@ -513,10 +513,17 @@ export class HrService {
     const asosiyHisob = r.ishchiKunlar > 0 ? (r.asosiyOylik * r.ishlaganKun) / r.ishchiKunlar : r.asosiyOylik;
     const soatlikHisob = (r.soatlikNarx || 0) * (r.ishlaganSoat || 0);
     const qoshimcha = r.kpi + r.bonus + r.ovqatPuli + r.tatilKartaga + r.tatilNaqd + r.ijara + r.transport;
-    const ushlanma = r.jarima + r.soliq;
-    const jami = asosiyHisob + soatlikHisob + r.rasmiyHisob + qoshimcha - ushlanma;
+    // Jami — yalpi (soliq/karta bu yerdan ushlanmaydi, quyida ajratiladi)
+    const jami = asosiyHisob + soatlikHisob + qoshimcha - r.jarima;
     const kunlik = r.ishchiKunlar > 0 ? r.asosiyOylik / r.ishchiKunlar : 0;
-    return { asosiyHisob, soatlikHisob, kunlik, jami };
+    // Karta = rasmiy oylik (rasmiyHisob). O'zi to'lasa 12% soliq ushlanadi,
+    // Kompaniya to'lasa to'liq kartaga. Naqd = Jami − rasmiy oylik.
+    const rasmiy = Math.max(0, r.rasmiyHisob || 0);
+    const selfPays = r.soliqKim === "O'zi" || r.soliqKim === 'Ishchi';
+    const soliq = selfPays ? Math.round(rasmiy * 0.12) : 0;
+    const karta = Math.max(0, rasmiy - soliq);
+    const naqd = jami - rasmiy;
+    return { asosiyHisob, soatlikHisob, kunlik, jami, rasmiy, soliq, karta, naqd };
   }
 
   private async paidByEmployee(period: string, employeeIds: string[]) {
@@ -570,9 +577,12 @@ export class HrService {
       const hourly = e.salary?.type === 'HOURLY';
       const asosiyOylik = hourly ? 0 : e.salary?.baseRate ?? 0;
       const soatlikNarx = hourly ? e.salary?.baseRate ?? 0 : 0;
-      const draft: any = { ishchiKunlar, ishlaganKun: ishchiKunlar, ishlaganSoat: 0, asosiyOylik, soatlikNarx, rasmiyHisob: 0, kpi: 0, bonus: 0, ovqatPuli: 0, tatilKartaga: 0, tatilNaqd: 0, ijara: 0, transport: 0, jarima: 0, soliq: 0 };
-      const { jami } = this.calcJami(draft);
-      await this.prisma.payrollRecord.create({ data: { period: dto.period, employeeId: e.id, ...draft, jami, naqd: jami, karta: 0 } });
+      // Rasmiy oylik (kartaga) + soliqni kim to'laydi — kelishuvdan
+      const rasmiyHisob = e.salary?.rasmiyOyligi ?? 0;
+      const soliqKim = e.salary?.soliqKim ?? null;
+      const draft: any = { ishchiKunlar, ishlaganKun: ishchiKunlar, ishlaganSoat: 0, asosiyOylik, soatlikNarx, rasmiyHisob, soliqKim, kpi: 0, bonus: 0, ovqatPuli: 0, tatilKartaga: 0, tatilNaqd: 0, ijara: 0, transport: 0, jarima: 0, soliq: 0 };
+      const c = this.calcJami(draft);
+      await this.prisma.payrollRecord.create({ data: { period: dto.period, employeeId: e.id, ...draft, jami: c.jami, soliq: c.soliq, naqd: c.naqd, karta: c.karta } });
       yaratildi++;
     }
     return { ok: true, yaratildi, jami: emps.length };
@@ -587,13 +597,15 @@ export class HrService {
 
     const records = await this.prisma.payrollRecord.findMany({
       where,
-      include: { employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } }, branch: { select: { name: true } }, department: { select: { name: true } }, salary: { select: { hisobKitob: true } } } } },
+      include: { employee: { include: { user: { select: { fullName: true } }, position: { select: { name: true } }, branch: { select: { name: true } }, department: { select: { name: true } }, salary: { select: { hisobKitob: true, rasmiyOyligi: true, soliqKim: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
     const paid = await this.paidByEmployee(params.period, records.map((r) => r.employeeId));
 
     const data = records.map((r) => {
-      const c = this.calcJami(r);
+      // Rasmiy oylik + soliqKim — joriy kelishuvdan (eski yozuvlar ham to'g'ri ko'rinsin)
+      const withSal = { ...r, rasmiyHisob: r.employee.salary?.rasmiyOyligi ?? r.rasmiyHisob, soliqKim: r.employee.salary?.soliqKim ?? r.soliqKim };
+      const c = this.calcJami(withSal);
       const berildi = paid[r.employeeId] ?? 0;
       return {
         id: r.id,
@@ -608,8 +620,11 @@ export class HrService {
         jami: c.jami,
         berildi,
         qoldiq: c.jami - berildi,
-        naqd: r.naqd,
-        karta: r.karta,
+        naqd: c.naqd,
+        karta: c.karta,
+        soliq: c.soliq,
+        rasmiy: c.rasmiy,
+        kunlik: Math.round(c.kunlik),
         confirmed: r.confirmed,
         // inline tahrir uchun xom maydonlar
         ishchiKunlar: r.ishchiKunlar,
@@ -684,28 +699,42 @@ export class HrService {
     return this.prisma.payrollRecord.update({ where: { id }, data: { confirmed: confirm } });
   }
 
-  // ===== Maoshlar · Oylik to'ldirish (inline tahrir + avtomat jami/naqd) =====
+  // ===== Maoshlar · Oylik to'ldirish (inline tahrir) =====
+  // Karta/Naqd/Soliq/rasmiyHisob qo'lda tahrirlanmaydi — kelishuvdan avtomat.
   private static readonly OYLIK_NUM_FIELDS = [
-    'ishchiKunlar', 'ishlaganKun', 'ishlaganSoat', 'asosiyOylik', 'soatlikNarx', 'rasmiyHisob',
-    'kpi', 'bonus', 'ovqatPuli', 'tatilKartaga', 'tatilNaqd', 'ijara', 'transport', 'jarima', 'soliq', 'karta',
+    'ishchiKunlar', 'ishlaganKun', 'ishlaganSoat', 'asosiyOylik', 'soatlikNarx',
+    'kpi', 'bonus', 'ovqatPuli', 'tatilKartaga', 'tatilNaqd', 'ijara', 'transport', 'jarima',
   ];
   async updateOylik(id: string, patch: any) {
-    const cur = await this.prisma.payrollRecord.findUnique({ where: { id } });
+    const cur = await this.prisma.payrollRecord.findUnique({
+      where: { id },
+      include: { employee: { include: { salary: true } } },
+    });
     if (!cur) throw new NotFoundException('Oylik yozuvi topilmadi');
 
     const data: any = {};
     for (const k of HrService.OYLIK_NUM_FIELDS) {
       if (k in patch) data[k] = patch[k] === '' || patch[k] == null ? 0 : Number(patch[k]) || 0;
     }
-    if ('soliqKim' in patch) data.soliqKim = patch.soliqKim || null;
     if ('note' in patch) data.note = patch.note || null;
 
+    // Rasmiy oylik + soliqni kim to'laydi — joriy kelishuvdan yangilanadi
+    const sal = cur.employee?.salary;
+    data.rasmiyHisob = sal?.rasmiyOyligi ?? cur.rasmiyHisob ?? 0;
+    data.soliqKim = sal?.soliqKim ?? cur.soliqKim ?? null;
+
     const merged = { ...cur, ...data };
-    const { jami } = this.calcJami(merged);
-    data.jami = jami;
-    // Naqd = jami − karta (karta qo'lda kiritiladi, naqd avtomat)
-    data.naqd = jami - (merged.karta ?? 0);
+    const c = this.calcJami(merged);
+    data.jami = c.jami;
+    data.soliq = c.soliq;
+    data.karta = c.karta;
+    data.naqd = c.naqd;
     return this.prisma.payrollRecord.update({ where: { id }, data });
+  }
+
+  async deleteOylik(id: string) {
+    await this.prisma.payrollRecord.delete({ where: { id } });
+    return { ok: true };
   }
 
   // ===== Maoshlar · 10 oylik (o'quv yili: Sentabr–Iyun) =====

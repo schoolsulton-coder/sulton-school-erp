@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Calculator, ListChecks, CheckCircle2, XCircle, Search, Save, Check } from 'lucide-react';
+import { X, Calculator, ListChecks, CheckCircle2, XCircle, Search, Save, Check, Trash2 } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { hrApi, SALARY_LABEL, type OylikRow, type OylikDetail, type OylikPreviewRow } from '@/lib/hr';
 
@@ -107,7 +107,6 @@ const NUM_COLS: { key: string; label: string; hourly?: boolean }[] = [
   { key: 'ijara', label: 'Ijara' },
   { key: 'transport', label: 'Transport' },
   { key: 'jarima', label: 'Jarima' },
-  { key: 'karta', label: 'Karta' },
 ];
 
 function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoading: boolean; onSaved: () => void }) {
@@ -120,6 +119,8 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
   const rowsKey = rows.map((r) => r.id).join(',');
   useEffect(() => { setLocal(Object.fromEntries(rows.map((r) => [r.id, { ...r }]))); }, [rowsKey]);
 
+  const del = useMutation({ mutationFn: (id: string) => hrApi.deleteOylik(id), onSuccess: onSaved });
+
   const doSave = async (id: string) => {
     const cur = localRef.current[id] ?? {};
     const patch: Record<string, any> = { note: cur.note ?? null };
@@ -127,7 +128,7 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
     setSaving((s) => ({ ...s, [id]: true }));
     try {
       const u: any = await hrApi.updateOylik(id, patch);
-      setLocal((p) => ({ ...p, [id]: { ...p[id], jami: u.jami, naqd: u.naqd } }));
+      setLocal((p) => ({ ...p, [id]: { ...p[id], jami: u.jami, naqd: u.naqd, karta: u.karta, soliq: u.soliq } }));
       setSaved((s) => ({ ...s, [id]: true }));
       onSaved();
       setTimeout(() => setSaved((s) => ({ ...s, [id]: false })), 1800);
@@ -158,15 +159,18 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-[1150px] border-separate border-spacing-0 text-sm">
+        <table className="min-w-[1300px] border-separate border-spacing-0 text-sm">
           <thead>
             <tr className="bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-400">
               <th className="sticky left-0 z-10 border-b border-slate-100 bg-slate-50/80 px-4 py-2.5 text-left">Xodim</th>
               <th className="border-b border-l border-slate-100 px-2 py-2.5 text-right">Stavka</th>
+              <th className="border-b border-l border-slate-100 px-2 py-2.5 text-right">Kunlik</th>
               {NUM_COLS.map((c) => <th key={c.key} className="border-b border-l border-slate-100 px-2 py-2.5 text-right">{c.label}</th>)}
               <th className="border-b border-l border-slate-100 px-2 py-2.5 text-left">Izoh</th>
               <th className="border-b border-l border-slate-100 px-3 py-2.5 text-right">Jami</th>
               <th className="border-b border-l border-slate-100 px-3 py-2.5 text-right">Naqd</th>
+              <th className="border-b border-l border-slate-100 px-3 py-2.5 text-right">Karta</th>
+              <th className="border-b border-l border-slate-100 px-3 py-2.5 text-right">Soliq</th>
               <th className="border-b border-l border-slate-100 px-2 py-2.5"></th>
             </tr>
           </thead>
@@ -176,17 +180,16 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
               const isHourly = r.hisobKitob === 'Soatbay';
               const stavka = isHourly ? `${numFmt(r.soatlikNarx)}/s` : numFmt(r.asosiyOylik);
               return (
-                <tr key={r.id} className="hover:bg-slate-50/40">
-                  <td className="sticky left-0 z-10 border-b border-slate-50 bg-white px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${isHourly ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{r.hisobKitob ? r.hisobKitob.toUpperCase() : 'KUNBAY'}</span>
-                      <span className="font-medium text-slate-800">{r.xodim}</span>
-                    </div>
+                <tr key={r.id} className="align-top hover:bg-slate-50/40">
+                  <td className="sticky left-0 z-10 w-[220px] min-w-[220px] border-b border-slate-50 bg-white px-4 py-2.5">
+                    <div className="mb-0.5"><span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${isHourly ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{r.hisobKitob ? r.hisobKitob.toUpperCase() : 'KUNBAY'}</span></div>
+                    <div className="font-medium leading-snug text-slate-800">{r.xodim}</div>
                     <div className="text-[11px] text-slate-400">{r.position ?? ''}</div>
                   </td>
-                  <td className="border-b border-l border-slate-50 px-2 py-2 text-right text-slate-500">{stavka}</td>
+                  <td className="border-b border-l border-slate-50 px-2 py-2.5 text-right text-slate-500">{stavka}</td>
+                  <td className="border-b border-l border-slate-50 px-2 py-2.5 text-right text-slate-500">{isHourly ? '—' : numFmt(row.kunlik ?? r.kunlik)}</td>
                   {NUM_COLS.map((c) => (
-                    <td key={c.key} className="border-b border-l border-slate-50 px-1 py-1 text-right">
+                    <td key={c.key} className="border-b border-l border-slate-50 px-1 py-1.5 text-right align-middle">
                       {c.hourly && !isHourly ? (
                         <span className="text-slate-300">—</span>
                       ) : (
@@ -197,22 +200,30 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
                           onChange={(e) => setField(r.id, c.key, e.target.value)}
                           onKeyDown={(e) => onKey(e, i, c.key)}
                           onFocus={(e) => e.target.select()}
-                          className="w-16 rounded border border-transparent px-1.5 py-1 text-right outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5"
+                          className="w-20 rounded border border-transparent px-2 py-1.5 text-right outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5"
                         />
                       )}
                     </td>
                   ))}
-                  <td className="border-b border-l border-slate-50 px-1 py-1">
+                  <td className="border-b border-l border-slate-50 px-1 py-1.5 align-middle">
                     <input value={row.note ?? ''} onChange={(e) => setField(r.id, 'note', e.target.value, false)} placeholder="—"
-                      className="w-28 rounded border border-transparent px-1.5 py-1 outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5" />
+                      className="w-32 rounded border border-transparent px-2 py-1.5 outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5" />
                   </td>
-                  <td className="border-b border-l border-slate-50 px-3 py-2 text-right font-semibold text-slate-800">{numFmt(row.jami)}</td>
-                  <td className="border-b border-l border-slate-50 px-3 py-2 text-right font-medium text-emerald-600">{numFmt(row.naqd)}</td>
-                  <td className="border-b border-l border-slate-50 px-2 py-2 text-center">
-                    <button onClick={() => saveNow(r.id)} disabled={saving[r.id]} title="Saqlash"
-                      className={`rounded-lg p-1.5 ${saved[r.id] ? 'text-emerald-500' : 'text-slate-400 hover:bg-brand/10 hover:text-brand'} disabled:opacity-50`}>
-                      {saved[r.id] ? <Check size={16} /> : <Save size={15} />}
-                    </button>
+                  <td className="border-b border-l border-slate-50 px-3 py-2.5 text-right font-semibold text-slate-800">{numFmt(row.jami)}</td>
+                  <td className="border-b border-l border-slate-50 px-3 py-2.5 text-right font-medium text-emerald-600">{numFmt(row.naqd)}</td>
+                  <td className="border-b border-l border-slate-50 px-3 py-2.5 text-right font-medium text-sky-600">{numFmt(row.karta)}</td>
+                  <td className="border-b border-l border-slate-50 px-3 py-2.5 text-right text-rose-500">{row.soliq ? numFmt(row.soliq) : '—'}</td>
+                  <td className="border-b border-l border-slate-50 px-2 py-2.5 align-middle">
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => saveNow(r.id)} disabled={saving[r.id]} title="Saqlash"
+                        className={`rounded-lg p-1.5 ${saved[r.id] ? 'text-emerald-500' : 'text-slate-400 hover:bg-brand/10 hover:text-brand'} disabled:opacity-50`}>
+                        {saved[r.id] ? <Check size={16} /> : <Save size={15} />}
+                      </button>
+                      <button onClick={() => { if (confirm(`${r.xodim} — oylik yozuvini o'chirasizmi?`)) del.mutate(r.id); }} title="O'chirish"
+                        className="rounded-lg p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -220,8 +231,8 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-400">
-        <span>Kunbay: oylik/ish kun × kun · Soatbay: narx × soat · Jami: +KPI +Bonus −Jarima · Naqd = Jami − Karta</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-400">
+        <span>Kunbay: oylik/ish kun × kun · Soatbay: narx × soat · Karta = rasmiy oylik (O&apos;zi → −12% soliq) · Naqd = Jami − rasmiy</span>
         <span>Avtomat saqlanadi yoki 💾 tugma</span>
       </div>
     </div>

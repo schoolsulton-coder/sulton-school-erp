@@ -123,6 +123,9 @@ export interface OylikRow {
   qoldiq: number;
   naqd: number;
   karta: number;
+  soliq: number;
+  rasmiy: number;
+  kunlik: number;
   confirmed: boolean;
   hisobKitob: string | null;
   // inline tahrir
@@ -239,7 +242,7 @@ export interface EmployeeNote {
   author?: { fullName: string } | null;
 }
 
-export const SOLIQ_KIM = ['Ishchi', 'Ish beruvchi'];
+export const SOLIQ_KIM = ["O'zi", 'Kompaniya']; // O'zi -> rasmiy oylikdan 12% soliq; Kompaniya -> to'liq kartaga
 // Xodim shaxsiy hujjat turlari (preset — yozib ham qo'shsa bo'ladi)
 export const XODIM_DOC_TYPES = ['Pasport', 'Diplom', 'IELTS', 'TOEFL', 'TESOL', 'CELTA', 'C1', 'B2', 'Rezyume', 'Narkologik', 'Ruhiy', 'Sudlanmaganlik', 'Tibbiy ma\'lumotnoma', 'Boshqa'];
 export const SHARTNOMA_TILLARI = ["O'zbekcha", 'Ruscha', 'Inglizcha'];
@@ -319,6 +322,7 @@ export const hrApi = {
     api.post(`/hr/oylik/${id}/confirm`, { confirm }).then((r) => r.data),
   updateOylik: (id: string, patch: Record<string, any>) =>
     api.patch(`/hr/oylik/${id}`, patch).then((r) => r.data),
+  deleteOylik: (id: string) => api.delete(`/hr/oylik/${id}`).then((r) => r.data),
   oylik10: (academicYear: string, branchId?: string) =>
     api.get<Oylik10Resp>('/hr/oylik-10', { params: { academicYear, branchId } }).then((r) => r.data),
   maoshUmumiy: (period: string, branchId?: string) =>
