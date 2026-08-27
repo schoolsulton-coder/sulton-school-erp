@@ -261,6 +261,7 @@ export interface LavozimDetail {
   kelishuv: LavozimKelishuv | null;
   cards: { stavka: number; jamiHisob: number; jamiBerilgan: number; qoldiqBalans: number; oyCount: number; tolovCount: number };
   oylar: { id: string; period: string; hisoblangan: number; berilgan: number; qoldiq: number; davrBalansi: number; confirmed: boolean }[];
+  hujjatlar: { id: string; type: string; number: string; date: string; status: string; stavka: number | null }[];
 }
 
 // Bitta kelishuv (joriy) maydonlari — create/edit uchun umumiy

@@ -9,9 +9,9 @@ import { hrApi, SHARTNOMA_TURLARI, SHARTNOMA_HOLATLARI, BANDLIK_TURLARI, SHARTNO
 const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
 const inp = 'w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm outline-none focus:border-brand focus:bg-white';
 
-export function ShartnomaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employeeName }: { onClose: () => void; onSaved: () => void; employeeId?: string; employeeName?: string }) {
   const [empSearch, setEmpSearch] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
+  const [employeeId, setEmployeeId] = useState(fixedEmp ?? '');
   const [type, setType] = useState(SHARTNOMA_TURLARI[0]);
   const [status, setStatus] = useState('YARATILGAN');
   const [date, setDate] = useState('');
@@ -86,7 +86,9 @@ export function ShartnomaModal({ onClose, onSaved }: { onClose: () => void; onSa
           {/* Xodim tanlash */}
           <div>
             <label className={lbl}>Xodim / Lavozim <span className="text-rose-500">*</span></label>
-            {selected ? (
+            {fixedEmp ? (
+              <div className="rounded-lg border border-brand/40 bg-brand/5 px-3 py-2 text-sm font-semibold text-slate-800">{employeeName ?? selected?.user.fullName ?? 'Xodim'}</div>
+            ) : selected ? (
               <div className="flex items-center justify-between rounded-lg border border-brand/40 bg-brand/5 px-3 py-2 text-sm">
                 <span><span className="font-semibold text-slate-800">{selected.user.fullName}</span> <span className="text-slate-400">· {selected.position?.name ?? '—'}</span></span>
                 <button onClick={() => setEmployeeId('')} className="text-slate-400 hover:text-rose-500"><X size={16} /></button>

@@ -6,6 +6,7 @@ import { X, Pencil } from 'lucide-react';
 import { hrApi, SALARY_LABEL, type LavozimDetail, type LavozimKelishuv, type KelishuvForm } from '@/lib/hr';
 import { money } from '@/lib/finance';
 import { KelishuvFields, validateKelishuv } from '@/components/kelishuv-fields';
+import { ShartnomaModal } from '@/components/shartnoma-form';
 
 const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
 const periodLabel = (p: string) => { const [y, m] = p.split('-').map(Number); return `${UZ_MONTHS[m - 1]} ${y}`; };
@@ -15,6 +16,7 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((
 export function LavozimDetailPanel({ employeeId, onClose, onChanged }: { employeeId: string; onClose: () => void; onChanged?: () => void }) {
   const qc = useQueryClient();
   const [editKelishuv, setEditKelishuv] = useState(false);
+  const [addDoc, setAddDoc] = useState(false);
   const { data: d, isLoading } = useQuery({ queryKey: ['lavozim-detail', employeeId], queryFn: () => hrApi.lavozimDetail(employeeId) });
   const refresh = () => { qc.invalidateQueries({ queryKey: ['lavozim-detail', employeeId] }); onChanged?.(); };
 
@@ -122,6 +124,29 @@ export function LavozimDetailPanel({ employeeId, onClose, onChanged }: { employe
                   <p className="py-4 text-center text-sm text-slate-400">Kelishuv yo&apos;q — Tahrirlash orqali qo&apos;shing</p>
                 )}
               </div>
+
+              {/* Hujjatlar — mehnat shartnomasi, buyruqlar, ishdan bo'shash */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Hujjatlar ({d.hujjatlar.length})</h3>
+                  <button onClick={() => setAddDoc(true)} className="inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline">+ Yangi hujjat</button>
+                </div>
+                {d.hujjatlar.length ? (
+                  <ul className="space-y-1.5">
+                    {d.hujjatlar.map((h) => (
+                      <li key={h.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-slate-700">{h.type}{h.number && h.number !== '—' ? ` · №${h.number}` : ''}</div>
+                          <div className="text-[11px] text-slate-400">{fmtDate(h.date)}{h.stavka ? ` · ${money(h.stavka)}` : ''}</div>
+                        </div>
+                        <span className="ml-2 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{h.status}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="py-4 text-center text-sm text-slate-400">Hujjat yo&apos;q — mehnat shartnomasi, buyruqlar shu yerda</p>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -129,6 +154,9 @@ export function LavozimDetailPanel({ employeeId, onClose, onChanged }: { employe
 
       {editKelishuv && d && (
         <KelishuvModal employeeId={employeeId} kelishuv={d.kelishuv} onClose={() => setEditKelishuv(false)} onSaved={() => { setEditKelishuv(false); refresh(); }} />
+      )}
+      {addDoc && d && (
+        <ShartnomaModal employeeId={employeeId} employeeName={d.fio} onClose={() => setAddDoc(false)} onSaved={() => { setAddDoc(false); refresh(); }} />
       )}
     </div>
   );

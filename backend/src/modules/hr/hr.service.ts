@@ -397,6 +397,7 @@ export class HrService {
         department: { select: { name: true } },
         branch: { select: { name: true } },
         salary: true,
+        contracts: { orderBy: { date: 'desc' } },
       },
     });
     if (!e) throw new NotFoundException('Xodim topilmadi');
@@ -455,6 +456,14 @@ export class HrService {
         tolovCount: payments.length,
       },
       oylar,
+      hujjatlar: e.contracts.map((c) => ({
+        id: c.id,
+        type: c.type,
+        number: c.number,
+        date: c.date,
+        status: c.status,
+        stavka: c.stavka,
+      })),
     };
   }
 
