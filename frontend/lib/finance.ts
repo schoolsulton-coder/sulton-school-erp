@@ -44,6 +44,10 @@ export const financeApi = {
   accounts: () => api.get<Account[]>('/finance/accounts').then((r) => r.data),
   createAccount: (data: { name: string; balance?: number }) =>
     api.post('/finance/accounts', data).then((r) => r.data),
+  deleteAccount: (id: string) =>
+    api.delete(`/finance/accounts/${id}`).then((r) => r.data),
+  deleteTransaction: (id: string) =>
+    api.delete<{ ok: boolean; removed: number }>(`/finance/transactions/${id}`).then((r) => r.data),
   categories: (type?: string) =>
     api.get<Category[]>('/finance/categories', { params: { type } }).then((r) => r.data),
   createCategory: (data: { name: string; type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' }) =>

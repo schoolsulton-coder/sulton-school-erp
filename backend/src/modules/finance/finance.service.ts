@@ -26,6 +26,41 @@ export class FinanceService {
     });
   }
 
+  // ===== Moliya kassa o'chirish (himoyalangan) =====
+  async removeAccount(id: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            transactions: true,
+            payments: true,
+            expensePayments: true,
+            expenseDollarPayments: true,
+            counterpartyEntries: true,
+          },
+        },
+      },
+    });
+    if (!account) throw new NotFoundException('Kassa topilmadi');
+
+    const c = account._count;
+    const linked =
+      c.transactions +
+      c.payments +
+      c.expensePayments +
+      c.expenseDollarPayments +
+      c.counterpartyEntries;
+    if (linked > 0) {
+      throw new BadRequestException(
+        `Bu kassada ${linked} ta harakat bog'langan. Avval ularni o'chiring, keyin kassani o'chiring.`,
+      );
+    }
+
+    await this.prisma.account.delete({ where: { id } });
+    return { ok: true };
+  }
+
   // ===== Kategoriyalar =====
   listCategories(type?: string) {
     return this.prisma.financeCategory.findMany({
@@ -64,6 +99,56 @@ export class FinanceService {
         data: { balance: { increment: delta } },
       });
       return transaction;
+    });
+  }
+
+  // ===== Tranzaksiya o'chirish (kassa balansini teskari qaytaradi) =====
+  async removeTransaction(id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const t = await tx.transaction.findUnique({ where: { id } });
+      if (!t) throw new NotFoundException('Tranzaksiya topilmadi');
+
+      if (t.type === 'TRANSFER') {
+        // Ichki o'tkazma — ikkala leg birga o'chiriladi.
+        // '→' = chiqim legi (yaratishda -amount), '←' = kirim legi (+amount).
+        const isOut = (t.description ?? '').startsWith('→');
+        const sibling = await tx.transaction.findFirst({
+          where: {
+            id: { not: t.id },
+            type: 'TRANSFER',
+            amount: t.amount,
+            date: t.date,
+            accountId: { not: t.accountId },
+            description: { startsWith: isOut ? '←' : '→' },
+          },
+        });
+
+        // Bu legning balansga ta'sirini qaytar
+        await tx.account.update({
+          where: { id: t.accountId },
+          data: { balance: { increment: isOut ? t.amount : -t.amount } },
+        });
+        await tx.transaction.delete({ where: { id: t.id } });
+
+        if (sibling) {
+          const sibOut = (sibling.description ?? '').startsWith('→');
+          await tx.account.update({
+            where: { id: sibling.accountId },
+            data: { balance: { increment: sibOut ? sibling.amount : -sibling.amount } },
+          });
+          await tx.transaction.delete({ where: { id: sibling.id } });
+        }
+        return { ok: true, removed: sibling ? 2 : 1 };
+      }
+
+      // Oddiy: EXPENSE yaratishda -amount qilingan => +amount qaytar; INCOME/INVESTMENT => -amount
+      const revert = t.type === 'EXPENSE' ? t.amount : -t.amount;
+      await tx.account.update({
+        where: { id: t.accountId },
+        data: { balance: { increment: revert } },
+      });
+      await tx.transaction.delete({ where: { id: t.id } });
+      return { ok: true, removed: 1 };
     });
   }
 

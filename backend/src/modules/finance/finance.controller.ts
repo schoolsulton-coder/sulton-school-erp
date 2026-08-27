@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -36,6 +38,12 @@ export class FinanceController {
     return this.service.createAccount(dto);
   }
 
+  @Delete('accounts/:id')
+  @Permissions('finance.delete')
+  removeAccount(@Param('id') id: string) {
+    return this.service.removeAccount(id);
+  }
+
   // ---- Kategoriyalar ----
   @Get('categories')
   @Permissions('finance.view')
@@ -65,6 +73,12 @@ export class FinanceController {
   @Permissions('finance.create')
   createTransaction(@Body() dto: CreateTransactionDto) {
     return this.service.createTransaction(dto);
+  }
+
+  @Delete('transactions/:id')
+  @Permissions('finance.delete')
+  removeTransaction(@Param('id') id: string) {
+    return this.service.removeTransaction(id);
   }
 
   // ---- Ichki o'tkazma ----

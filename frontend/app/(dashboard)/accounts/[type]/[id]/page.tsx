@@ -2,10 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { registersApi, cur, type RegisterMovement } from '@/lib/registers';
+import { financeApi } from '@/lib/finance';
+
+const errMsg = (e: any) =>
+  e?.response?.data?.message || e?.response?.data?.error || "O'chirishda xatolik yuz berdi";
 
 const inp = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
 const fmtTime = (iso: string) => new Date(iso).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -19,6 +23,28 @@ export default function RegisterDetailPage() {
   const { data: d, isLoading } = useQuery({
     queryKey: ['register-detail', type, id, from, to],
     queryFn: () => registersApi.detail(type, id, { from: from || undefined, to: to || undefined }),
+  });
+
+  const qc = useQueryClient();
+  const router = useRouter();
+  const canDelete = type === 'ACCOUNT'; // Moliya kassa — o'chirish/tahrir shu yerda
+
+  const delTx = useMutation({
+    mutationFn: (refId: string) => financeApi.deleteTransaction(refId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['register-detail', type, id] });
+      qc.invalidateQueries({ queryKey: ['registers'] });
+    },
+    onError: (e) => alert(errMsg(e)),
+  });
+
+  const delAccount = useMutation({
+    mutationFn: () => financeApi.deleteAccount(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['registers'] });
+      router.push('/accounts');
+    },
+    onError: (e) => alert(errMsg(e)),
   });
 
   const ccy = d?.register.currency ?? 'SOM';
@@ -38,8 +64,21 @@ export default function RegisterDetailPage() {
   return (
     <div className="p-6">
       <Link href="/accounts" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand"><ArrowLeft size={15} /> Hisoblar</Link>
-      <h1 className="text-2xl font-bold">{d.register.name}</h1>
-      <p className="mb-5 text-sm text-slate-500">{d.register.kassaTuri ?? 'Moliya'}{d.register.branch ? ` · ${d.register.branch}` : ''} · {ccy}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{d.register.name}</h1>
+          <p className="mb-5 text-sm text-slate-500">{d.register.kassaTuri ?? 'Moliya'}{d.register.branch ? ` · ${d.register.branch}` : ''} · {ccy}</p>
+        </div>
+        {canDelete && (
+          <button
+            onClick={() => { if (confirm(`"${d.register.name}" hisobini butunlay o'chirasizmi?`)) delAccount.mutate(); }}
+            disabled={delAccount.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+          >
+            <Trash2 size={15} /> Hisobni o&apos;chirish
+          </button>
+        )}
+      </div>
 
       {/* Kartalar */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -106,6 +145,7 @@ export default function RegisterDetailPage() {
                 <th className="px-5 py-2.5 text-right">Chiqim</th>
                 <th className="px-5 py-2.5 text-right">Balans</th>
                 <th className="px-5 py-2.5 text-center">Status</th>
+                <th className="px-5 py-2.5"></th>
               </tr>
             </thead>
             <tbody>
@@ -120,9 +160,26 @@ export default function RegisterDetailPage() {
                   <td className="px-5 py-3 text-center">
                     <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${t.confirmed ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{t.confirmed ? 'Tasdiqlangan' : 'Kutilmoqda'}</span>
                   </td>
+                  <td className="px-5 py-3 text-right">
+                    {canDelete && t.refType === 'Transaction' && (
+                      <button
+                        onClick={() => {
+                          const msg = t.label === "Ichki o'tkazma"
+                            ? "Ichki o'tkazma o'chirilsinmi? Ikkala kassada ham balans qaytariladi."
+                            : "Tranzaksiya o'chirilsinmi? Kassa balansi qaytariladi.";
+                          if (confirm(msg)) delTx.mutate(t.refId);
+                        }}
+                        disabled={delTx.isPending}
+                        title="O'chirish"
+                        className="rounded p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-50"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
-              {!txs.length && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">Tranzaksiya yo&apos;q</td></tr>}
+              {!txs.length && <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">Tranzaksiya yo&apos;q</td></tr>}
             </tbody>
           </table>
         </div>
