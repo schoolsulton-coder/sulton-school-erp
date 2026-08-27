@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronDown, FileText, Pencil, Trash2, Plus, X } from 'luc
 import { contractsApi } from '@/lib/contracts';
 import { contractTemplatesApi } from '@/lib/contract-templates';
 import { crmApi, type ClassForm } from '@/lib/crm';
+import { financeApi } from '@/lib/finance';
 import { StudentRecords } from '@/components/student-records';
 
 const num = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -316,11 +317,13 @@ function InfoRow({ label, value, accent }: { label: string; value?: string | nul
 }
 
 function PaymentModal({ contractId, onClose, onPaid }: { contractId: string; onClose: () => void; onPaid: () => void }) {
-  const [form, setForm] = useState({ amount: '', method: 'naqd', note: '' });
+  const [form, setForm] = useState({ amount: '', method: 'naqd', accountId: '', note: '' });
+  const { data: accounts } = useQuery({ queryKey: ['finance-accounts'], queryFn: financeApi.accounts });
   const pay = useMutation({
-    mutationFn: () => contractsApi.addPayment(contractId, { amount: Number(form.amount), method: form.method, note: form.note || undefined }),
+    mutationFn: () => contractsApi.addPayment(contractId, { amount: Number(form.amount), method: form.method, accountId: form.accountId || undefined, note: form.note || undefined }),
     onSuccess: onPaid,
   });
+  const acc = accounts?.find((a) => a.id === form.accountId);
   const inp = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -333,6 +336,13 @@ function PaymentModal({ contractId, onClose, onPaid }: { contractId: string; onC
         <select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className={inp}>
           <option value="naqd">Naqd</option><option value="plastik">Plastik karta</option><option value="click">Click</option><option value="payme">Payme</option>
         </select>
+        <div>
+          <select value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className={inp}>
+            <option value="">Kassa (ixtiyoriy)...</option>
+            {accounts?.map((a) => <option key={a.id} value={a.id}>{a.name} — {num(a.balance)}</option>)}
+          </select>
+          {acc && <p className="mt-1 text-xs text-slate-400">Tanlangan kassaga qo&apos;shiladi. Yangi qoldiq: {num(acc.balance + (Number(form.amount) || 0))}</p>}
+        </div>
         <input placeholder="Izoh (ixtiyoriy)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className={inp} />
         <button type="submit" disabled={pay.isPending} className="w-full rounded-lg bg-brand py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
           {pay.isPending ? 'Saqlanmoqda...' : "To'lovni saqlash"}

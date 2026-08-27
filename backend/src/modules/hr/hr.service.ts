@@ -468,22 +468,52 @@ export class HrService {
   }
 
   async createTolov(dto: any) {
-    return this.prisma.salaryPayment.create({
-      data: {
-        employeeId: dto.employeeId,
-        date: dto.date ? new Date(dto.date) : new Date(),
-        branchId: dto.branchId ?? null,
-        kassa: dto.kassa || 'Naqd',
-        somAmount: dto.somAmount ?? 0,
-        somAccountId: dto.somAccountId ?? null,
-        dollarAmount: dto.dollarAmount ?? null,
-        dollarRate: dto.dollarRate ?? null,
-        dollarKassa: dto.dollarKassa ?? null,
-        dollarAccountId: dto.dollarAccountId ?? null,
-        periodYear: dto.periodYear ?? null,
-        periodMonth: dto.periodMonth ?? null,
-        note: dto.note ?? null,
-      },
+    const som = dto.somAmount ?? 0;
+    const usd = dto.dollarAmount ?? 0;
+    return this.prisma.$transaction(async (tx) => {
+      const pay = await tx.salaryPayment.create({
+        data: {
+          employeeId: dto.employeeId,
+          date: dto.date ? new Date(dto.date) : new Date(),
+          branchId: dto.branchId ?? null,
+          kassa: dto.kassa || 'Naqd',
+          somAmount: som,
+          somAccountId: dto.somAccountId ?? null,
+          dollarAmount: usd || null,
+          dollarRate: dto.dollarRate ?? null,
+          dollarKassa: dto.dollarKassa ?? null,
+          dollarAccountId: dto.dollarAccountId ?? null,
+          periodYear: dto.periodYear ?? null,
+          periodMonth: dto.periodMonth ?? null,
+          note: dto.note ?? null,
+        },
+      });
+      // Maosh to'landi — kassadan (FlowAccount) pul chiqadi
+      if (pay.somAccountId && som > 0) {
+        await tx.flowAccount.update({ where: { id: pay.somAccountId }, data: { balance: { decrement: som } } });
+      }
+      if (pay.dollarAccountId && usd > 0) {
+        await tx.flowAccount.update({ where: { id: pay.dollarAccountId }, data: { balance: { decrement: usd } } });
+      }
+      return pay;
+    });
+  }
+
+  // Maosh to'lovini o'chirish — kassa balansini teskari qaytaradi
+  async deleteTolov(id: string) {
+    const p = await this.prisma.salaryPayment.findUnique({ where: { id } });
+    if (!p) throw new NotFoundException("To'lov topilmadi");
+    return this.prisma.$transaction(async (tx) => {
+      const som = p.somAmount ?? 0;
+      const usd = p.dollarAmount ?? 0;
+      if (p.somAccountId && som > 0) {
+        await tx.flowAccount.update({ where: { id: p.somAccountId }, data: { balance: { increment: som } } });
+      }
+      if (p.dollarAccountId && usd > 0) {
+        await tx.flowAccount.update({ where: { id: p.dollarAccountId }, data: { balance: { increment: usd } } });
+      }
+      await tx.salaryPayment.delete({ where: { id } });
+      return { ok: true };
     });
   }
 

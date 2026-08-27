@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { Search, ChevronRight } from 'lucide-react';
-import { registersApi, cur, type RegisterItem } from '@/lib/registers';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Search, ChevronRight, ShieldCheck, X } from 'lucide-react';
+import { registersApi, cur, type RegisterItem, type ReconcileResp } from '@/lib/registers';
 import { crmApi } from '@/lib/crm';
 
 const sel = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
@@ -14,6 +14,7 @@ export default function AccountsPage() {
   const [type, setType] = useState('');
   const [branchId, setBranchId] = useState('');
   const [active, setActive] = useState('');
+  const [showRec, setShowRec] = useState(false);
 
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data, isLoading } = useQuery({
@@ -28,8 +29,12 @@ export default function AccountsPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-1"><h1 className="text-2xl font-bold">Hisoblar — Balans</h1></div>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Hisoblar — Balans</h1>
+        <button onClick={() => setShowRec(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><ShieldCheck size={15} /> Balans tekshiruvi</button>
+      </div>
       <p className="mb-5 text-sm text-slate-500">Har kassa va bank hisobi bo&apos;yicha hozirgi qoldiq</p>
+      {showRec && <ReconcileModal onClose={() => setShowRec(false)} />}
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
         <div className="relative min-w-[220px] flex-1">
@@ -97,6 +102,80 @@ function Kpi({ label, value, cls }: { label: string; value: string; cls?: string
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
       <div className={`mt-1 text-2xl font-bold ${cls ?? 'text-slate-800'}`}>{value}</div>
+    </div>
+  );
+}
+
+function ReconcileModal({ onClose }: { onClose: () => void }) {
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['reconcile-check'],
+    queryFn: () => registersApi.reconcile('check'),
+  });
+  const run = useMutation({
+    mutationFn: (mode: 'adopt' | 'apply') => registersApi.reconcile(mode),
+    onSuccess: () => refetch(),
+  });
+  const d: ReconcileResp | undefined = data;
+  const rows = d?.drifted ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="mt-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-800">Balans tekshiruvi</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
+        </div>
+        <div className="space-y-4 px-6 py-5">
+          <p className="text-sm text-slate-500">To&apos;g&apos;ri balans = boshlang&apos;ich qoldiq + barcha harakatlar. Farq (drift) bo&apos;lsa quyida ko&apos;rinadi.</p>
+          {isLoading ? (
+            <div className="py-8 text-center text-slate-400">Tekshirilmoqda…</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-400">Tekshirildi</div><div className="text-xl font-bold text-slate-800">{d?.checked ?? 0}</div></div>
+                <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-400">Farqli</div><div className={`text-xl font-bold ${(d?.driftedCount ?? 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{d?.driftedCount ?? 0}</div></div>
+                <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-400">Jami farq</div><div className="text-xl font-bold text-slate-800">{cur(d?.totalDriftAbs ?? 0, 'SOM')}</div></div>
+              </div>
+
+              {rows.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase text-slate-400">
+                      <tr><th className="px-3 py-2">Hisob</th><th className="px-3 py-2 text-right">Boshlang&apos;ich</th><th className="px-3 py-2 text-right">Harakatlar</th><th className="px-3 py-2 text-right">Saqlangan</th><th className="px-3 py-2 text-right">To&apos;g&apos;ri</th><th className="px-3 py-2 text-right">Farq</th></tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={`${r.type}-${r.id}`} className="border-t border-slate-50">
+                          <td className="px-3 py-2 font-medium text-slate-700">{r.name}</td>
+                          <td className="px-3 py-2 text-right text-slate-500">{cur(r.opening, r.currency)}</td>
+                          <td className="px-3 py-2 text-right text-slate-500">{cur(r.net, r.currency)}</td>
+                          <td className="px-3 py-2 text-right text-slate-500">{cur(r.stored, r.currency)}</td>
+                          <td className="px-3 py-2 text-right font-medium text-slate-700">{cur(r.correct, r.currency)}</td>
+                          <td className={`px-3 py-2 text-right font-bold ${r.drift < 0 ? 'text-rose-600' : 'text-amber-600'}`}>{cur(r.drift, r.currency)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-emerald-50 py-6 text-center text-sm font-medium text-emerald-700">Barcha balanslar mos ✓</div>
+              )}
+            </>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">
+          <button
+            onClick={() => { if (confirm("Hozirgi balanslar to'g'ri deb qabul qilinsinmi? (boshlang'ich qoldiq shunga moslanadi, balans o'zgarmaydi)")) run.mutate('adopt'); }}
+            disabled={run.isPending || isFetching}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >Hozirgi balansni asos qil</button>
+          <button
+            onClick={() => { if (confirm('Balanslar boshlang\'ich + harakatlar bo\'yicha to\'g\'rilansinmi? Saqlangan qiymatlar o\'zgaradi.')) run.mutate('apply'); }}
+            disabled={run.isPending || isFetching || rows.length === 0}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+          >Balanslarni to&apos;g&apos;rilash</button>
+        </div>
+      </div>
     </div>
   );
 }

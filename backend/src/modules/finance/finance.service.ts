@@ -19,8 +19,10 @@ export class FinanceService {
   }
 
   createAccount(dto: CreateAccountDto) {
+    const opening = dto.balance ?? 0;
+    // Boshlang'ich qoldiq — ham joriy balans, ham baseline (openingBalance) sifatida
     return this.prisma.account.create({
-      data: { name: dto.name, balance: dto.balance ?? 0 },
+      data: { name: dto.name, balance: opening, openingBalance: opening },
     });
   }
 

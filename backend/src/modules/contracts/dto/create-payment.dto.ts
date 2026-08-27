@@ -22,5 +22,9 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsString()
+  accountId?: string; // qaysi kassaga tushishi (bo'sh bo'lsa kassaga urilmaydi)
+
+  @IsOptional()
+  @IsString()
   note?: string;
 }

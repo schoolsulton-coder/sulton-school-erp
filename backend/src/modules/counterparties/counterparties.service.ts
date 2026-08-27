@@ -377,8 +377,40 @@ export class CounterpartiesService {
   }
 
   async remove(id: string) {
-    await this.prisma.counterparty.delete({ where: { id } });
-    return { ok: true };
+    const exists = await this.prisma.counterparty.findUnique({ where: { id }, select: { id: true, pairId: true } });
+    if (!exists) throw new NotFoundException('Kontragent topilmadi');
+    return this.prisma.$transaction(async (tx) => {
+      // Yozuvlarni tranzaksiya ichida o'qiymiz (poyga bo'lmasin)
+      const entries = await tx.counterpartyEntry.findMany({ where: { counterpartyId: id } });
+      const reverse = (e: { direction: string; somFlowAccountId: string | null; somAmount: number | null; dollarFlowAccountId: string | null; dollarAmount: number | null }) => {
+        const sign = e.direction === 'IN' ? 1 : -1; // IN oshirgan → kamaytiramiz; OUT kamaytirgan → oshiramiz
+        const ops: Promise<any>[] = [];
+        if (e.somFlowAccountId && e.somAmount) ops.push(tx.flowAccount.update({ where: { id: e.somFlowAccountId }, data: { balance: { decrement: sign * e.somAmount } } }));
+        if (e.dollarFlowAccountId && e.dollarAmount) ops.push(tx.flowAccount.update({ where: { id: e.dollarFlowAccountId }, data: { balance: { decrement: sign * e.dollarAmount } } }));
+        return ops;
+      };
+
+      const handledPairs = new Set<string>();
+      for (const e of entries) {
+        if (e.transferPairId) {
+          // Transfer — ikkala legni (ikkala kontragentda) to'liq qaytaramiz va o'chiramiz,
+          // aks holda juft leg qolib pul "yaralib" ketadi.
+          if (handledPairs.has(e.transferPairId)) continue;
+          handledPairs.add(e.transferPairId);
+          const legs = await tx.counterpartyEntry.findMany({ where: { transferPairId: e.transferPairId } });
+          for (const l of legs) for (const op of reverse(l)) await op;
+          await tx.counterpartyEntry.deleteMany({ where: { transferPairId: e.transferPairId } });
+        } else {
+          for (const op of reverse(e)) await op;
+        }
+      }
+      // Juftlik (pair) bog'lanishini uzamiz — FK xatosi bo'lmasin
+      if (exists.pairId) {
+        await tx.counterparty.update({ where: { id: exists.pairId }, data: { pairId: null } }).catch(() => undefined);
+      }
+      await tx.counterparty.delete({ where: { id } });
+      return { ok: true };
+    });
   }
 
   private userLabel(u: { fullName: string; email: string | null } | null) {

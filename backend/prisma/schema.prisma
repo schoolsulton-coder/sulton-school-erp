@@ -690,6 +690,7 @@ model Account {
   id              String           @id @default(uuid())
   name            String        // Asosiy kassa, Bank, ...
   balance         Float            @default(0)
+  openingBalance  Float            @default(0) // boshlang'ich qoldiq (harakatlardan tashqari); balance = openingBalance + Σ(harakatlar)
   transactions          Transaction[]
   payments              Payment[]
   expensePayments       ExpensePayment[] @relation("ExpenseSomAccount")
@@ -1323,6 +1324,7 @@ model FlowAccount {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   balance   Float    @default(0)
+  openingBalance Float @default(0) // boshlang'ich qoldiq; balance = openingBalance + Σ(harakatlar)
   active    Boolean  @default(true)
   entrySom    CounterpartyEntry[] @relation("EntrySomFlow")
   entryDollar CounterpartyEntry[] @relation("EntryDollarFlow")

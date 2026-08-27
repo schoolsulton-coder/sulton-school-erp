@@ -364,12 +364,21 @@ export class ContractsService {
         data: {
           studentId: contract.studentId,
           contractId: id,
+          accountId: dto.accountId || null,
           amount: dto.amount,
           method: dto.method,
           paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
           note: dto.note,
         },
       });
+
+      // To'lov kassaga (Account) tushadi — balansni oshiramiz
+      if (payment.accountId) {
+        await tx.account.update({
+          where: { id: payment.accountId },
+          data: { balance: { increment: payment.amount } },
+        });
+      }
 
       // eng eski to'lanmagan installment'lardan boshlab taqsimlash
       let remaining = dto.amount;

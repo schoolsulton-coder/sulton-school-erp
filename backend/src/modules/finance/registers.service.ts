@@ -81,7 +81,11 @@ export class RegistersService {
       const itFrom = await this.prisma.internalTransfer.findMany({ where: { fromAccountId: id }, include: { toAccount: { select: { name: true } } } });
       for (const t of itFrom) mv.push({ date: t.date, source: 'INTERNAL_TRANSFER', label: "Ichki o'tkazma", direction: 'OUT', amount: usd ? (t.dollarAmount ?? 0) : (t.somAmount ?? 0), currency, confirmed: t.confirmedAt != null, refType: 'InternalTransfer', refId: t.id, counterparty: t.toAccount?.name ?? '—', note: t.note });
       const itTo = await this.prisma.internalTransfer.findMany({ where: { toAccountId: id }, include: { fromAccount: { select: { name: true } } } });
-      for (const t of itTo) mv.push({ date: t.date, source: 'INTERNAL_TRANSFER', label: "Ichki o'tkazma", direction: 'IN', amount: usd ? (t.dollarAmount ?? 0) : (t.somAmount ?? 0), currency, confirmed: t.confirmedAt != null, refType: 'InternalTransfer', refId: t.id, counterparty: t.fromAccount?.name ?? '—', note: t.note });
+      for (const t of itTo) {
+        // PUL o'tkazmada yo'qotish (loss) qabul qiluvchiga yetib bormaydi — kirim = amount − loss (applyBalance bilan bir xil)
+        const inAmt = (usd ? (t.dollarAmount ?? 0) : (t.somAmount ?? 0)) - (t.kind === 'PUL' ? (t.loss ?? 0) : 0);
+        mv.push({ date: t.date, source: 'INTERNAL_TRANSFER', label: "Ichki o'tkazma", direction: 'IN', amount: Math.max(0, inAmt), currency, confirmed: t.confirmedAt != null, refType: 'InternalTransfer', refId: t.id, counterparty: t.fromAccount?.name ?? '—', note: t.note });
+      }
       // Oldi-berdi / investitsiya (kontragent)
       const cpSom = await this.prisma.counterpartyEntry.findMany({ where: { somFlowAccountId: id }, include: { counterparty: { select: { name: true } } } });
       for (const c of cpSom) mv.push({ date: c.date, source: 'COUNTERPARTY', label: this.cpLabel(c), direction: c.direction === 'IN' ? 'IN' : 'OUT', amount: c.somAmount ?? 0, currency: 'SOM', confirmed: c.confirmedAt != null, refType: 'CounterpartyEntry', refId: c.id, counterparty: c.counterparty?.name ?? '—', note: c.note });
@@ -174,6 +178,60 @@ export class RegistersService {
       expenseBreakdown,
       transactions: txList,
       count: period.length,
+    };
+  }
+
+  /**
+   * Balans-tekshiruv. To'g'ri balans = openingBalance (boshlang'ich qoldiq) + Σ(harakatlar).
+   * drift = saqlangan balans − to'g'ri balans. Rejimlar:
+   *   'check'  → faqat hisobot (o'zgartirmaydi).
+   *   'adopt'  → hozirgi saqlangan balanslarni baseline sifatida qabul qiladi
+   *              (openingBalance = stored − net), shunda drift 0 bo'ladi. Bir marta,
+   *              tizim jonli ma'lumotga o'tishdan oldin ishlatiladi — balansni buzmaydi.
+   *   'apply'  → saqlangan balansni to'g'ri qiymatga (opening + net) qo'yadi.
+   */
+  async reconcile(mode: 'check' | 'adopt' | 'apply' = 'check') {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const rows: any[] = [];
+    const accs = await this.prisma.account.findMany();
+    for (const a of accs) {
+      const mv = await this.movements('ACCOUNT', a.id, 'SOM');
+      const net = mv.reduce((s, m) => s + (m.direction === 'IN' ? m.amount : -m.amount), 0);
+      const opening = a.openingBalance ?? 0;
+      rows.push({ type: 'ACCOUNT', id: a.id, name: a.name, currency: 'SOM', opening, net, stored: a.balance, correct: opening + net, drift: round2(a.balance - (opening + net)) });
+    }
+    const flows = await this.prisma.flowAccount.findMany();
+    for (const f of flows) {
+      const cur = f.currency === 'USD' ? 'USD' : 'SOM';
+      const mv = await this.movements('FLOW', f.id, cur);
+      const net = mv.reduce((s, m) => s + (m.direction === 'IN' ? m.amount : -m.amount), 0);
+      const opening = f.openingBalance ?? 0;
+      rows.push({ type: 'FLOW', id: f.id, name: f.name, currency: cur, opening, net, stored: f.balance, correct: opening + net, drift: round2(f.balance - (opening + net)) });
+    }
+    const drifted = rows.filter((r) => Math.abs(r.drift) > 0.001);
+
+    if (mode === 'adopt') {
+      // Hozirgi balansni to'g'ri deb qabul qilib, boshlang'ich qoldiqni shunga moslaymiz
+      for (const r of rows) {
+        const newOpening = round2(r.stored - r.net);
+        if (r.type === 'ACCOUNT') await this.prisma.account.update({ where: { id: r.id }, data: { openingBalance: newOpening } });
+        else await this.prisma.flowAccount.update({ where: { id: r.id }, data: { openingBalance: newOpening } });
+        r.opening = newOpening; r.correct = r.stored; r.drift = 0;
+      }
+    } else if (mode === 'apply') {
+      for (const r of drifted) {
+        if (r.type === 'ACCOUNT') await this.prisma.account.update({ where: { id: r.id }, data: { balance: r.correct } });
+        else await this.prisma.flowAccount.update({ where: { id: r.id }, data: { balance: r.correct } });
+      }
+    }
+
+    return {
+      mode,
+      checked: rows.length,
+      driftedCount: mode === 'adopt' ? 0 : drifted.length,
+      totalDriftAbs: round2((mode === 'adopt' ? [] : drifted).reduce((s, r) => s + Math.abs(r.drift), 0)),
+      drifted: mode === 'adopt' ? [] : drifted,
+      all: rows,
     };
   }
 }

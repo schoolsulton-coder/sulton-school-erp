@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateFlowAccountDto, UpdateFlowAccountDto } from './dto/flow-account.dto';
 
@@ -34,7 +34,22 @@ export class FlowAccountsService {
     });
   }
 
-  update(id: string, dto: UpdateFlowAccountDto) {
+  async update(id: string, dto: UpdateFlowAccountDto) {
+    const cur = await this.prisma.flowAccount.findUnique({ where: { id } });
+    if (!cur) throw new NotFoundException('Hisob topilmadi');
+    // Valyuta o'zgartirilsa — harakatlar/qoldiq bilan desync bo'lmasin
+    if (dto.currency !== undefined && dto.currency !== cur.currency) {
+      const [sal, itFrom, itTo, cpSom, cpDol] = await Promise.all([
+        this.prisma.salaryPayment.count({ where: { OR: [{ somAccountId: id }, { dollarAccountId: id }] } }),
+        this.prisma.internalTransfer.count({ where: { fromAccountId: id } }),
+        this.prisma.internalTransfer.count({ where: { toAccountId: id } }),
+        this.prisma.counterpartyEntry.count({ where: { somFlowAccountId: id } }),
+        this.prisma.counterpartyEntry.count({ where: { dollarFlowAccountId: id } }),
+      ]);
+      if (sal + itFrom + itTo + cpSom + cpDol > 0 || cur.balance !== 0) {
+        throw new BadRequestException("Hisobda harakatlar bor — valyutani o'zgartirib bo'lmaydi");
+      }
+    }
     return this.prisma.flowAccount.update({
       where: { id },
       data: {

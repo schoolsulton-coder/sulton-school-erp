@@ -309,6 +309,7 @@ export const hrApi = {
   tolovlar: (params?: { search?: string; branchId?: string; kassa?: string; year?: string; month?: string }) =>
     api.get<TolovlarResp>('/hr/tolovlar', { params }).then((r) => r.data),
   createTolov: (data: any) => api.post('/hr/tolovlar', data).then((r) => r.data),
+  deleteTolov: (id: string) => api.delete(`/hr/tolovlar/${id}`).then((r) => r.data),
   oylikStatus: (employeeId: string, period: string) =>
     api.get<OylikStatus>('/hr/oylik-status', { params: { employeeId, period } }).then((r) => r.data),
   oylikList: (params: { period: string; branchId?: string; search?: string }) =>

@@ -1,8 +1,8 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, ShieldCheck } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { ShartnomaModal } from '@/components/shartnoma-form';
 import { TolovModal } from '@/components/tolov-form';
@@ -268,6 +268,13 @@ export function TolovlarTab() {
   const rows = data?.data ?? [];
 
   const yo = (r: TolovRow) => (r.periodYear && r.periodMonth ? `${r.periodYear} / ${MONTHS[r.periodMonth - 1]}` : '—');
+  const del = useMutation({
+    mutationFn: (id: string) => hrApi.deleteTolov(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tolovlar'] }),
+  });
+  const onDelete = (p: TolovRow) => {
+    if (confirm(`${p.xodim} — ${numFmt(p.jami)} so'mlik to'lov o'chirilsinmi? Kassa balansi qaytariladi.`)) del.mutate(p.id);
+  };
 
   return (
     <>
@@ -298,12 +305,12 @@ export function TolovlarTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                <th className="px-5 py-3">Sana</th><th className="px-5 py-3">Xodim</th><th className="px-5 py-3">Filial</th><th className="px-5 py-3">Kassa</th><th className="px-5 py-3 text-right">Summa (so'm)</th><th className="px-5 py-3 text-right">$</th><th className="px-5 py-3 text-right">Kurs</th><th className="px-5 py-3 text-right">Jami</th><th className="px-5 py-3">Y/O</th>
+                <th className="px-5 py-3">Sana</th><th className="px-5 py-3">Xodim</th><th className="px-5 py-3">Filial</th><th className="px-5 py-3">Kassa</th><th className="px-5 py-3 text-right">Summa (so'm)</th><th className="px-5 py-3 text-right">$</th><th className="px-5 py-3 text-right">Kurs</th><th className="px-5 py-3 text-right">Jami</th><th className="px-5 py-3">Y/O</th><th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={9} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
+                <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
               ) : rows.length ? rows.map((p: TolovRow) => (
                 <tr key={p.id} className="border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
                   <td className="whitespace-nowrap px-5 py-3.5 text-slate-500">{fmtDate(p.date)}</td>
@@ -315,8 +322,9 @@ export function TolovlarTab() {
                   <td className="px-5 py-3.5 text-right text-slate-500">{p.dollarRate ? numFmt(p.dollarRate) : <span className="text-slate-300">—</span>}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right font-semibold text-slate-800">{numFmt(p.jami)}</td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-xs text-slate-400">{yo(p)}</td>
+                  <td className="px-5 py-3.5 text-right"><button onClick={() => onDelete(p)} disabled={del.isPending} className="rounded-lg p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" title="O'chirish"><Trash2 size={15} /></button></td>
                 </tr>
-              )) : (<tr><td colSpan={9} className="px-5 py-12 text-center text-slate-400">To&apos;lov topilmadi</td></tr>)}
+              )) : (<tr><td colSpan={10} className="px-5 py-12 text-center text-slate-400">To&apos;lov topilmadi</td></tr>)}
             </tbody>
           </table>
         </div>

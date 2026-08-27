@@ -141,6 +141,12 @@ export class HrController {
     return this.service.createTolov(dto);
   }
 
+  @Delete('tolovlar/:id')
+  @Permissions('payroll.create')
+  deleteTolov(@Param('id') id: string) {
+    return this.service.deleteTolov(id);
+  }
+
   @Get('oylik-status')
   @Permissions('hr.view')
   oylikStatus(@Query('employeeId') employeeId: string, @Query('period') period: string) {

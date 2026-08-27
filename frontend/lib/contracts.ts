@@ -107,7 +107,7 @@ export const contractsApi = {
   ) => api.post(`/contracts/from-lead/${leadId}`, data).then((r) => r.data),
   addPayment: (
     id: string,
-    data: { amount: number; method: string; note?: string },
+    data: { amount: number; method: string; accountId?: string; note?: string },
   ) => api.post(`/contracts/${id}/payments`, data).then((r) => r.data),
   cancel: (id: string) =>
     api.patch(`/contracts/${id}/cancel`).then((r) => r.data),

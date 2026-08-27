@@ -40,11 +40,33 @@ export interface RegisterDetail {
   count: number;
 }
 
+export interface ReconcileRow {
+  type: 'ACCOUNT' | 'FLOW';
+  id: string;
+  name: string;
+  currency: 'SOM' | 'USD';
+  opening: number;
+  net: number;
+  stored: number;
+  correct: number;
+  drift: number;
+}
+export interface ReconcileResp {
+  mode: 'check' | 'adopt' | 'apply';
+  checked: number;
+  driftedCount: number;
+  totalDriftAbs: number;
+  drifted: ReconcileRow[];
+  all: ReconcileRow[];
+}
+
 export const registersApi = {
   list: (params?: { type?: string; branchId?: string; active?: string }) =>
     api.get<RegisterListResp>('/finance/registers', { params }).then((r) => r.data),
   detail: (type: string, id: string, params?: { from?: string; to?: string; limit?: number }) =>
     api.get<RegisterDetail>(`/finance/registers/${type}/${id}/detail`, { params }).then((r) => r.data),
+  reconcile: (mode: 'check' | 'adopt' | 'apply' = 'check') =>
+    api.post<ReconcileResp>('/finance/registers/reconcile', null, { params: { mode } }).then((r) => r.data),
 };
 
 /** Valyutaga qarab summa formati (SOM: so'm, USD: $) */

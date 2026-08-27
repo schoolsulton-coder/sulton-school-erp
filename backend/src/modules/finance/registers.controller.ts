@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RegistersService } from './registers.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -28,5 +28,13 @@ export class RegistersController {
     @Query('limit') limit?: string,
   ) {
     return this.service.detail(type.toUpperCase(), id, { from, to, limit: limit ? Number(limit) : undefined });
+  }
+
+  /** Balans-tekshiruv: ?mode=check (hisobot) | adopt (baseline) | apply (to'g'rilash) */
+  @Post('reconcile')
+  @Permissions('finance.create')
+  reconcile(@Query('mode') mode?: string) {
+    const m = mode === 'adopt' || mode === 'apply' ? mode : 'check';
+    return this.service.reconcile(m);
   }
 }
