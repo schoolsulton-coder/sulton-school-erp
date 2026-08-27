@@ -783,6 +783,27 @@ export class HrService {
     return { ok: true };
   }
 
+  // ===== Izohlar (xodimga) =====
+  listNotes(employeeId: string) {
+    return this.prisma.employeeNote.findMany({
+      where: { employeeId },
+      orderBy: { createdAt: 'desc' },
+      include: { author: { select: { fullName: true } } },
+    });
+  }
+  async addNote(authorId: string | null, employeeId: string, text: string) {
+    const t = (text ?? '').trim();
+    if (!t) throw new NotFoundException('Izoh bo‘sh');
+    return this.prisma.employeeNote.create({
+      data: { employeeId, authorId, text: t },
+      include: { author: { select: { fullName: true } } },
+    });
+  }
+  async deleteNote(noteId: string) {
+    await this.prisma.employeeNote.delete({ where: { id: noteId } });
+    return { ok: true };
+  }
+
   /** Ishga qabul: login + xodim + stavka (bitta tranzaksiyada) */
   async hire(dto: HireEmployeeDto) {
     const exists = await this.prisma.user.findUnique({

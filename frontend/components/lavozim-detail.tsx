@@ -7,6 +7,7 @@ import { hrApi, SALARY_LABEL, type LavozimDetail, type LavozimKelishuv, type Kel
 import { money } from '@/lib/finance';
 import { KelishuvFields, validateKelishuv } from '@/components/kelishuv-fields';
 import { ShartnomaModal } from '@/components/shartnoma-form';
+import { IzohlarSection } from '@/components/izohlar-section';
 
 const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
 const periodLabel = (p: string) => { const [y, m] = p.split('-').map(Number); return `${UZ_MONTHS[m - 1]} ${y}`; };
@@ -147,6 +148,9 @@ export function LavozimDetailPanel({ employeeId, onClose, onChanged }: { employe
                   <p className="py-4 text-center text-sm text-slate-400">Hujjat yo&apos;q — mehnat shartnomasi, buyruqlar shu yerda</p>
                 )}
               </div>
+
+              {/* Izohlar */}
+              <IzohlarSection employeeId={employeeId} />
             </div>
           </>
         )}

@@ -20,6 +20,7 @@ import { AddDocumentDto } from './dto/add-document.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('hr')
 @ApiBearerAuth()
@@ -229,5 +230,23 @@ export class HrController {
   @Permissions('hr.update')
   deleteDocument(@Param('docId') docId: string) {
     return this.service.deleteDocument(docId);
+  }
+
+  @Get('employees/:id/notes')
+  @Permissions('hr.view')
+  listNotes(@Param('id') id: string) {
+    return this.service.listNotes(id);
+  }
+
+  @Post('employees/:id/notes')
+  @Permissions('hr.update')
+  addNote(@CurrentUser('id') authorId: string, @Param('id') id: string, @Body('text') text: string) {
+    return this.service.addNote(authorId, id, text);
+  }
+
+  @Delete('employees/notes/:noteId')
+  @Permissions('hr.update')
+  deleteNote(@Param('noteId') noteId: string) {
+    return this.service.deleteNote(noteId);
   }
 }

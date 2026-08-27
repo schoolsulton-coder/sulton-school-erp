@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, ExternalLink, FileText, Trash2, Plus, Paperclip } from 'lucide-react';
 import { hrApi, XODIM_DOC_TYPES } from '@/lib/hr';
 import { money } from '@/lib/finance';
+import { IzohlarSection } from '@/components/izohlar-section';
 
 const initials = (n: string) => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 const fmtDate = (iso?: string | null) => { if (!iso) return '—'; const s = new Date(iso).toLocaleDateString('en-CA'); const [y, m, d] = s.split('-'); return `${d}.${m}.${y}`; };
@@ -102,6 +103,9 @@ export function XodimDetailPanel({ employeeId, onClose }: { employeeId: string; 
                   <p className="py-3 text-center text-sm text-slate-400">Hujjat yo&apos;q</p>
                 )}
               </div>
+
+              {/* Izohlar */}
+              <IzohlarSection employeeId={employeeId} />
             </div>
           </>
         )}

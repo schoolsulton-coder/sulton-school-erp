@@ -179,6 +179,7 @@ model User {
   auditLogs       AuditLog[]
   debtorContacts  DebtorContact[]  @relation("DebtorContactAuthor")
   markedAttendances Attendance[]   @relation("AttendanceMarker")
+  employeeNotes   EmployeeNote[]   @relation("EmployeeNoteAuthor")
   flowAccounts    FlowAccount[]
   cpEntriesCreated   CounterpartyEntry[] @relation("CpEntryCreatedBy")
   cpEntriesUpdated   CounterpartyEntry[] @relation("CpEntryUpdatedBy")
@@ -855,6 +856,7 @@ model Employee {
   payrollItems PayrollItem[]
   documents    EmployeeDocument[]
   contracts    EmploymentContract[]
+  notes        EmployeeNote[]
   salaryPayments SalaryPayment[]
   payrollRecords PayrollRecord[]
 
@@ -958,6 +960,20 @@ model EmploymentContract {
   @@index([employeeId])
   @@index([date])
   @@map("employment_contracts")
+}
+
+/// Xodimga izoh (istalgan lavozim/xodim sahifasidan ko'rinadi)
+model EmployeeNote {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  authorId   String?
+  author     User?    @relation("EmployeeNoteAuthor", fields: [authorId], references: [id])
+  text       String
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId, createdAt])
+  @@map("employee_notes")
 }
 
 model EmployeeDocument {
