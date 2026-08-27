@@ -26,6 +26,22 @@ export class CreateFlowAccountDto {
   @IsOptional()
   @IsString()
   userId?: string;
+
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  cardNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  cardHolder?: string;
+
+  @IsOptional()
+  @IsString()
+  cardType?: string;
 }
 
 export class UpdateFlowAccountDto {
@@ -52,4 +68,20 @@ export class UpdateFlowAccountDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  cardNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  cardHolder?: string;
+
+  @IsOptional()
+  @IsString()
+  cardType?: string;
 }

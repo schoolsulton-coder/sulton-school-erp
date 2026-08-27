@@ -16,14 +16,31 @@ export interface FlowAccount {
   kassaTuri: string;
   balance: number;
   active: boolean;
+  bankName: string | null;
+  cardNumber: string | null;
+  cardHolder: string | null;
+  cardType: string | null;
+}
+
+export interface FlowAccountInput {
+  name: string;
+  branchId?: string;
+  currency?: string;
+  kassaTuri?: string;
+  userId?: string;
+  active?: boolean;
+  bankName?: string;
+  cardNumber?: string;
+  cardHolder?: string;
+  cardType?: string;
 }
 
 export const flowAccountsApi = {
   list: (params?: { branchId?: string; currency?: string; userId?: string; active?: string }) =>
     api.get<FlowAccount[]>('/flow-accounts', { params }).then((r) => r.data),
-  create: (data: { name: string; branchId?: string; currency?: string; kassaTuri?: string; userId?: string }) =>
+  create: (data: FlowAccountInput) =>
     api.post<FlowAccount>('/flow-accounts', data).then((r) => r.data),
-  update: (id: string, data: Partial<{ name: string; branchId: string; currency: string; kassaTuri: string; userId: string; active: boolean }>) =>
+  update: (id: string, data: Partial<FlowAccountInput>) =>
     api.patch(`/flow-accounts/${id}`, data).then((r) => r.data),
   remove: (id: string) => api.delete(`/flow-accounts/${id}`).then((r) => r.data),
 };

@@ -8,12 +8,44 @@ export interface RegisterItem {
   kassaTuri: string | null;
   branch: string | null;
   branchId: string | null;
-  storedBalance: number;
+  userId: string | null;
   active: boolean;
+  mine: boolean;
+  storedBalance: number;
+  confirmedBalance: number;
+  pendingIn: number;
+  pendingOut: number;
+  pendingNet: number;
+  drift: number;
+  lastMovement: string | null;
+  bankName: string | null;
+  cardNumber: string | null;
+  cardHolder: string | null;
+  cardType: string | null;
+}
+export interface RegisterTotals {
+  count: number;
+  somConfirmed: number;
+  usdConfirmed: number;
+  somPendingIn: number;
+  somPendingOut: number;
+  somPendingNet: number;
+  usdPendingIn: number;
+  usdPendingOut: number;
+  usdPendingNet: number;
 }
 export interface RegisterListResp {
   registers: RegisterItem[];
-  totals: { somBalance: number; usdBalance: number; count: number };
+  totals: RegisterTotals;
+}
+export interface RegisterListParams {
+  type?: string;
+  branchId?: string;
+  active?: string;
+  kassaTuri?: string;
+  currency?: string;
+  mine?: string;
+  asOf?: string;
 }
 
 export interface RegisterMovement {
@@ -61,7 +93,7 @@ export interface ReconcileResp {
 }
 
 export const registersApi = {
-  list: (params?: { type?: string; branchId?: string; active?: string }) =>
+  list: (params?: RegisterListParams) =>
     api.get<RegisterListResp>('/finance/registers', { params }).then((r) => r.data),
   detail: (type: string, id: string, params?: { from?: string; to?: string; limit?: number }) =>
     api.get<RegisterDetail>(`/finance/registers/${type}/${id}/detail`, { params }).then((r) => r.data),

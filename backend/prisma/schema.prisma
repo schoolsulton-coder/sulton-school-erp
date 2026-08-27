@@ -1326,6 +1326,10 @@ model FlowAccount {
   balance   Float    @default(0)
   openingBalance Float @default(0) // boshlang'ich qoldiq; balance = openingBalance + Σ(harakatlar)
   active    Boolean  @default(true)
+  bankName   String? // Bank nomi/filiali (masalan: ATB "KAPITALBANK" M.Ulug'bek filiali)
+  cardNumber String? // Karta raqami (masalan: 8600 4929 5678 3654)
+  cardHolder String? // Karta egasi (masalan: Jasur Lutfullayev)
+  cardType   String? // Uzcard | Humo | Visa ...
   entrySom    CounterpartyEntry[] @relation("EntrySomFlow")
   entryDollar CounterpartyEntry[] @relation("EntryDollarFlow")
   itFrom      InternalTransfer[]  @relation("ITFrom")

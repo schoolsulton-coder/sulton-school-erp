@@ -30,6 +30,10 @@ export class FlowAccountsService {
         currency: dto.currency ?? 'SOM',
         kassaTuri: dto.kassaTuri ?? 'Naqd',
         userId: dto.userId || null,
+        bankName: dto.bankName || null,
+        cardNumber: dto.cardNumber || null,
+        cardHolder: dto.cardHolder || null,
+        cardType: dto.cardType || null,
       },
     });
   }
@@ -59,11 +63,30 @@ export class FlowAccountsService {
         ...(dto.kassaTuri !== undefined ? { kassaTuri: dto.kassaTuri } : {}),
         ...(dto.userId !== undefined ? { userId: dto.userId || null } : {}),
         ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.bankName !== undefined ? { bankName: dto.bankName || null } : {}),
+        ...(dto.cardNumber !== undefined ? { cardNumber: dto.cardNumber || null } : {}),
+        ...(dto.cardHolder !== undefined ? { cardHolder: dto.cardHolder || null } : {}),
+        ...(dto.cardType !== undefined ? { cardType: dto.cardType || null } : {}),
       },
     });
   }
 
   async remove(id: string) {
+    const acc = await this.prisma.flowAccount.findUnique({ where: { id } });
+    if (!acc) throw new NotFoundException('Hisob topilmadi');
+    const [sal, itFrom, itTo, cpSom, cpDol] = await Promise.all([
+      this.prisma.salaryPayment.count({ where: { OR: [{ somAccountId: id }, { dollarAccountId: id }] } }),
+      this.prisma.internalTransfer.count({ where: { fromAccountId: id } }),
+      this.prisma.internalTransfer.count({ where: { toAccountId: id } }),
+      this.prisma.counterpartyEntry.count({ where: { somFlowAccountId: id } }),
+      this.prisma.counterpartyEntry.count({ where: { dollarFlowAccountId: id } }),
+    ]);
+    const linked = sal + itFrom + itTo + cpSom + cpDol;
+    if (linked > 0) {
+      throw new BadRequestException(
+        `Bu hisobda ${linked} ta harakat bog'langan. Avval ularni o'chiring, keyin hisobni o'chiring.`,
+      );
+    }
     await this.prisma.flowAccount.delete({ where: { id } });
     return { ok: true };
   }

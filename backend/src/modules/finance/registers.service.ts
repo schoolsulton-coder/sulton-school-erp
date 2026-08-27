@@ -24,26 +24,146 @@ const dayEnd = (s: string) => new Date(`${s.slice(0, 10)}T23:59:59.999Z`);
 export class RegistersService {
   constructor(private prisma: PrismaService) {}
 
-  /** Barcha kassalar (Account + FlowAccount) birlashtirilgan ro'yxati */
-  async list(params: { type?: string; branchId?: string; active?: string }) {
+  /** Bitta hisob uchun harakatlardan agregat (tasdiqlangan/pending/drift/oxirgi) */
+  private async aggregate(
+    type: 'ACCOUNT' | 'FLOW',
+    id: string,
+    currency: string,
+    opening: number,
+    storedBalance: number,
+    asOfEnd: Date | null,
+  ) {
+    let mv = await this.movements(type, id, currency);
+    if (asOfEnd) mv = mv.filter((m) => m.date <= asOfEnd);
+    let confirmedNet = 0;
+    let allNet = 0;
+    let pendingIn = 0;
+    let pendingOut = 0;
+    let last: Date | null = null;
+    for (const m of mv) {
+      const signed = m.direction === 'IN' ? m.amount : -m.amount;
+      allNet += signed;
+      if (m.confirmed) confirmedNet += signed;
+      else m.direction === 'IN' ? (pendingIn += m.amount) : (pendingOut += m.amount);
+      if (!last || m.date > last) last = m.date;
+    }
+    const liveBalance = opening + allNet;
+    const stored = asOfEnd ? liveBalance : storedBalance;
+    return {
+      confirmedBalance: opening + confirmedNet,
+      pendingIn,
+      pendingOut,
+      pendingNet: pendingIn - pendingOut,
+      storedBalance: stored,
+      drift: asOfEnd ? 0 : Math.round((storedBalance - liveBalance) * 100) / 100,
+      lastMovement: last ? last.toISOString() : null,
+    };
+  }
+
+  /** Barcha kassalar (Account + FlowAccount) — boyitilgan balans ro'yxati */
+  async list(params: {
+    type?: string;
+    branchId?: string;
+    active?: string;
+    kassaTuri?: string;
+    currency?: string;
+    mine?: string;
+    userId?: string;
+    asOf?: string;
+  }) {
+    const asOfEnd = params.asOf ? dayEnd(params.asOf) : null;
+    const mineOnly = params.mine === 'true';
     const out: any[] = [];
-    if (params.type !== 'FLOW') {
+
+    // Moliya kassa (Account) — filial/kassaTuri/egasi yo'q, doim SOM
+    const skipAccounts =
+      params.type === 'FLOW' ||
+      mineOnly ||
+      !!params.branchId ||
+      !!params.kassaTuri ||
+      (!!params.currency && params.currency !== 'SOM');
+    if (!skipAccounts) {
       const accs = await this.prisma.account.findMany({ orderBy: { name: 'asc' } });
       for (const a of accs) {
-        out.push({ id: a.id, type: 'ACCOUNT', name: a.name, currency: 'SOM', kassaTuri: null, branch: null, branchId: null, storedBalance: a.balance, active: true });
+        const agg = await this.aggregate('ACCOUNT', a.id, 'SOM', a.openingBalance ?? 0, a.balance, asOfEnd);
+        out.push({
+          id: a.id,
+          type: 'ACCOUNT',
+          name: a.name,
+          currency: 'SOM',
+          kassaTuri: null,
+          branch: null,
+          branchId: null,
+          userId: null,
+          active: true,
+          mine: false,
+          bankName: null,
+          cardNumber: null,
+          cardHolder: null,
+          cardType: null,
+          ...agg,
+        });
       }
     }
+
     if (params.type !== 'ACCOUNT') {
-      const flows = await this.prisma.flowAccount.findMany({ include: { branch: { select: { name: true } } }, orderBy: { name: 'asc' } });
+      const flows = await this.prisma.flowAccount.findMany({
+        include: { branch: { select: { name: true } } },
+        orderBy: { name: 'asc' },
+      });
       for (const f of flows) {
         if (params.branchId && f.branchId !== params.branchId) continue;
         if (params.active === 'true' && !f.active) continue;
         if (params.active === 'false' && f.active) continue;
-        out.push({ id: f.id, type: 'FLOW', name: f.name, currency: f.currency === 'USD' ? 'USD' : 'SOM', kassaTuri: f.kassaTuri, branch: f.branch?.name ?? null, branchId: f.branchId, storedBalance: f.balance, active: f.active });
+        if (params.kassaTuri && f.kassaTuri !== params.kassaTuri) continue;
+        const cur = f.currency === 'USD' ? 'USD' : 'SOM';
+        if (params.currency && cur !== params.currency) continue;
+        if (mineOnly && (!params.userId || f.userId !== params.userId)) continue;
+        const agg = await this.aggregate('FLOW', f.id, cur, f.openingBalance ?? 0, f.balance, asOfEnd);
+        out.push({
+          id: f.id,
+          type: 'FLOW',
+          name: f.name,
+          currency: cur,
+          kassaTuri: f.kassaTuri,
+          branch: f.branch?.name ?? null,
+          branchId: f.branchId,
+          userId: f.userId,
+          active: f.active,
+          mine: !!params.userId && f.userId === params.userId,
+          bankName: f.bankName ?? null,
+          cardNumber: f.cardNumber ?? null,
+          cardHolder: f.cardHolder ?? null,
+          cardType: f.cardType ?? null,
+          ...agg,
+        });
       }
     }
-    const totals = { somBalance: 0, usdBalance: 0, count: out.length };
-    for (const r of out) (r.currency === 'USD' ? (totals.usdBalance += r.storedBalance) : (totals.somBalance += r.storedBalance));
+
+    const totals = {
+      count: out.length,
+      somConfirmed: 0,
+      usdConfirmed: 0,
+      somPendingIn: 0,
+      somPendingOut: 0,
+      somPendingNet: 0,
+      usdPendingIn: 0,
+      usdPendingOut: 0,
+      usdPendingNet: 0,
+    };
+    for (const r of out) {
+      if (r.currency === 'USD') {
+        totals.usdConfirmed += r.confirmedBalance;
+        totals.usdPendingIn += r.pendingIn;
+        totals.usdPendingOut += r.pendingOut;
+        totals.usdPendingNet += r.pendingNet;
+      } else {
+        totals.somConfirmed += r.confirmedBalance;
+        totals.somPendingIn += r.pendingIn;
+        totals.somPendingOut += r.pendingOut;
+        totals.somPendingNet += r.pendingNet;
+      }
+    }
     return { registers: out, totals };
   }
 

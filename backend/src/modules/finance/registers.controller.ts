@@ -4,6 +4,7 @@ import { RegistersService } from './registers.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('registers')
 @ApiBearerAuth()
@@ -14,8 +15,26 @@ export class RegistersController {
 
   @Get()
   @Permissions('finance.view')
-  list(@Query('type') type?: string, @Query('branchId') branchId?: string, @Query('active') active?: string) {
-    return this.service.list({ type, branchId, active });
+  list(
+    @CurrentUser() user: any,
+    @Query('type') type?: string,
+    @Query('branchId') branchId?: string,
+    @Query('active') active?: string,
+    @Query('kassaTuri') kassaTuri?: string,
+    @Query('currency') currency?: string,
+    @Query('mine') mine?: string,
+    @Query('asOf') asOf?: string,
+  ) {
+    return this.service.list({
+      type,
+      branchId,
+      active,
+      kassaTuri,
+      currency,
+      mine,
+      asOf,
+      userId: user?.id,
+    });
   }
 
   @Get(':type/:id/detail')

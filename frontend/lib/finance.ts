@@ -44,6 +44,8 @@ export const financeApi = {
   accounts: () => api.get<Account[]>('/finance/accounts').then((r) => r.data),
   createAccount: (data: { name: string; balance?: number }) =>
     api.post('/finance/accounts', data).then((r) => r.data),
+  updateAccount: (id: string, data: { name?: string; openingBalance?: number }) =>
+    api.patch(`/finance/accounts/${id}`, data).then((r) => r.data),
   deleteAccount: (id: string) =>
     api.delete(`/finance/accounts/${id}`).then((r) => r.data),
   deleteTransaction: (id: string) =>

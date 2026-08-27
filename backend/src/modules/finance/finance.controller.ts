@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -11,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FinanceService } from './finance.service';
 import { CreateAccountDto } from './dto/create-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { TransferDto } from './dto/transfer.dto';
@@ -36,6 +38,12 @@ export class FinanceController {
   @Permissions('finance.create')
   createAccount(@Body() dto: CreateAccountDto) {
     return this.service.createAccount(dto);
+  }
+
+  @Patch('accounts/:id')
+  @Permissions('finance.create')
+  updateAccount(@Param('id') id: string, @Body() dto: UpdateAccountDto) {
+    return this.service.updateAccount(id, dto);
   }
 
   @Delete('accounts/:id')

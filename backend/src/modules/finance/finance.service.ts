@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { TransferDto } from './dto/transfer.dto';
@@ -24,6 +25,22 @@ export class FinanceService {
     return this.prisma.account.create({
       data: { name: dto.name, balance: opening, openingBalance: opening },
     });
+  }
+
+  // ===== Moliya kassa tahrirlash (nom + boshlang'ich qoldiq) =====
+  async updateAccount(id: string, dto: UpdateAccountDto) {
+    const acc = await this.prisma.account.findUnique({ where: { id } });
+    if (!acc) throw new NotFoundException('Kassa topilmadi');
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.openingBalance !== undefined) {
+      // balance = openingBalance + Σ(harakatlar); harakatlar o'zgarmaydi, shuning uchun
+      // balansni ham xuddi shu farqqa suramiz.
+      const delta = dto.openingBalance - (acc.openingBalance ?? 0);
+      data.openingBalance = dto.openingBalance;
+      data.balance = acc.balance + delta;
+    }
+    return this.prisma.account.update({ where: { id }, data });
   }
 
   // ===== Moliya kassa o'chirish (himoyalangan) =====
