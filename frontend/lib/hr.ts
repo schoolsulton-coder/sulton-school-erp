@@ -233,6 +233,8 @@ export const SHARTNOMA_HOLATLARI: { label: string; value: string }[] = [
 export const BANDLIK_TURLARI = ["To'liq stavka", 'Yarim stavka', '0.25 stavka', "O'rindoshlik"];
 export const HISOB_KITOB_TURLARI = ['Kunbay', 'Soatbay', 'Ishbay', 'KPI'];
 export const SOLIQ_KIM = ['Ishchi', 'Ish beruvchi'];
+// Xodim shaxsiy hujjat turlari (preset — yozib ham qo'shsa bo'ladi)
+export const XODIM_DOC_TYPES = ['Pasport', 'Diplom', 'IELTS', 'TOEFL', 'TESOL', 'CELTA', 'C1', 'B2', 'Rezyume', 'Narkologik', 'Ruhiy', 'Sudlanmaganlik', 'Tibbiy ma\'lumotnoma', 'Boshqa'];
 export const SHARTNOMA_TILLARI = ["O'zbekcha", 'Ruscha', 'Inglizcha'];
 
 export interface LavozimKelishuv {
@@ -331,6 +333,8 @@ export const hrApi = {
     api.patch(`/hr/employees/${id}/terminate`, { fireDate }).then((r) => r.data),
   addDocument: (id: string, data: { type: string; fileName: string; filePath: string }) =>
     api.post(`/hr/employees/${id}/documents`, data).then((r) => r.data),
+  deleteDocument: (docId: string) =>
+    api.delete(`/hr/employees/documents/${docId}`).then((r) => r.data),
 
   departments: () => api.get<Department[]>('/hr/departments').then((r) => r.data),
   createDepartment: (name: string) =>

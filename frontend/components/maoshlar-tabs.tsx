@@ -8,6 +8,7 @@ import { ShartnomaModal } from '@/components/shartnoma-form';
 import { TolovModal } from '@/components/tolov-form';
 import { XodimModal, LavozimModal } from '@/components/xodim-lavozim-forms';
 import { LavozimDetailPanel } from '@/components/lavozim-detail';
+import { XodimDetailPanel } from '@/components/xodim-detail';
 import { hrApi, GENDER_LABEL, SALARY_LABEL, EMP_STATUS, CONTRACT_STATUS, type XodimRow, type LavozimRow, type ShartnomaRow, type TolovRow, type SalaryType } from '@/lib/hr';
 
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
@@ -38,6 +39,7 @@ export function XodimlarTab() {
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data, isLoading } = useQuery({ queryKey: ['xodimlar', search, branchId], queryFn: () => hrApi.xodimlar({ search: search || undefined, branchId: branchId || undefined }) });
   const t = data?.totals;
@@ -78,7 +80,7 @@ export function XodimlarTab() {
               {isLoading ? (
                 <tr><td colSpan={5} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
               ) : rows.length ? rows.map((e: XodimRow) => (
-                <tr key={e.id} className="border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
+                <tr key={e.id} onClick={() => setDetailId(e.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">{initials(e.fio)}</div>
@@ -95,6 +97,7 @@ export function XodimlarTab() {
           </table>
         </div>
       </div>
+      {detailId && <XodimDetailPanel employeeId={detailId} onClose={() => setDetailId(null)} />}
     </>
   );
 }

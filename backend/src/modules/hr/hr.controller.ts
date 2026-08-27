@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -222,5 +223,11 @@ export class HrController {
   @Permissions('hr.update')
   addDocument(@Param('id') id: string, @Body() dto: AddDocumentDto) {
     return this.service.addDocument(id, dto);
+  }
+
+  @Delete('employees/documents/:docId')
+  @Permissions('hr.update')
+  deleteDocument(@Param('docId') docId: string) {
+    return this.service.deleteDocument(docId);
   }
 }

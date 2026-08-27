@@ -756,7 +756,8 @@ export class HrService {
         department: true,
         position: true,
         salary: true,
-        documents: true,
+        documents: { orderBy: { createdAt: 'desc' } },
+        branchLinks: { include: { branch: { select: { name: true } } } },
         payrollItems: {
           include: { payrollRun: true },
           orderBy: { id: 'desc' },
@@ -766,6 +767,11 @@ export class HrService {
     });
     if (!emp) throw new NotFoundException('Xodim topilmadi');
     return emp;
+  }
+
+  async deleteDocument(docId: string) {
+    await this.prisma.employeeDocument.delete({ where: { id: docId } });
+    return { ok: true };
   }
 
   /** Ishga qabul: login + xodim + stavka (bitta tranzaksiyada) */
