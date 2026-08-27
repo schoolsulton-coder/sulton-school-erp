@@ -138,7 +138,7 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
   };
 
   const setField = (id: string, key: string, value: string, isNum = true) => {
-    const v = isNum ? (value === '' ? 0 : Number(value) || 0) : value;
+    const v = isNum ? Number(String(value).replace(/[^\d]/g, '')) || 0 : value;
     setLocal((p) => ({ ...p, [id]: { ...p[id], [key]: v } }));
     clearTimeout(timers.current[id]);
     timers.current[id] = setTimeout(() => doSave(id), 900);
@@ -189,25 +189,26 @@ function OylikFillGrid({ rows, isLoading, onSaved }: { rows: OylikRow[]; isLoadi
                   <td className="border-b border-l border-slate-50 px-2 py-2.5 text-right text-slate-500">{stavka}</td>
                   <td className="border-b border-l border-slate-50 px-2 py-2.5 text-right text-slate-500">{isHourly ? '—' : numFmt(row.kunlik ?? r.kunlik)}</td>
                   {NUM_COLS.map((c) => (
-                    <td key={c.key} className="border-b border-l border-slate-50 px-1 py-1.5 text-right align-middle">
+                    <td key={c.key} className="border-b border-l border-slate-50 px-1.5 py-2.5 text-right align-middle">
                       {c.hourly && !isHourly ? (
                         <span className="text-slate-300">—</span>
                       ) : (
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           data-cell={`${i}-${c.key}`}
-                          value={row[c.key] ?? 0}
+                          value={numFmt(row[c.key] ?? 0)}
                           onChange={(e) => setField(r.id, c.key, e.target.value)}
                           onKeyDown={(e) => onKey(e, i, c.key)}
                           onFocus={(e) => e.target.select()}
-                          className="w-20 rounded border border-transparent px-2 py-1.5 text-right outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5"
+                          className="w-24 rounded-lg border border-slate-100 bg-slate-50/40 px-2.5 py-2 text-right text-slate-700 outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5"
                         />
                       )}
                     </td>
                   ))}
-                  <td className="border-b border-l border-slate-50 px-1 py-1.5 align-middle">
+                  <td className="border-b border-l border-slate-50 px-1.5 py-2.5 align-middle">
                     <input value={row.note ?? ''} onChange={(e) => setField(r.id, 'note', e.target.value, false)} placeholder="—"
-                      className="w-32 rounded border border-transparent px-2 py-1.5 outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5" />
+                      className="w-36 rounded-lg border border-slate-100 bg-slate-50/40 px-2.5 py-2 outline-none hover:border-slate-200 focus:border-brand focus:bg-brand/5" />
                   </td>
                   <td className="border-b border-l border-slate-50 px-3 py-2.5 text-right font-semibold text-slate-800">{numFmt(row.jami)}</td>
                   <td className="border-b border-l border-slate-50 px-3 py-2.5 text-right font-medium text-emerald-600">{numFmt(row.naqd)}</td>
