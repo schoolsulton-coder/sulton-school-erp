@@ -16,6 +16,12 @@ const UZ_MONTHS = [
 ];
 const monthLabel = (d: Date) => `${UZ_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 
+/** Naqd/nal to'lov — tasdiq talab qilmaydi (avtomat tasdiqlangan) */
+const isCash = (m?: string | null) => {
+  const s = (m ?? '').toLowerCase();
+  return s.includes('naqd') || s.includes('nal');
+};
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -224,6 +230,7 @@ export class PaymentsService {
     if (!studentId)
       throw new BadRequestException('studentId yoki contractId kerak');
 
+    const paidAt = dto.paidAt ? new Date(dto.paidAt) : new Date();
     const payment = await this.prisma.$transaction(
       async (tx) => {
         const created = await tx.payment.create({
@@ -236,9 +243,10 @@ export class PaymentsService {
             type: dto.type || null,
             cardLast4: dto.cardLast4 || null,
             isRefund: dto.isRefund ?? false,
-            paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+            paidAt,
             note: dto.note || null,
-            confirmedAt: null, // to'lov tasdiqlanmagan holatda boshlanadi
+            // Naqd — avtomat tasdiqlangan; bank/karta — tasdiq kutadi
+            confirmedAt: isCash(dto.method) ? paidAt : null,
             createdById: userId ?? null,
             updatedById: userId ?? null,
           },
@@ -280,7 +288,8 @@ export class PaymentsService {
       async (tx) => {
         const old = await tx.payment.findUnique({ where: { id } });
         if (!old) throw new NotFoundException('To‘lov topilmadi');
-        if (old.confirmedAt) {
+        // Naqd avtomat tasdiqlangan bo'lsa ham tahrirlanadi; faqat bank/karta tasdiqi qulflaydi
+        if (old.confirmedAt && !isCash(old.method)) {
           throw new BadRequestException(
             'Tasdiqlangan to‘lovni tahrirlab bo‘lmaydi. Avval tasdiqni bekor qiling.',
           );
@@ -297,17 +306,21 @@ export class PaymentsService {
         const newAccountId =
           dto.accountId !== undefined ? dto.accountId || null : old.accountId;
 
+        const newMethod = dto.method ?? old.method;
+        const newPaidAt = dto.paidAt ? new Date(dto.paidAt) : old.paidAt;
         const updated = await tx.payment.update({
           where: { id },
           data: {
             amount: dto.amount ?? old.amount,
-            method: dto.method ?? old.method,
+            method: newMethod,
             type: dto.type !== undefined ? dto.type || null : old.type,
             accountId: newAccountId,
             cardLast4: dto.cardLast4 !== undefined ? dto.cardLast4 || null : old.cardLast4,
             note: dto.note !== undefined ? dto.note || null : old.note,
             isRefund: dto.isRefund ?? old.isRefund,
-            paidAt: dto.paidAt ? new Date(dto.paidAt) : old.paidAt,
+            paidAt: newPaidAt,
+            // Naqd → tasdiqlangan; bank/karta → tasdiq kutadi (yangi/o'zgargan holatda)
+            confirmedAt: isCash(newMethod) ? newPaidAt : null,
             updatedById: userId ?? null,
             updateCount: { increment: 1 },
           },
@@ -353,7 +366,8 @@ export class PaymentsService {
       async (tx) => {
         const p = await tx.payment.findUnique({ where: { id } });
         if (!p) throw new NotFoundException('To‘lov topilmadi');
-        if (p.confirmedAt) {
+        // Naqd o'chirilaveradi; faqat tasdiqlangan bank/karta qulflaydi
+        if (p.confirmedAt && !isCash(p.method)) {
           throw new BadRequestException(
             'Tasdiqlangan to‘lovni o‘chirib bo‘lmaydi. Avval tasdiqni bekor qiling.',
           );

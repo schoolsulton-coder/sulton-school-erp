@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { login, password });
-      setAuth(data.accessToken, data.user);
+      setAuth(data.accessToken, data.user, data.refreshToken ?? null);
       const portalRoles = ['student', 'guardian'];
       router.push(portalRoles.includes(data.user.role) ? '/portal' : '/crm');
     } catch {

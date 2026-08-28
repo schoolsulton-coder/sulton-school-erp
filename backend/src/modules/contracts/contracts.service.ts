@@ -359,6 +359,8 @@ export class ContractsService {
   async addPayment(id: string, dto: CreatePaymentDto) {
     const contract = await this.findOne(id);
 
+    const paidAt = dto.paidAt ? new Date(dto.paidAt) : new Date();
+    const cash = /naqd|nal/i.test(dto.method || '');
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
@@ -367,7 +369,9 @@ export class ContractsService {
           accountId: dto.accountId || null,
           amount: dto.amount,
           method: dto.method,
-          paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+          paidAt,
+          // Naqd — avtomat tasdiqlangan; bank/karta — tasdiq kutadi
+          confirmedAt: cash ? paidAt : null,
           note: dto.note,
         },
       });

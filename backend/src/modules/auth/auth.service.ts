@@ -31,39 +31,56 @@ export class AuthService {
     return user;
   }
 
+  private async signAccess(user: { id: string; role: { slug: string }; permissions: string[] }) {
+    return this.jwt.signAsync(
+      { sub: user.id, role: user.role.slug, permissions: user.permissions },
+      { secret: process.env.JWT_ACCESS_SECRET, expiresIn: process.env.JWT_ACCESS_TTL ?? '1h' },
+    );
+  }
+
+  private userView(user: any, permissions: string[]) {
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      phone: user.phone,
+      email: user.email,
+      role: user.role.slug,
+      permissions,
+    };
+  }
+
   async login(dto: LoginDto) {
     const user = await this.validateUser(dto.login, dto.password);
     const permissions = user.role.permissions.map((rp) => rp.permission.slug);
 
-    const payload = {
-      sub: user.id,
-      role: user.role.slug,
-      permissions,
-    };
-
-    const accessToken = await this.jwt.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_SECRET,
-      expiresIn: process.env.JWT_ACCESS_TTL ?? '15m',
-    });
+    const accessToken = await this.signAccess({ id: user.id, role: user.role, permissions });
     const refreshToken = await this.jwt.signAsync(
       { sub: user.id },
-      {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: process.env.JWT_REFRESH_TTL ?? '7d',
-      },
+      { secret: process.env.JWT_REFRESH_SECRET, expiresIn: process.env.JWT_REFRESH_TTL ?? '30d' },
     );
 
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        phone: user.phone,
-        email: user.email,
-        role: user.role.slug,
-        permissions,
-      },
-    };
+    return { accessToken, refreshToken, user: this.userView(user, permissions) };
+  }
+
+  // Refresh token orqali yangi access token (foydalanuvchi doim qaytadan yuklanadi —
+  // rol/ruxsatlar yangilanadi). Stateless: bir nechta qurilma bir vaqtda kira oladi.
+  async refresh(refreshToken: string) {
+    if (!refreshToken) throw new UnauthorizedException('Refresh token yo‘q');
+    let payload: { sub: string };
+    try {
+      payload = await this.jwt.verifyAsync(refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
+    } catch {
+      throw new UnauthorizedException('Sessiya muddati tugagan');
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { role: { include: { permissions: { include: { permission: true } } } } },
+    });
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Foydalanuvchi faol emas');
+    }
+    const permissions = user.role.permissions.map((rp) => rp.permission.slug);
+    const accessToken = await this.signAccess({ id: user.id, role: user.role, permissions });
+    return { accessToken, user: this.userView(user, permissions) };
   }
 }
