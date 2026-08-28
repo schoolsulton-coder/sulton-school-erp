@@ -37,6 +37,10 @@ export const PLACEHOLDERS: PlaceholderDef[] = [
   { key: 'oylik_tolov', label: "Oylik to'lov", sample: "1 500 000 so'm", group: "To'lov" },
   { key: 'yillik_tolov', label: "Yillik (jami) to'lov", sample: "13 500 000 so'm", group: "To'lov" },
   { key: 'jami_summa', label: 'Jami summa', sample: "13 500 000 so'm", group: "To'lov" },
+  // So'z (matn) ko'rinishidagi summalar
+  { key: 'oylik_tolov_matn', label: "Oylik to'lov (so'z bilan)", sample: "bir million besh yuz ming so'm", group: "To'lov" },
+  { key: 'yillik_tolov_matn', label: "Yillik to'lov (so'z bilan)", sample: "o'n uch million besh yuz ming so'm", group: "To'lov" },
+  { key: 'jami_summa_matn', label: "Jami summa (so'z bilan)", sample: "o'n uch million besh yuz ming so'm", group: "To'lov" },
   { key: 'oylar_soni', label: 'Oylar soni', sample: '9', group: "To'lov" },
   { key: 'tolov_jadvali', label: "To'lov jadvali (jadval)", sample: '[jadval]', group: "To'lov" },
   // Boshqa
@@ -53,6 +57,46 @@ const UZ_MONTHS = [
 
 const money = (n: number) =>
   new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0)) + " so'm";
+
+// ===== Raqamni o'zbekcha so'z ko'rinishiga o'girish =====
+const UZ_ONES = ['', 'bir', 'ikki', 'uch', "to'rt", 'besh', 'olti', 'yetti', 'sakkiz', "to'qqiz"];
+const UZ_TENS = ['', "o'n", 'yigirma', "o'ttiz", 'qirq', 'ellik', 'oltmish', 'yetmish', 'sakson', "to'qson"];
+const UZ_SCALES = ['', 'ming', 'million', 'milliard', 'trillion'];
+
+/** 0..999 → so'z */
+function uzThree(n: number): string {
+  const parts: string[] = [];
+  const h = Math.floor(n / 100);
+  const t = Math.floor((n % 100) / 10);
+  const o = n % 10;
+  if (h) parts.push(h === 1 ? 'yuz' : `${UZ_ONES[h]} yuz`);
+  if (t) parts.push(UZ_TENS[t]);
+  if (o) parts.push(UZ_ONES[o]);
+  return parts.join(' ');
+}
+
+/** Butun sonni o'zbekcha so'zga o'giradi (masalan 20999990 → "yigirma million ...") */
+export function numToUzWords(num: number): string {
+  let n = Math.round(Math.abs(num || 0));
+  if (n === 0) return 'nol';
+  const groups: number[] = [];
+  while (n > 0) {
+    groups.push(n % 1000);
+    n = Math.floor(n / 1000);
+  }
+  const out: string[] = [];
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const g = groups[i];
+    if (!g) continue;
+    let w = uzThree(g);
+    if (i === 1 && g === 1) w = ''; // 1000 = "ming" ("bir ming" emas)
+    out.push((w ? `${w} ` : '') + UZ_SCALES[i]);
+  }
+  return out.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Summani so'z + "so'm" ko'rinishida */
+const moneyWords = (n: number) => `${numToUzWords(n)} so'm`;
 
 /** Toshkent vaqti bo'yicha yil/oy/kun (off-by-one bo'lmasin) */
 function tashkentParts(d: Date): { y: string; m: string; day: string } {
@@ -132,6 +176,9 @@ export function buildTokens(c: any): Record<string, string> {
     oylik_tolov: money(c.monthlyAmount ?? 0),
     yillik_tolov: money(totalSum),
     jami_summa: money(totalSum),
+    oylik_tolov_matn: moneyWords(c.monthlyAmount ?? 0),
+    yillik_tolov_matn: moneyWords(totalSum),
+    jami_summa_matn: moneyWords(totalSum),
     oylar_soni: String(months),
     tolov_jadvali: jadval,
     bugungi_sana: fmtDate(today()),
