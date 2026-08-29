@@ -50,6 +50,16 @@ export default function ContractTemplatesPage() {
     onError: (e: any) => alert(e?.response?.data?.message ?? 'Xatolik'),
   });
 
+  // Kadrlar uchun tayyor namunalar (buyruq + mehnat shartnomasi)
+  const createSamples = useMutation({
+    mutationFn: () => contractTemplatesApi.createHrSamples(),
+    onSuccess: (r: { count: number }) => {
+      refresh();
+      alert(r.count ? `${r.count} ta namuna shablon qo'shildi` : 'Namunalar allaqachon mavjud');
+    },
+    onError: (e: any) => alert(e?.response?.data?.message ?? 'Xatolik'),
+  });
+
   const del = useMutation({
     mutationFn: (id: string) => contractTemplatesApi.remove(id),
     onSuccess: refresh,
@@ -110,6 +120,16 @@ export default function ContractTemplatesPage() {
           >
             <Plus size={16} /> Bo'sh shablon
           </button>
+          {isHr && (
+            <button
+              onClick={() => createSamples.mutate()}
+              disabled={createSamples.isPending}
+              title="Buyruq va mehnat shartnomasi — maydonlari ulangan tayyor namunalar"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 text-sm font-medium text-brand hover:bg-brand/10 disabled:opacity-50 sm:col-start-2"
+            >
+              {createSamples.isPending ? <Loader2 size={15} className="animate-spin" /> : <FileText size={16} />} Namuna shablonlar
+            </button>
+          )}
         </div>
       )}
 
@@ -118,7 +138,11 @@ export default function ContractTemplatesPage() {
       ) : !list?.length ? (
         <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 text-slate-400">
           <FileText size={28} />
-          <span>Hali shablon yo'q. DOCX yuklang yoki bo'sh shablon yarating.</span>
+          <span>
+            {isHr
+              ? "Hali shablon yo'q. «Namuna shablonlar» tugmasini bosing yoki o'z DOCX faylingizni yuklang."
+              : "Hali shablon yo'q. DOCX yuklang yoki bo'sh shablon yarating."}
+          </span>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">

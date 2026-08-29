@@ -56,6 +56,12 @@ export class ContractTemplatesController {
     return this.service.uploadDocx(name, file, kind);
   }
 
+  @Post('hr-samples')
+  @Permissions('contracts.create')
+  createHrSamples() {
+    return this.service.createHrSamples();
+  }
+
   @Post()
   @Permissions('contracts.create')
   create(@Body() body: { name: string; html: string; kind?: string }) {

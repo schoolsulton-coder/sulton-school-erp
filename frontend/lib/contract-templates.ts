@@ -25,6 +25,9 @@ export const contractTemplatesApi = {
   list: (kind?: TemplateKind) =>
     api.get<TemplateListItem[]>('/contract-templates', { params: { kind } }).then((r) => r.data),
   get: (id: string) => api.get<Template>(`/contract-templates/${id}`).then((r) => r.data),
+  /** Kadrlar uchun tayyor namunalar (buyruq + mehnat shartnomasi) */
+  createHrSamples: () =>
+    api.post<{ created: { id: string; name: string }[]; count: number }>('/contract-templates/hr-samples').then((r) => r.data),
   create: (data: { name: string; html: string; kind?: TemplateKind }) =>
     api.post<Template>('/contract-templates', data).then((r) => r.data),
   update: (id: string, data: { name?: string; html?: string }) =>

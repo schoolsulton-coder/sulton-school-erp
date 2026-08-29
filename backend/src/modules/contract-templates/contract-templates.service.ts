@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PdfService } from '../../common/pdf/pdf.service';
 import { buildTokens, fillPlaceholders, PLACEHOLDERS } from './tokens';
 import { buildHrTokens, HR_PLACEHOLDERS } from './hr-tokens';
+import { HR_SAMPLE_TEMPLATES } from './hr-sample-templates';
 
 export interface UploadedDocx {
   buffer: Buffer;
@@ -72,6 +73,23 @@ export class ContractTemplatesService {
     return this.prisma.contractTemplate.create({
       data: { name, html: data.html ?? '', kind: data.kind === 'HR' ? 'HR' : 'STUDENT' },
     });
+  }
+
+  /** Tayyor kadrlar namunalari (buyruq + mehnat shartnomasi) — mavjudi qayta yaratilmaydi */
+  async createHrSamples() {
+    const created: { id: string; name: string }[] = [];
+    for (const t of HR_SAMPLE_TEMPLATES) {
+      const exists = await this.prisma.contractTemplate.findFirst({
+        where: { kind: 'HR', name: t.name },
+        select: { id: true },
+      });
+      if (exists) continue;
+      const row = await this.prisma.contractTemplate.create({
+        data: { name: t.name, html: t.html, kind: 'HR' },
+      });
+      created.push({ id: row.id, name: row.name });
+    }
+    return { created, count: created.length };
   }
 
   async uploadDocx(name: string | undefined, file?: UploadedDocx, kind?: string) {
