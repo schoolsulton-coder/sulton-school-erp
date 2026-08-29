@@ -28,12 +28,13 @@ export function EntriesTable({ rows, isInvestor, loading, onRow }: { rows: Entry
               <th className="px-5 py-3">{isInvestor ? 'Investor' : 'Oldi-berdichi'}</th>
               <th className="px-5 py-3">{isInvestor ? 'Investitsiya turi / Izoh' : 'Sabab / Izoh'}</th>
               <th className="px-5 py-3">Filial / Hisob</th>
+              <th className="px-5 py-3">Holat</th>
               <th className="px-5 py-3 text-right">Summa</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
+              <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
             ) : rows.length ? (
               rows.map((e) => (
                 <tr key={e.id} onClick={() => onRow?.(e.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
@@ -66,13 +67,18 @@ export function EntriesTable({ rows, isInvestor, loading, onRow }: { rows: Entry
                     <div className="text-slate-600">{e.branch ?? '—'}</div>
                     {e.hisob && <div className="text-xs text-slate-400">{e.hisob}</div>}
                   </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium ${e.confirmed ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                      {e.confirmed ? 'Tasdiqlangan' : 'Tasdiqlanmagan'}
+                    </span>
+                  </td>
                   <td className={`whitespace-nowrap px-5 py-3.5 text-right font-semibold ${e.direction === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {signed(e.direction, e.amount)}
                   </td>
                 </tr>
               ))
             ) : (
-              <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">Yozuv yo&apos;q</td></tr>
+              <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">Yozuv yo&apos;q</td></tr>
             )}
           </tbody>
         </table>

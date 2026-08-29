@@ -57,11 +57,15 @@ const DelBtn = ({ onClick }: { onClick: () => void }) => (
 
 /* ===== Yozuv detali (Oldi-berdi / Investitsiya) ===== */
 export function EntryDetailPanel({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+  const qc = useQueryClient();
   const { data: d } = useQuery({ queryKey: ['entry-detail', id], queryFn: () => counterpartiesApi.entryDetail(id) });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['entry-detail', id] }); onChanged(); };
   const del = useMutation({
     mutationFn: () => counterpartiesApi.removeEntry(id),
     onSuccess: () => { onChanged(); onClose(); },
   });
+  const confirmed = !!d?.confirmedAt;
+  const conf = useMutation({ mutationFn: () => counterpartiesApi.confirmEntry(id, !confirmed), onSuccess: refresh });
   const isInv = !!d?.counterparty.isInvestor;
 
   return (
@@ -69,7 +73,16 @@ export function EntryDetailPanel({ id, onClose, onChanged }: { id: string; onClo
       title={d?.title ?? '...'}
       badge={d && <DirBadge dir={d.direction} />}
       sub={d ? `ID: ${d.id}` : undefined}
-      actions={<DelBtn onClick={() => { if (confirm("Yozuv o'chirilsinmi? Hisob balansi qaytariladi.")) del.mutate(); }} />}
+      actions={
+        <>
+          {d && !d.isTransfer && (
+            <button onClick={() => conf.mutate()} disabled={conf.isPending} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${confirmed ? 'border-amber-200 text-amber-600 hover:bg-amber-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}>
+              {confirmed ? <><XCircle size={14} /> Tasdiqni bekor qilish</> : <><CheckCircle2 size={14} /> Tasdiqlash</>}
+            </button>
+          )}
+          <DelBtn onClick={() => { if (confirm("Yozuv o'chirilsinmi? Tasdiqlangan bo'lsa hisob balansi qaytariladi.")) del.mutate(); }} />
+        </>
+      }
       onClose={onClose}
     >
       {d && (
@@ -102,6 +115,12 @@ export function EntryDetailPanel({ id, onClose, onChanged }: { id: string; onClo
             {d.capex != null && d.capex > 0 && <Field label="Capex" value={som(d.capex)} />}
             {d.operation != null && d.operation > 0 && <Field label="Operation" value={som(d.operation)} />}
             <Field label="Izoh" value={d.note} />
+            <Field
+              label="Tasdiq"
+              value={confirmed
+                ? <span className="text-emerald-600">Tasdiqlandi{d.confirmedBy ? ` · ${d.confirmedBy}` : ''}</span>
+                : <span className="text-amber-600">Tasdiqlanmagan — kassaga hali tushmagan</span>}
+            />
           </div>
           <div className="mt-3 rounded-xl border border-slate-200 px-4">
             <Field label="Yaratildi" value={`${fmtDT(d.createdAt)}${d.createdBy ? ` · ${d.createdBy}` : ''}`} />

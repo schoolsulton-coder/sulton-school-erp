@@ -112,6 +112,16 @@ export class CounterpartiesController {
     return this.service.transfer(dto, userId);
   }
 
+  @Post('entries/:id/confirm')
+  @Permissions('finance.create')
+  confirmEntry(
+    @Param('id') id: string,
+    @Body('confirm') confirm: boolean | undefined,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.confirmEntry(id, userId, confirm !== false);
+  }
+
   @Post('transfers/:pairId/confirm')
   @Permissions('finance.create')
   confirmTransfer(

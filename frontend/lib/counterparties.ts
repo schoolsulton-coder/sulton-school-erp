@@ -119,6 +119,7 @@ export interface EntryRow {
   periodMonth: number | null;
   academicYear: string | null;
   amount: number;
+  confirmed: boolean;
 }
 export interface EntriesResp {
   totals: { count: number; kirim: number; chiqim: number; balans: number };
@@ -148,6 +149,7 @@ export interface EntryDetail {
   kassaTuri: string | null; somHisob: string | null; dollarKassaTuri: string | null; dollarHisob: string | null;
   investType: string | null; academicYear: string | null; periodYear: number | null; periodMonth: number | null;
   capex: number | null; operation: number | null;
+  isTransfer: boolean; confirmedAt: string | null; confirmedBy: string | null;
   createdAt: string; updatedAt: string; createdBy: string | null; updatedBy: string | null;
 }
 export interface TransferDetail {
@@ -175,6 +177,8 @@ export const counterpartiesApi = {
     api.get<CounterpartyList>('/counterparties', { params }).then((r) => r.data),
   entryDetail: (id: string) => api.get<EntryDetail>(`/counterparties/entries/${id}`).then((r) => r.data),
   transferDetail: (pairId: string) => api.get<TransferDetail>(`/counterparties/transfers/${pairId}`).then((r) => r.data),
+  confirmEntry: (id: string, confirm: boolean) =>
+    api.post(`/counterparties/entries/${id}/confirm`, { confirm }).then((r) => r.data),
   confirmTransfer: (pairId: string, confirm: boolean) =>
     api.post(`/counterparties/transfers/${pairId}/confirm`, { confirm }).then((r) => r.data),
   removeEntry: (id: string) => api.delete(`/counterparties/entries/${id}`).then((r) => r.data),

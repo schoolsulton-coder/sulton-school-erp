@@ -282,6 +282,9 @@ export function NewTransactionModal({ onClose, onSaved }: { onClose: () => void;
             {som(total)}
           </span>{' '}
           <span className="text-xs text-slate-400">({direction === 'IN' ? 'bizga kirdi' : 'bizdan chiqdi'})</span>
+          <div className="mt-1 text-xs text-amber-600">
+            Yozuv tasdiqlanmagan holda saqlanadi — kassa balansiga tasdiqlangandan keyin tushadi.
+          </div>
         </div>
 
         <div>

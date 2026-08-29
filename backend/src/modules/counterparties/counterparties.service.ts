@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCounterpartyDto } from './dto/create-counterparty.dto';
@@ -130,6 +131,7 @@ export class CounterpartiesService {
       periodMonth: e.periodMonth,
       academicYear: e.academicYear,
       amount: e.amount,
+      confirmed: e.confirmedAt != null,
     }));
 
     const kirim = data.filter((d) => d.direction === 'IN').reduce((s, d) => s + d.amount, 0);
@@ -260,8 +262,6 @@ export class CounterpartiesService {
     const amount = som + usd * rate; // so'm ekvivalenti
     if (amount <= 0) throw new BadRequestException("Summa noto'g'ri");
 
-    const sign = dto.direction === 'IN' ? 1 : -1; // IN = hisobga kirim (+), OUT = chiqim (−)
-
     return this.prisma.$transaction(async (tx) => {
       const entry = await tx.counterpartyEntry.create({
         data: {
@@ -290,19 +290,8 @@ export class CounterpartiesService {
           updatedById: userId || null,
         },
       });
-      // Tashqi hisob balansini yangilash (so'm hisob so'mda, dollar hisob dollarda)
-      if (dto.somFlowAccountId && som) {
-        await tx.flowAccount.update({
-          where: { id: dto.somFlowAccountId },
-          data: { balance: { increment: sign * som } },
-        });
-      }
-      if (dto.dollarFlowAccountId && usd) {
-        await tx.flowAccount.update({
-          where: { id: dto.dollarFlowAccountId },
-          data: { balance: { increment: sign * usd } },
-        });
-      }
+      // Balans bu yerda o'zgarmaydi — yozuv tasdiqlanmagan holda tushadi.
+      // Pul kassaga faqat tasdiqlangandan keyin kiradi (confirmEntry).
       return entry;
     });
   }
@@ -382,7 +371,9 @@ export class CounterpartiesService {
     return this.prisma.$transaction(async (tx) => {
       // Yozuvlarni tranzaksiya ichida o'qiymiz (poyga bo'lmasin)
       const entries = await tx.counterpartyEntry.findMany({ where: { counterpartyId: id } });
-      const reverse = (e: { direction: string; somFlowAccountId: string | null; somAmount: number | null; dollarFlowAccountId: string | null; dollarAmount: number | null }) => {
+      const reverse = (e: { direction: string; confirmedAt: Date | null; transferPairId: string | null; somFlowAccountId: string | null; somAmount: number | null; dollarFlowAccountId: string | null; dollarAmount: number | null }) => {
+        // Tasdiqlanmagan oddiy yozuv balansga tushmagan — qaytarish ham shart emas
+        if (!e.confirmedAt && !e.transferPairId) return [];
         const sign = e.direction === 'IN' ? 1 : -1; // IN oshirgan → kamaytiramiz; OUT kamaytirgan → oshiramiz
         const ops: Promise<any>[] = [];
         if (e.somFlowAccountId && e.somAmount) ops.push(tx.flowAccount.update({ where: { id: e.somFlowAccountId }, data: { balance: { decrement: sign * e.somAmount } } }));
@@ -428,6 +419,7 @@ export class CounterpartiesService {
         dollarFlowAccount: { select: { name: true, kassaTuri: true, currency: true } },
         createdBy: { select: { fullName: true, email: true } },
         updatedBy: { select: { fullName: true, email: true } },
+        confirmedBy: { select: { fullName: true, email: true } },
       },
     });
     if (!e) throw new NotFoundException('Yozuv topilmadi');
@@ -455,6 +447,9 @@ export class CounterpartiesService {
       periodMonth: e.periodMonth,
       capex: e.capex,
       operation: e.operation,
+      isTransfer: e.transferPairId != null,
+      confirmedAt: e.confirmedAt,
+      confirmedBy: this.userLabel(e.confirmedBy),
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
       createdBy: this.userLabel(e.createdBy),
@@ -516,18 +511,64 @@ export class CounterpartiesService {
     return { ok: true };
   }
 
-  // Yozuvni o'chirish + hisob balansini qaytarish
+  /**
+   * Yozuvning kassaga ta'siri. factor = +1 (qo'llash), −1 (qaytarish).
+   * Faqat tasdiqlangan yozuv balansda turadi — tasdiqlanmagani «kutilmoqda» bo'lib qoladi.
+   */
+  private async applyEntryBalance(
+    tx: Prisma.TransactionClient,
+    e: {
+      direction: string;
+      somFlowAccountId: string | null;
+      somAmount: number | null;
+      dollarFlowAccountId: string | null;
+      dollarAmount: number | null;
+    },
+    factor: 1 | -1,
+  ) {
+    const sign = (e.direction === 'IN' ? 1 : -1) * factor;
+    if (e.somFlowAccountId && e.somAmount) {
+      await tx.flowAccount.update({
+        where: { id: e.somFlowAccountId },
+        data: { balance: { increment: sign * e.somAmount } },
+      });
+    }
+    if (e.dollarFlowAccountId && e.dollarAmount) {
+      await tx.flowAccount.update({
+        where: { id: e.dollarFlowAccountId },
+        data: { balance: { increment: sign * e.dollarAmount } },
+      });
+    }
+  }
+
+  // Yozuvni tasdiqlash / tasdiqni bekor qilish — pul kassaga shu paytda kiradi (yoki qaytadi)
+  async confirmEntry(id: string, userId: string | undefined, confirm: boolean) {
+    return this.prisma.$transaction(async (tx) => {
+      const e = await tx.counterpartyEntry.findUnique({ where: { id } });
+      if (!e) throw new NotFoundException('Yozuv topilmadi');
+      if (e.transferPairId) {
+        throw new BadRequestException('Transfer yozuvi — transfer panelidan tasdiqlanadi');
+      }
+      const already = e.confirmedAt != null;
+      if (confirm === already) return { ok: true }; // holat o'zgarmadi
+      await this.applyEntryBalance(tx, e, confirm ? 1 : -1);
+      await tx.counterpartyEntry.update({
+        where: { id },
+        data: confirm
+          ? { confirmedAt: new Date(), confirmedById: userId || null, updatedById: userId || null }
+          : { confirmedAt: null, confirmedById: null, updatedById: userId || null },
+      });
+      return { ok: true };
+    });
+  }
+
+  // Yozuvni o'chirish + (tasdiqlangan bo'lsa) hisob balansini qaytarish
   async removeEntry(id: string) {
-    const e = await this.prisma.counterpartyEntry.findUnique({ where: { id } });
-    if (!e) throw new NotFoundException('Yozuv topilmadi');
-    const sign = e.direction === 'IN' ? 1 : -1;
     await this.prisma.$transaction(async (tx) => {
-      if (e.somFlowAccountId && e.somAmount) {
-        await tx.flowAccount.update({ where: { id: e.somFlowAccountId }, data: { balance: { decrement: sign * e.somAmount } } });
-      }
-      if (e.dollarFlowAccountId && e.dollarAmount) {
-        await tx.flowAccount.update({ where: { id: e.dollarFlowAccountId }, data: { balance: { decrement: sign * e.dollarAmount } } });
-      }
+      const e = await tx.counterpartyEntry.findUnique({ where: { id } });
+      if (!e) throw new NotFoundException('Yozuv topilmadi');
+      // Transfer legi doim balansda, oddiy yozuv esa faqat tasdiqlangan bo'lsa
+      if (e.confirmedAt || e.transferPairId) await this.applyEntryBalance(tx, e, -1);
       await tx.counterpartyEntry.delete({ where: { id } });
     });
     return { ok: true };

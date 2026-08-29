@@ -10,6 +10,8 @@ export interface Movement {
   amount: number; // musbat, register valyutasida
   currency: string; // SOM | USD
   confirmed: boolean;
+  /** Saqlangan balansda hisobga olinganmi (tasdiqlanmagan oldi-berdi — yo'q) */
+  affectsBalance?: boolean;
   refType: string;
   refId: string;
   counterparty: string;
@@ -42,7 +44,7 @@ export class RegistersService {
     let last: Date | null = null;
     for (const m of mv) {
       const signed = m.direction === 'IN' ? m.amount : -m.amount;
-      allNet += signed;
+      if (m.affectsBalance !== false) allNet += signed;
       if (m.confirmed) confirmedNet += signed;
       else m.direction === 'IN' ? (pendingIn += m.amount) : (pendingOut += m.amount);
       if (!last || m.date > last) last = m.date;
@@ -216,9 +218,9 @@ export class RegistersService {
       }
       // Oldi-berdi / investitsiya (kontragent)
       const cpSom = await this.prisma.counterpartyEntry.findMany({ where: { somFlowAccountId: id }, include: { counterparty: { select: { name: true } } } });
-      for (const c of cpSom) mv.push({ date: c.date, source: 'COUNTERPARTY', label: this.cpLabel(c), direction: c.direction === 'IN' ? 'IN' : 'OUT', amount: c.somAmount ?? 0, currency: 'SOM', confirmed: c.confirmedAt != null, refType: 'CounterpartyEntry', refId: c.id, counterparty: c.counterparty?.name ?? '—', note: c.note });
+      for (const c of cpSom) mv.push({ date: c.date, source: 'COUNTERPARTY', label: this.cpLabel(c), direction: c.direction === 'IN' ? 'IN' : 'OUT', amount: c.somAmount ?? 0, currency: 'SOM', confirmed: c.confirmedAt != null, affectsBalance: c.confirmedAt != null || c.transferPairId != null, refType: 'CounterpartyEntry', refId: c.id, counterparty: c.counterparty?.name ?? '—', note: c.note });
       const cpDol = await this.prisma.counterpartyEntry.findMany({ where: { dollarFlowAccountId: id }, include: { counterparty: { select: { name: true } } } });
-      for (const c of cpDol) mv.push({ date: c.date, source: 'COUNTERPARTY', label: this.cpLabel(c) + ' (valyuta)', direction: c.direction === 'IN' ? 'IN' : 'OUT', amount: c.dollarAmount ?? 0, currency: 'USD', confirmed: c.confirmedAt != null, refType: 'CounterpartyEntry', refId: c.id, counterparty: c.counterparty?.name ?? '—', note: c.note });
+      for (const c of cpDol) mv.push({ date: c.date, source: 'COUNTERPARTY', label: this.cpLabel(c) + ' (valyuta)', direction: c.direction === 'IN' ? 'IN' : 'OUT', amount: c.dollarAmount ?? 0, currency: 'USD', confirmed: c.confirmedAt != null, affectsBalance: c.confirmedAt != null || c.transferPairId != null, refType: 'CounterpartyEntry', refId: c.id, counterparty: c.counterparty?.name ?? '—', note: c.note });
     }
 
     mv.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -246,13 +248,14 @@ export class RegistersService {
     }
 
     const all = await this.movements(type, id, reg.currency);
-    const totalNet = all.reduce((s, m) => s + (m.direction === 'IN' ? m.amount : -m.amount), 0);
+    const netOf = (m: Movement) => (m.affectsBalance === false ? 0 : m.direction === 'IN' ? m.amount : -m.amount);
+    const totalNet = all.reduce((s, m) => s + netOf(m), 0);
     // opening — joriy balansdan barcha harakatlarni yechib (opening + Σ = storedBalance)
     const opening = reg.storedBalance - totalNet;
 
     // Yugurib boruvchi balans (barcha harakatlar bo'yicha)
     let run = opening;
-    for (const m of all) { run += m.direction === 'IN' ? m.amount : -m.amount; m.runningBalance = run; }
+    for (const m of all) { run += netOf(m); m.runningBalance = run; }
     const liveBalance = run; // = storedBalance
 
     // Davr filtri
@@ -262,7 +265,7 @@ export class RegistersService {
     const period = all.filter(inPeriod);
 
     // Davr balansi
-    const periodOpening = from ? opening + all.filter((m) => m.date < from).reduce((s, m) => s + (m.direction === 'IN' ? m.amount : -m.amount), 0) : opening;
+    const periodOpening = from ? opening + all.filter((m) => m.date < from).reduce((s, m) => s + netOf(m), 0) : opening;
     let totalIn = 0, totalOut = 0, pendingIn = 0, pendingOut = 0, confirmedNet = 0, allIn = 0, allOut = 0;
     for (const m of all) {
       const signed = m.direction === 'IN' ? m.amount : -m.amount;
@@ -324,7 +327,7 @@ export class RegistersService {
     const accs = await this.prisma.account.findMany();
     for (const a of accs) {
       const mv = await this.movements('ACCOUNT', a.id, 'SOM');
-      const net = mv.reduce((s, m) => s + (m.direction === 'IN' ? m.amount : -m.amount), 0);
+      const net = mv.reduce((s, m) => s + (m.affectsBalance === false ? 0 : m.direction === 'IN' ? m.amount : -m.amount), 0);
       const opening = a.openingBalance ?? 0;
       rows.push({ type: 'ACCOUNT', id: a.id, name: a.name, currency: 'SOM', opening, net, stored: a.balance, correct: opening + net, drift: round2(a.balance - (opening + net)) });
     }
@@ -332,7 +335,7 @@ export class RegistersService {
     for (const f of flows) {
       const cur = f.currency === 'USD' ? 'USD' : 'SOM';
       const mv = await this.movements('FLOW', f.id, cur);
-      const net = mv.reduce((s, m) => s + (m.direction === 'IN' ? m.amount : -m.amount), 0);
+      const net = mv.reduce((s, m) => s + (m.affectsBalance === false ? 0 : m.direction === 'IN' ? m.amount : -m.amount), 0);
       const opening = f.openingBalance ?? 0;
       rows.push({ type: 'FLOW', id: f.id, name: f.name, currency: cur, opening, net, stored: f.balance, correct: opening + net, drift: round2(f.balance - (opening + net)) });
     }
