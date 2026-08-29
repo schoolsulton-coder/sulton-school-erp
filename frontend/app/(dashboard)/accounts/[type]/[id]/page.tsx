@@ -18,7 +18,8 @@ export default function RegisterDetailPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [tab, setTab] = useState<'confirmed' | 'pending' | 'all'>('confirmed');
+  // Sukut bo'yicha hamma harakat ko'rinadi (maktab to'lovi, oldi-berdi, investitsiya, maosh...)
+  const [tab, setTab] = useState<'confirmed' | 'pending' | 'all'>('all');
 
   const { data: d, isLoading } = useQuery({
     queryKey: ['register-detail', type, id, from, to],
@@ -129,7 +130,7 @@ export default function RegisterDetailPage() {
         <div className="flex items-center justify-between px-5 py-3">
           <h3 className="text-sm font-semibold text-slate-700">Tranzaksiyalar ({txs.length})</h3>
           <div className="flex gap-1 text-xs">
-            {([['confirmed', 'Tasdiqlangan'], ['pending', 'Tasdiqlanmagan'], ['all', 'Hammasi']] as const).map(([k, l]) => (
+            {([['all', 'Hammasi'], ['confirmed', 'Tasdiqlangan'], ['pending', 'Tasdiqlanmagan']] as const).map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)} className={`rounded-lg px-2.5 py-1 font-medium ${tab === k ? 'bg-brand text-white' : 'text-slate-500 hover:bg-slate-100'}`}>{l}</button>
             ))}
           </div>
