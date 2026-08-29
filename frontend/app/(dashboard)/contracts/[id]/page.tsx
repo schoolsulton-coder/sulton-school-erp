@@ -51,7 +51,7 @@ export default function ContractDetailPage() {
   const [tplOpen, setTplOpen] = useState(false);
 
   const { data: c } = useQuery({ queryKey: ['contract', id], queryFn: () => contractsApi.get(id) as Promise<any> });
-  const { data: templates } = useQuery({ queryKey: ['contract-templates'], queryFn: contractTemplatesApi.list });
+  const { data: templates } = useQuery({ queryKey: ['contract-templates', 'STUDENT'], queryFn: () => contractTemplatesApi.list('STUDENT') });
 
   const del = useMutation({
     mutationFn: () => contractsApi.remove(id),

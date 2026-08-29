@@ -7,6 +7,7 @@ import * as mammoth from 'mammoth';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PdfService } from '../../common/pdf/pdf.service';
 import { buildTokens, fillPlaceholders, PLACEHOLDERS } from './tokens';
+import { buildHrTokens, HR_PLACEHOLDERS } from './hr-tokens';
 
 export interface UploadedDocx {
   buffer: Buffer;
@@ -27,6 +28,19 @@ const CONTRACT_INCLUDE = {
   installments: { orderBy: { dueDate: 'asc' as const } },
 };
 
+// Kadrlar shartnomasi — buildHrTokens uchun kerakli include
+const HR_CONTRACT_INCLUDE = {
+  employee: {
+    include: {
+      user: { select: { fullName: true, phone: true } },
+      position: { select: { name: true } },
+      department: { select: { name: true } },
+      branch: { select: { name: true } },
+    },
+  },
+  branch: { select: { name: true } },
+};
+
 @Injectable()
 export class ContractTemplatesService {
   constructor(
@@ -34,14 +48,15 @@ export class ContractTemplatesService {
     private readonly pdf: PdfService,
   ) {}
 
-  placeholders() {
-    return PLACEHOLDERS;
+  placeholders(kind?: string) {
+    return kind === 'HR' ? HR_PLACEHOLDERS : PLACEHOLDERS;
   }
 
-  list() {
+  list(kind?: string) {
     return this.prisma.contractTemplate.findMany({
+      where: kind ? { kind } : undefined,
       orderBy: { updatedAt: 'desc' },
-      select: { id: true, name: true, createdAt: true, updatedAt: true },
+      select: { id: true, name: true, kind: true, createdAt: true, updatedAt: true },
     });
   }
 
@@ -51,15 +66,15 @@ export class ContractTemplatesService {
     return t;
   }
 
-  create(data: { name: string; html: string }) {
+  create(data: { name: string; html: string; kind?: string }) {
     const name = data.name?.trim();
     if (!name) throw new BadRequestException('Nom kiritilishi shart');
     return this.prisma.contractTemplate.create({
-      data: { name, html: data.html ?? '' },
+      data: { name, html: data.html ?? '', kind: data.kind === 'HR' ? 'HR' : 'STUDENT' },
     });
   }
 
-  async uploadDocx(name: string | undefined, file?: UploadedDocx) {
+  async uploadDocx(name: string | undefined, file?: UploadedDocx, kind?: string) {
     if (!file?.buffer?.length) throw new BadRequestException('Fayl topilmadi');
     const isDocx =
       /\.docx$/i.test(file.originalname || '') ||
@@ -81,7 +96,9 @@ export class ContractTemplatesService {
       name?.trim() ||
       (file.originalname || '').replace(/\.docx$/i, '').trim() ||
       'Shablon';
-    return this.prisma.contractTemplate.create({ data: { name: nm, html } });
+    return this.prisma.contractTemplate.create({
+      data: { name: nm, html, kind: kind === 'HR' ? 'HR' : 'STUDENT' },
+    });
   }
 
   async update(id: string, data: { name?: string; html?: string }) {
@@ -149,5 +166,38 @@ export class ContractTemplatesService {
       javascript: false,
     });
     return { buffer, number: contract.number };
+  }
+
+  // ===== Kadrlar hujjati (buyruq / mehnat shartnomasi) =====
+  private async getHrContract(contractId: string) {
+    const c = await this.prisma.employmentContract.findUnique({
+      where: { id: contractId },
+      include: HR_CONTRACT_INCLUDE,
+    });
+    if (!c) throw new NotFoundException('Kadrlar shartnomasi topilmadi');
+    return c;
+  }
+
+  /** Xodim ma'lumotlari bilan to'ldirilgan to'liq HTML */
+  async renderForEmployment(templateId: string, contractId: string): Promise<string> {
+    const [tpl, contract] = await Promise.all([
+      this.findOne(templateId),
+      this.getHrContract(contractId),
+    ]);
+    return this.wrapHtml(fillPlaceholders(tpl.html, buildHrTokens(contract)));
+  }
+
+  async pdfForEmployment(
+    templateId: string,
+    contractId: string,
+  ): Promise<{ buffer: Buffer; number: string }> {
+    const contract = await this.getHrContract(contractId);
+    const tpl = await this.findOne(templateId);
+    const filled = fillPlaceholders(tpl.html, buildHrTokens(contract));
+    const buffer = await this.pdf.fromHtml(this.wrapHtml(filled), {
+      javascript: false,
+    });
+    const num = contract.number && contract.number !== '—' ? contract.number : 'hujjat';
+    return { buffer, number: num.replace(/[\\/:*?"<>|]/g, '-') };
   }
 }

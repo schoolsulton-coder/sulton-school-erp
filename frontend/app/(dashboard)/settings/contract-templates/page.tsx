@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Upload, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
-import { contractTemplatesApi, type Template } from '@/lib/contract-templates';
+import { contractTemplatesApi, type Template, type TemplateKind } from '@/lib/contract-templates';
 import { TemplateEditor } from '@/components/template-editor';
 import { useAuthStore } from '@/store/auth';
 
@@ -19,14 +19,16 @@ export default function ContractTemplatesPage() {
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [kind, setKind] = useState<TemplateKind>('STUDENT');
+  const isHr = kind === 'HR';
 
-  const { data: list, isLoading } = useQuery({ queryKey: ['contract-templates'], queryFn: contractTemplatesApi.list });
-  const { data: placeholders } = useQuery({ queryKey: ['tpl-placeholders'], queryFn: contractTemplatesApi.placeholders });
+  const { data: list, isLoading } = useQuery({ queryKey: ['contract-templates', kind], queryFn: () => contractTemplatesApi.list(kind) });
+  const { data: placeholders } = useQuery({ queryKey: ['tpl-placeholders', kind], queryFn: () => contractTemplatesApi.placeholders(kind) });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['contract-templates'] });
 
   const upload = useMutation({
-    mutationFn: () => contractTemplatesApi.uploadDocx(name.trim(), file!),
+    mutationFn: () => contractTemplatesApi.uploadDocx(name.trim(), file!, kind),
     onSuccess: (t) => {
       setFile(null); setName('');
       if (fileRef.current) fileRef.current.value = '';
@@ -37,7 +39,13 @@ export default function ContractTemplatesPage() {
   });
 
   const createEmpty = useMutation({
-    mutationFn: () => contractTemplatesApi.create({ name: 'Yangi shablon', html: '<h2>O\'QUV XIZMATLARI SHARTNOMASI</h2><p>Matnni shu yerda yozing va "Belgi qo\'shish" orqali maydonlarni joylang.</p>' }),
+    mutationFn: () => contractTemplatesApi.create({
+      name: isHr ? 'Yangi kadrlar hujjati' : 'Yangi shablon',
+      kind,
+      html: isHr
+        ? '<h2>BUYRUQ</h2><p>Matnni shu yerda yozing va "Belgi qo\'shish" orqali maydonlarni joylang.</p>'
+        : '<h2>O\'QUV XIZMATLARI SHARTNOMASI</h2><p>Matnni shu yerda yozing va "Belgi qo\'shish" orqali maydonlarni joylang.</p>',
+    }),
     onSuccess: (t) => { refresh(); setEditId(t.id); },
     onError: (e: any) => alert(e?.response?.data?.message ?? 'Xatolik'),
   });
@@ -56,8 +64,19 @@ export default function ContractTemplatesPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-5">
-        <h1 className="text-2xl font-bold">Shartnoma shablonlari</h1>
-        <p className="text-sm text-slate-500">DOCX yuklang, ERP ichida tahrirlang — shartnoma ma'lumotlari avtomat qo'yiladi</p>
+        <h1 className="text-2xl font-bold">Hujjat shablonlari</h1>
+        <p className="text-sm text-slate-500">DOCX yuklang, ERP ichida tahrirlang — ma'lumotlar avtomat qo'yiladi</p>
+        <div className="mt-3 inline-flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+          {([['STUDENT', "O'quvchi shartnomasi"], ['HR', 'Kadrlar hujjatlari']] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => { setKind(k); setEditId(null); }}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${kind === k ? 'bg-brand text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {canWrite && (

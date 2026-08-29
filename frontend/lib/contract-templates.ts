@@ -1,8 +1,11 @@
 import { api } from './api';
 
+export type TemplateKind = 'STUDENT' | 'HR';
+
 export interface TemplateListItem {
   id: string;
   name: string;
+  kind?: TemplateKind;
   createdAt: string;
   updatedAt: string;
 }
@@ -17,27 +20,33 @@ export interface Placeholder {
 }
 
 export const contractTemplatesApi = {
-  placeholders: () =>
-    api.get<Placeholder[]>('/contract-templates/placeholders').then((r) => r.data),
-  list: () => api.get<TemplateListItem[]>('/contract-templates').then((r) => r.data),
+  placeholders: (kind?: TemplateKind) =>
+    api.get<Placeholder[]>('/contract-templates/placeholders', { params: { kind } }).then((r) => r.data),
+  list: (kind?: TemplateKind) =>
+    api.get<TemplateListItem[]>('/contract-templates', { params: { kind } }).then((r) => r.data),
   get: (id: string) => api.get<Template>(`/contract-templates/${id}`).then((r) => r.data),
-  create: (data: { name: string; html: string }) =>
+  create: (data: { name: string; html: string; kind?: TemplateKind }) =>
     api.post<Template>('/contract-templates', data).then((r) => r.data),
   update: (id: string, data: { name?: string; html?: string }) =>
     api.patch<Template>(`/contract-templates/${id}`, data).then((r) => r.data),
   remove: (id: string) =>
     api.delete(`/contract-templates/${id}`).then((r) => r.data),
 
-  uploadDocx: (name: string, file: File) => {
+  uploadDocx: (name: string, file: File, kind?: TemplateKind) => {
     const fd = new FormData();
     fd.append('name', name);
     fd.append('file', file);
+    if (kind) fd.append('kind', kind);
     return api
       .post<Template>('/contract-templates/upload', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((r) => r.data);
   },
+
+  /** Shablon bo'yicha kadrlar hujjatiga (buyruq/mehnat shartnomasi) PDF */
+  openHrPdf: (templateId: string, contractId: string, number: string) =>
+    openBlobPdf(`/contract-templates/${templateId}/hr-pdf/${contractId}`, number),
 
   /** Shablon bo'yicha shartnomaga PDF (blob → yangi oynada). Xato bo'lsa — sababini ko'rsatadi */
   openPdf: async (templateId: string, contractId: string, number: string) => {
@@ -65,6 +74,29 @@ export const contractTemplatesApi = {
     }
   },
 };
+
+/** PDF'ni blob sifatida olib, yangi oynada ochadi (auth header bilan) */
+async function openBlobPdf(url: string, filename: string) {
+  try {
+    const res = await api.get(url, { responseType: 'blob' });
+    const blob = res.data as Blob;
+    if (blob.type && !blob.type.includes('pdf')) {
+      alert(await readPdfError(blob));
+      return;
+    }
+    const objUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.download = `${filename}.pdf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 10_000);
+  } catch (e: any) {
+    const d = e?.response?.data;
+    alert(d instanceof Blob ? await readPdfError(d) : (e?.message ?? "PDF yaratib bo'lmadi"));
+  }
+}
 
 /** Blob ichidagi server xato xabarini o'qiydi (PDF o'rniga JSON kelganda) */
 export async function readPdfError(blob: Blob): Promise<string> {

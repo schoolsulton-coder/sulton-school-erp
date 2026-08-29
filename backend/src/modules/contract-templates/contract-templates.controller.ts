@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -32,14 +33,14 @@ export class ContractTemplatesController {
   // Statik yo'llar :id dan oldin turishi shart
   @Get('placeholders')
   @Permissions('contracts.view')
-  placeholders() {
-    return this.service.placeholders();
+  placeholders(@Query('kind') kind?: string) {
+    return this.service.placeholders(kind);
   }
 
   @Get()
   @Permissions('contracts.view')
-  list() {
-    return this.service.list();
+  list(@Query('kind') kind?: string) {
+    return this.service.list(kind);
   }
 
   @Post('upload')
@@ -50,13 +51,14 @@ export class ContractTemplatesController {
   upload(
     @UploadedFile() file: UploadedDocx,
     @Body('name') name?: string,
+    @Body('kind') kind?: string,
   ) {
-    return this.service.uploadDocx(name, file);
+    return this.service.uploadDocx(name, file, kind);
   }
 
   @Post()
   @Permissions('contracts.create')
-  create(@Body() body: { name: string; html: string }) {
+  create(@Body() body: { name: string; html: string; kind?: string }) {
     return this.service.create(body);
   }
 
@@ -90,6 +92,23 @@ export class ContractTemplatesController {
     @Res() res: Response,
   ) {
     const { buffer, number } = await this.service.pdfForContract(id, contractId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${number}.pdf"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  // Shablon bo'yicha kadrlar shartnomasiga (buyruq/mehnat shartnomasi) PDF
+  @Get(':id/hr-pdf/:contractId')
+  @Permissions('hr.view')
+  async hrPdf(
+    @Param('id') id: string,
+    @Param('contractId') contractId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, number } = await this.service.pdfForEmployment(id, contractId);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${number}.pdf"`,

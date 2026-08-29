@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Pencil, Trash2, ExternalLink, FileText } from 'lucide-react';
+import { X, Pencil, Trash2, ExternalLink, FileText, FileDown } from 'lucide-react';
 import { hrApi, CONTRACT_STATUS, SHARTNOMA_HOLATLARI } from '@/lib/hr';
+import { contractTemplatesApi } from '@/lib/contract-templates';
 import { ShartnomaModal } from '@/components/shartnoma-form';
 
 const initials = (n: string) =>
@@ -40,7 +41,14 @@ export function ShartnomaDetailPanel({
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [tplId, setTplId] = useState('');
+  const [pdfPending, setPdfPending] = useState(false);
   const { data: c, isLoading } = useQuery({ queryKey: ['shartnoma', id], queryFn: () => hrApi.shartnoma(id) });
+  // Kadrlar hujjati shablonlari (buyruq, mehnat shartnomasi...)
+  const { data: templates } = useQuery({
+    queryKey: ['contract-templates', 'HR'],
+    queryFn: () => contractTemplatesApi.list('HR'),
+  });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['shartnoma', id] });
@@ -111,6 +119,31 @@ export function ShartnomaDetailPanel({
                     {SHARTNOMA_HOLATLARI.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </label>
+                {/* Hujjat (PDF) — kadrlar shablonlari bo'yicha */}
+                {templates && templates.length > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    {templates.length > 1 && (
+                      <select
+                        value={tplId || templates[0].id}
+                        onChange={(e) => setTplId(e.target.value)}
+                        className="cursor-pointer rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 outline-none"
+                      >
+                        {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    )}
+                    <button
+                      onClick={async () => {
+                        setPdfPending(true);
+                        await contractTemplatesApi.openHrPdf(tplId || templates[0].id, id, `${c.type} ${c.number}`.trim());
+                        setPdfPending(false);
+                      }}
+                      disabled={pdfPending}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <FileDown size={14} /> {pdfPending ? 'PDF...' : 'PDF'}
+                    </button>
+                  </span>
+                )}
                 <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">
                   <Pencil size={14} /> Tahrirlash
                 </button>
@@ -122,6 +155,12 @@ export function ShartnomaDetailPanel({
                   <Trash2 size={14} /> O&apos;chirish
                 </button>
               </div>
+              {templates && templates.length === 0 && (
+                <p className="mt-2 text-xs text-slate-400">
+                  Hujjat (PDF) uchun shablon yo&apos;q — Sozlamalar → Hujjat shablonlari → «Kadrlar hujjatlari» bo&apos;limiga
+                  buyruq/mehnat shartnomasi .docx faylini yuklang.
+                </p>
+              )}
             </div>
 
             {/* Asosiy ma'lumotlar */}

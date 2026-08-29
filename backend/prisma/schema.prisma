@@ -617,9 +617,12 @@ model ContractTemplate {
   id        String   @id @default(uuid())
   name      String
   html      String   @db.Text
+  // STUDENT = o'quvchi shartnomasi, HR = kadrlar hujjati (buyruq/mehnat shartnomasi)
+  kind      String   @default("STUDENT")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([kind])
   @@map("contract_templates")
 }
 
