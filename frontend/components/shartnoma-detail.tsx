@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Pencil, Trash2, ExternalLink, FileText, FileDown } from 'lucide-react';
 import { hrApi, CONTRACT_STATUS, SHARTNOMA_HOLATLARI } from '@/lib/hr';
@@ -119,10 +120,19 @@ export function ShartnomaDetailPanel({
                     {SHARTNOMA_HOLATLARI.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </label>
-                {/* Hujjat (PDF) — kadrlar shablonlari bo'yicha */}
-                {templates && templates.length > 0 && (
+                {/* Hujjat (PDF) — kadrlar shablonlari bo'yicha.
+                    Shablon yo'q bo'lsa tugma yuklash sahifasiga olib boradi. */}
+                {templates && templates.length === 0 ? (
+                  <Link
+                    href="/settings/contract-templates"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    title="Avval kadrlar hujjati shablonini yuklang"
+                  >
+                    <FileDown size={14} /> PDF — shablon yuklash
+                  </Link>
+                ) : (
                   <span className="inline-flex items-center gap-1">
-                    {templates.length > 1 && (
+                    {templates && templates.length > 1 && (
                       <select
                         value={tplId || templates[0].id}
                         onChange={(e) => setTplId(e.target.value)}
@@ -133,11 +143,12 @@ export function ShartnomaDetailPanel({
                     )}
                     <button
                       onClick={async () => {
+                        if (!templates?.length) return; // hali yuklanmagan
                         setPdfPending(true);
                         await contractTemplatesApi.openHrPdf(tplId || templates[0].id, id, `${c.type} ${c.number}`.trim());
                         setPdfPending(false);
                       }}
-                      disabled={pdfPending}
+                      disabled={pdfPending || !templates?.length}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
                       <FileDown size={14} /> {pdfPending ? 'PDF...' : 'PDF'}
@@ -155,12 +166,6 @@ export function ShartnomaDetailPanel({
                   <Trash2 size={14} /> O&apos;chirish
                 </button>
               </div>
-              {templates && templates.length === 0 && (
-                <p className="mt-2 text-xs text-slate-400">
-                  Hujjat (PDF) uchun shablon yo&apos;q — Sozlamalar → Hujjat shablonlari → «Kadrlar hujjatlari» bo&apos;limiga
-                  buyruq/mehnat shartnomasi .docx faylini yuklang.
-                </p>
-              )}
             </div>
 
             {/* Asosiy ma'lumotlar */}
