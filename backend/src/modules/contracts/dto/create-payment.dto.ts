@@ -22,7 +22,11 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsString()
-  accountId?: string; // qaysi kassaga tushishi (bo'sh bo'lsa kassaga urilmaydi)
+  accountId?: string; // eski Moliya kassa (bo'sh bo'lsa kassaga urilmaydi)
+
+  @IsOptional()
+  @IsString()
+  flowAccountId?: string; // «Hisoblar» bo'limidagi kassa
 
   @IsOptional()
   @IsString()
