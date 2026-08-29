@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { paymentsApi, money, type PaymentListRow, type PaymentFilters } from '@/lib/payments';
 import { crmApi } from '@/lib/crm';
-import { financeApi } from '@/lib/finance';
+import { flowAccountsApi } from '@/lib/flow-accounts';
 import { NewPaymentModal } from '@/components/payment-form';
 import { PaymentDetailModal } from '@/components/payment-detail';
 
@@ -50,7 +50,7 @@ export default function PaymentsPage() {
   });
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data: years } = useQuery({ queryKey: ['academic-years'], queryFn: crmApi.academicYears });
-  const { data: accounts } = useQuery({ queryKey: ['accounts'], queryFn: financeApi.accounts });
+  const { data: accounts } = useQuery({ queryKey: ['flow-acc', 'all'], queryFn: () => flowAccountsApi.list({ active: 'true' }) });
   const [draft, setDraft] = useState<PaymentFilters>({});
   const setD = (patch: Partial<PaymentFilters>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -270,7 +270,7 @@ export default function PaymentsPage() {
                             )}
                           </div>
                         </td>
-                        <td className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500" title={p.account?.name ?? ''}>{p.account?.name ?? '—'}</td>
+                        <td className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500" title={p.flowAccount?.name ?? p.account?.name ?? ''}>{p.flowAccount?.name ?? p.account?.name ?? '—'}</td>
                         <td className="px-4 py-3 text-xs text-slate-400">{p.note ?? '—'}</td>
                         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <button onClick={() => { if (window.confirm("To'lovni o'chirasizmi?")) remove.mutate(p.id); }} className="grid h-7 w-7 place-items-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-500">

@@ -366,7 +366,8 @@ export class ContractsService {
         data: {
           studentId: contract.studentId,
           contractId: id,
-          accountId: dto.accountId || null,
+          accountId: dto.flowAccountId ? null : dto.accountId || null,
+          flowAccountId: dto.flowAccountId || null,
           amount: dto.amount,
           method: dto.method,
           paidAt,
@@ -376,8 +377,13 @@ export class ContractsService {
         },
       });
 
-      // To'lov kassaga (Account) tushadi — balansni oshiramiz
-      if (payment.accountId) {
+      // To'lov kassaga tushadi — balansni oshiramiz («Hisoblar» kassasi yoki eski Moliya kassa)
+      if (payment.flowAccountId) {
+        await tx.flowAccount.update({
+          where: { id: payment.flowAccountId },
+          data: { balance: { increment: payment.amount } },
+        });
+      } else if (payment.accountId) {
         await tx.account.update({
           where: { id: payment.accountId },
           data: { balance: { increment: payment.amount } },

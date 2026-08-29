@@ -92,7 +92,17 @@ export class PaymentsService {
     }
     if (filters.method) where.method = filters.method;
     if (filters.type) where.type = filters.type;
-    if (filters.accountId) where.accountId = filters.accountId;
+    // Hisob filtri — yangi «Hisoblar» kassasi yoki eski Moliya kassa
+    // (search ham OR ishlatadi — shuning uchun AND ichiga qo'yamiz)
+    if (filters.accountId)
+      where.AND = [
+        {
+          OR: [
+            { flowAccountId: filters.accountId },
+            { accountId: filters.accountId },
+          ],
+        },
+      ];
     if (filters.confirmed === 'true') where.confirmedAt = { not: null };
     if (filters.confirmed === 'false') {
       // "Tasdiqlanmagan" = tasdiq KUTAYOTGAN (bank/karta) to'lovlar.
@@ -142,6 +152,7 @@ export class PaymentsService {
           },
           contract: { select: { number: true } },
           account: { select: { id: true, name: true } },
+          flowAccount: { select: { id: true, name: true } },
         },
         // Barqaror tartib: teng paidAt bo'lsa ham qator o'rni o'zgarmasin
         // (tasdiqlash paidAt/createdAt/id ni o'zgartirmaydi)
@@ -196,6 +207,7 @@ export class PaymentsService {
         },
         contract: { select: { id: true, number: true } },
         account: { select: { id: true, name: true } },
+        flowAccount: { select: { id: true, name: true } },
       },
     });
     if (!p) throw new NotFoundException('To‘lov topilmadi');
@@ -237,7 +249,8 @@ export class PaymentsService {
           data: {
             studentId,
             contractId: dto.contractId || null,
-            accountId: dto.accountId || null,
+            accountId: dto.flowAccountId ? null : dto.accountId || null,
+            flowAccountId: dto.flowAccountId || null,
             amount: dto.amount,
             method: dto.method,
             type: dto.type || null,
@@ -264,14 +277,11 @@ export class PaymentsService {
         }
 
         if (dto.contractId) await this.recompute(tx, dto.contractId);
-        if (created.accountId) {
-          await tx.account.update({
-            where: { id: created.accountId },
-            data: {
-              balance: { increment: created.isRefund ? -created.amount : created.amount },
-            },
-          });
-        }
+        await this.applyBalance(
+          tx,
+          created,
+          created.isRefund ? -created.amount : created.amount,
+        );
         return created;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -296,15 +306,15 @@ export class PaymentsService {
         }
 
         // eski hisob ta'sirini bekor qilamiz
-        if (old.accountId) {
-          await tx.account.update({
-            where: { id: old.accountId },
-            data: { balance: { increment: old.isRefund ? old.amount : -old.amount } },
-          });
-        }
+        await this.applyBalance(tx, old, old.isRefund ? old.amount : -old.amount);
 
-        const newAccountId =
+        // Hisob: yangi (flow) yoki eski Moliya kassa — faqat bittasi saqlanadi
+        let newAccountId =
           dto.accountId !== undefined ? dto.accountId || null : old.accountId;
+        let newFlowAccountId =
+          dto.flowAccountId !== undefined ? dto.flowAccountId || null : old.flowAccountId;
+        if (dto.flowAccountId) newAccountId = null;
+        else if (dto.accountId) newFlowAccountId = null;
 
         const newMethod = dto.method ?? old.method;
         const newPaidAt = dto.paidAt ? new Date(dto.paidAt) : old.paidAt;
@@ -315,6 +325,7 @@ export class PaymentsService {
             method: newMethod,
             type: dto.type !== undefined ? dto.type || null : old.type,
             accountId: newAccountId,
+            flowAccountId: newFlowAccountId,
             cardLast4: dto.cardLast4 !== undefined ? dto.cardLast4 || null : old.cardLast4,
             note: dto.note !== undefined ? dto.note || null : old.note,
             isRefund: dto.isRefund ?? old.isRefund,
@@ -330,14 +341,11 @@ export class PaymentsService {
           await tx.paymentAllocation.deleteMany({ where: { paymentId: id } });
         }
 
-        if (updated.accountId) {
-          await tx.account.update({
-            where: { id: updated.accountId },
-            data: {
-              balance: { increment: updated.isRefund ? -updated.amount : updated.amount },
-            },
-          });
-        }
+        await this.applyBalance(
+          tx,
+          updated,
+          updated.isRefund ? -updated.amount : updated.amount,
+        );
 
         if (updated.contractId) await this.recompute(tx, updated.contractId);
         if (old.contractId && old.contractId !== updated.contractId) {
@@ -372,12 +380,7 @@ export class PaymentsService {
             'Tasdiqlangan to‘lovni o‘chirib bo‘lmaydi. Avval tasdiqni bekor qiling.',
           );
         }
-        if (p.accountId) {
-          await tx.account.update({
-            where: { id: p.accountId },
-            data: { balance: { increment: p.isRefund ? p.amount : -p.amount } },
-          });
-        }
+        await this.applyBalance(tx, p, p.isRefund ? p.amount : -p.amount);
         await tx.payment.delete({ where: { id } });
         if (p.contractId) await this.recompute(tx, p.contractId);
         return { ok: true };
@@ -431,6 +434,27 @@ export class PaymentsService {
       debt,
       installments,
     };
+  }
+
+  // ===== Kassa balansi =====
+  // To'lov «Hisoblar» kassasiga (flow_accounts) yoki eski Moliya kassaga bog'langan bo'ladi.
+  private async applyBalance(
+    tx: Prisma.TransactionClient,
+    ref: { accountId: string | null; flowAccountId: string | null },
+    delta: number,
+  ) {
+    if (!delta) return;
+    if (ref.flowAccountId) {
+      await tx.flowAccount.update({
+        where: { id: ref.flowAccountId },
+        data: { balance: { increment: delta } },
+      });
+    } else if (ref.accountId) {
+      await tx.account.update({
+        where: { id: ref.accountId },
+        data: { balance: { increment: delta } },
+      });
+    }
   }
 
   // ===== Installment'larni to'lovlardan qayta hisoblash =====

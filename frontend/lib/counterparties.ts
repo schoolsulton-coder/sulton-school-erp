@@ -3,14 +3,12 @@ import { api } from './api';
 export type CpCategory =
   | 'OLDI_BERDICHI'
   | 'OLDI_BERDI'
-  | 'TRANSFER'
   | 'INVESTOR'
   | 'INVESTITSIYA';
 
 export const CP_TABS: { key: CpCategory; label: string }[] = [
   { key: 'OLDI_BERDICHI', label: 'Oldi-berdichilar' },
   { key: 'OLDI_BERDI', label: 'Oldi-berdilar' },
-  { key: 'TRANSFER', label: 'Transferlar' },
   { key: 'INVESTOR', label: 'Investorlar' },
   { key: 'INVESTITSIYA', label: 'Investitsiyalar' },
 ];

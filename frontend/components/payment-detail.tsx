@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, CheckCircle2, Pencil, Trash2, Save } from 'lucide-react';
 import { paymentsApi, money, KASSA_TYPES } from '@/lib/payments';
-import { financeApi } from '@/lib/finance';
+import { flowAccountsApi } from '@/lib/flow-accounts';
 
 const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
 const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('uz-UZ') : '—');
@@ -135,7 +135,7 @@ export function PaymentDetailModal({
                 <Row label="Sana" value={fmtDate(p.paidAt)} />
                 <Row label="Oy" value={UZ_MONTHS[new Date(p.paidAt).getMonth()]} />
                 <Row label="Kassa turi" value={p.method} />
-                <Row label="Hisob" value={p.account?.name ?? '—'} />
+                <Row label="Hisob" value={p.flowAccount?.name ?? p.account?.name ?? '—'} />
                 <Row label="To'lov turi (type)" value={p.type ?? '—'} />
                 <Row label="Karta 4 raqami" value={p.cardLast4 ?? '—'} />
                 <Row label="Filial" value={p.student?.branch?.name ?? '—'} />
@@ -169,17 +169,21 @@ export function PaymentDetailModal({
 function EditForm({ p, onDone }: { p: any; onDone: () => void }) {
   const [amount, setAmount] = useState(String(p.amount));
   const [method, setMethod] = useState(p.method);
-  const [accountId, setAccountId] = useState(p.account?.id ?? '');
+  const [accountId, setAccountId] = useState(p.flowAccount?.id ?? '');
   const [date, setDate] = useState(new Date(p.paidAt).toISOString().slice(0, 10));
   const [note, setNote] = useState(p.note ?? '');
-  const { data: accounts } = useQuery({ queryKey: ['accounts'], queryFn: financeApi.accounts });
+  // «Hisoblar» bo'limidagi so'm kassalari — tanlangan kassa turi bo'yicha
+  const { data: accounts } = useQuery({
+    queryKey: ['flow-acc', 'SOM', method],
+    queryFn: () => flowAccountsApi.list({ currency: 'SOM', kassaTuri: method, active: 'true' }),
+  });
 
   const save = useMutation({
     mutationFn: () =>
       paymentsApi.update(p.id, {
         amount: Number(amount),
         method,
-        accountId: accountId || undefined,
+        flowAccountId: accountId || undefined,
         paidAt: date,
         note: note || undefined,
       }),
@@ -200,7 +204,7 @@ function EditForm({ p, onDone }: { p: any; onDone: () => void }) {
         <label className="block"><span className="mb-1 block text-xs text-slate-500">Hisob</span>
           <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className={cls + ' cursor-pointer'}>
             <option value="">—</option>
-            {accounts?.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            {accounts?.map((a) => <option key={a.id} value={a.id}>{a.branch ? `${a.name} — ${a.branch.name}` : a.name}</option>)}
           </select>
         </label>
         <label className="block"><span className="mb-1 block text-xs text-slate-500">Sana</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={cls} /></label>

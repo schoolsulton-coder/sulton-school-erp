@@ -9,16 +9,9 @@ import {
   type ExpensePayment as ExpensePaymentT,
 } from '@/lib/expenses';
 import { financeApi } from '@/lib/finance';
+import { flowAccountsApi } from '@/lib/flow-accounts';
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('uz-UZ');
-
-/** Hisobni kassa turiga qarab ajratadi (nom bo'yicha) — To'lovlar oynasidagi kabi */
-const accKind = (name?: string) => {
-  const s = (name ?? '').toLowerCase();
-  if (s.includes('bank')) return 'Bank';
-  if (['karta', 'terminal', 'plastik', 'click', 'payme', 'uzcard', 'humo'].some((k) => s.includes(k))) return 'Karta';
-  return 'Naqd';
-};
 
 export function ExpenseDetail({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
   const qc = useQueryClient();
@@ -127,9 +120,9 @@ export function ExpenseDetail({ id, onClose, onChanged }: { id: string; onClose:
                       <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5">
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-slate-700">{fmtDate(p.paidAt)}{p.isRefund && <span className="ml-1.5 rounded bg-rose-100 px-1.5 text-xs text-rose-600">qaytarish</span>}</div>
-                          <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-400"><CreditCard size={11} /> {p.method}{p.account ? ` · ${p.account.name}` : ''}{p.note ? ` · ${p.note}` : ''}</div>
+                          <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-400"><CreditCard size={11} /> {p.method}{p.flowAccount ? ` · ${p.flowAccount.name}` : p.account ? ` · ${p.account.name}` : ''}{p.note ? ` · ${p.note}` : ''}</div>
                           {dollarSom > 0 && (
-                            <div className="mt-0.5 text-xs text-emerald-600">💵 ${money(p.dollarAmount || 0)} × {money(p.dollarRate || 0)}{p.dollarAccount ? ` · ${p.dollarAccount.name}` : ''} = {money(dollarSom)} so&apos;m</div>
+                            <div className="mt-0.5 text-xs text-emerald-600">💵 ${money(p.dollarAmount || 0)} × {money(p.dollarRate || 0)}{p.dollarFlowAccount ? ` · ${p.dollarFlowAccount.name}` : p.dollarAccount ? ` · ${p.dollarAccount.name}` : ''} = {money(dollarSom)} so&apos;m</div>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -284,11 +277,10 @@ function LineEditModal({ line, onClose, onSaved }: { line: ExpenseLine; onClose:
 /* ===== Xarajat uchun to'lov (alohida oyna, xarajatlar yonida) ===== */
 function PaymentModal({ expense, refund, payment, onClose, onSaved }: { expense: ExpenseDetailT; refund: boolean; payment?: ExpensePaymentT; onClose: () => void; onSaved: () => void }) {
   const editing = !!payment;
-  const { data: accounts } = useQuery({ queryKey: ['fin-accounts'], queryFn: financeApi.accounts });
   const [isRefund, setIsRefund] = useState(payment?.isRefund ?? refund);
   const [amount, setAmount] = useState(payment?.amount ? String(payment.amount) : '');
   const [method, setMethod] = useState(payment?.method ?? 'Naqd');
-  const [accountId, setAccountId] = useState(payment?.accountId ?? '');
+  const [accountId, setAccountId] = useState(payment?.flowAccountId ?? '');
   const [date, setDate] = useState((payment?.paidAt ?? new Date().toISOString()).slice(0, 10));
   const [note, setNote] = useState(payment?.note ?? '');
   const [error, setError] = useState('');
@@ -297,22 +289,31 @@ function PaymentModal({ expense, refund, payment, onClose, onSaved }: { expense:
   const [dollarAmount, setDollarAmount] = useState(payment?.dollarAmount ? String(payment.dollarAmount) : '');
   const [dollarRate, setDollarRate] = useState(payment?.dollarRate ? String(payment.dollarRate) : '');
   const [dollarMethod, setDollarMethod] = useState(payment?.dollarMethod ?? 'Naqd');
-  const [dollarAccountId, setDollarAccountId] = useState(payment?.dollarAccountId ?? '');
+  const [dollarAccountId, setDollarAccountId] = useState(payment?.dollarFlowAccountId ?? '');
 
-  const somAccounts = (accounts ?? []).filter((a) => accKind(a.name) === method);
-  const dollarAccounts = (accounts ?? []).filter((a) => accKind(a.name) === dollarMethod);
+  // «Hisoblar» bo'limidagi kassalar — so'm qismi so'm hisobiga, dollar qismi dollar hisobiga
+  const { data: somAccountsData } = useQuery({
+    queryKey: ['flow-acc', 'SOM', method],
+    queryFn: () => flowAccountsApi.list({ currency: 'SOM', kassaTuri: method, active: 'true' }),
+  });
+  const { data: dollarAccountsData } = useQuery({
+    queryKey: ['flow-acc', 'USD', dollarMethod],
+    queryFn: () => flowAccountsApi.list({ currency: 'USD', kassaTuri: dollarMethod, active: 'true' }),
+  });
+  const somAccounts = somAccountsData ?? [];
+  const dollarAccounts = dollarAccountsData ?? [];
 
   // Kassa turi o'zgarsa: bitta hisob bo'lsa avtomat, mos kelmasa tozalaymiz
   useEffect(() => {
     if (somAccounts.length === 1) setAccountId(somAccounts[0].id);
     else if (accountId && !somAccounts.some((a) => a.id === accountId)) setAccountId('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, accounts]);
+  }, [method, somAccountsData]);
   useEffect(() => {
     if (dollarAccounts.length === 1) setDollarAccountId(dollarAccounts[0].id);
     else if (dollarAccountId && !dollarAccounts.some((a) => a.id === dollarAccountId)) setDollarAccountId('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dollarMethod, accounts]);
+  }, [dollarMethod, dollarAccountsData]);
 
   const dollarSom = useDollar ? (Number(dollarAmount) || 0) * (Number(dollarRate) || 0) : 0;
   const totalSom = (Number(amount) || 0) + dollarSom;
@@ -320,11 +321,11 @@ function PaymentModal({ expense, refund, payment, onClose, onSaved }: { expense:
   const payload = () => ({
     amount: Number(amount) || undefined,
     method,
-    accountId: accountId || undefined,
+    flowAccountId: accountId || undefined,
     dollarAmount: useDollar ? Number(dollarAmount) || undefined : undefined,
     dollarRate: useDollar ? Number(dollarRate) || undefined : undefined,
     dollarMethod: useDollar ? dollarMethod : undefined,
-    dollarAccountId: useDollar ? dollarAccountId || undefined : undefined,
+    dollarFlowAccountId: useDollar ? dollarAccountId || undefined : undefined,
     paidAt: date, isRefund, note: note || undefined,
   });
   const save = useMutation({

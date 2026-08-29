@@ -20,7 +20,8 @@ export interface PaymentListRow {
   confirmedAt?: string | null;
   student?: PaymentStudent | null;
   contract?: { number: string } | null;
-  account?: { id: string; name: string } | null;
+  account?: { id: string; name: string } | null; // eski Moliya kassa
+  flowAccount?: { id: string; name: string } | null; // «Hisoblar» kassasi
 }
 
 export interface PaymentStats {
@@ -76,7 +77,8 @@ export interface PaymentInput {
   amount: number;
   method: string;
   type?: string;
-  accountId?: string;
+  accountId?: string; // eski Moliya kassa (legacy)
+  flowAccountId?: string; // «Hisoblar» bo'limidagi kassa
   cardLast4?: string;
   paidAt?: string;
   note?: string;

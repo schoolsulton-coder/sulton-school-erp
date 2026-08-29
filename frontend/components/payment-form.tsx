@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Search, ArrowRight } from 'lucide-react';
 import { paymentsApi, money, KASSA_TYPES } from '@/lib/payments';
-import { financeApi } from '@/lib/finance';
+import { flowAccountsApi } from '@/lib/flow-accounts';
 import { crmApi } from '@/lib/crm';
 
 const fmtNum = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -54,7 +54,11 @@ export function NewPaymentModal({
     queryFn: () => crmApi.searchStudents(q, payYear),
     enabled: !initStudentId && !studentId && !!payYear,
   });
-  const { data: accounts } = useQuery({ queryKey: ['accounts'], queryFn: financeApi.accounts });
+  // «Hisoblar» bo'limidagi so'm kassalari — tanlangan kassa turi bo'yicha
+  const { data: accounts } = useQuery({
+    queryKey: ['flow-acc', 'SOM', method],
+    queryFn: () => flowAccountsApi.list({ currency: 'SOM', kassaTuri: method, active: 'true' }),
+  });
   const { data: schedule } = useQuery({
     queryKey: ['pay-schedule', studentId],
     queryFn: () => paymentsApi.schedule(studentId),
@@ -79,14 +83,8 @@ export function NewPaymentModal({
     st?.class ? `${st.class.name}${st.class.language ? ` (${st.class.language})` : ''}` : null,
   ].filter(Boolean).join(' · ');
 
-  // Hisobni kassa turiga qarab ajratamiz (nom bo'yicha)
-  const accKind = (name?: string) => {
-    const s = (name ?? '').toLowerCase();
-    if (s.includes('bank')) return 'Bank';
-    if (['karta', 'terminal', 'plastik', 'click', 'payme', 'uzcard', 'humo'].some((k) => s.includes(k))) return 'Karta';
-    return 'Naqd';
-  };
-  const filteredAccounts = (accounts ?? []).filter((a) => accKind(a.name) === method);
+  // Hisoblar allaqachon kassa turi bo'yicha so'ralgan
+  const filteredAccounts = accounts ?? [];
   // Kassa turi o'zgarsa: bitta hisob bo'lsa — avtomat tanlaymiz; aks holda mos kelmaydiganini tozalaymiz
   useEffect(() => {
     if (filteredAccounts.length === 1) setAccountId(filteredAccounts[0].id);
@@ -128,7 +126,7 @@ export function NewPaymentModal({
         method,
         type: method === 'Karta' ? type || undefined : undefined,
         cardLast4: method === 'Karta' ? cardLast4 || undefined : undefined,
-        accountId: accountId || undefined,
+        flowAccountId: accountId || undefined,
         paidAt: date,
         note: note || undefined,
         isRefund,
@@ -233,7 +231,7 @@ export function NewPaymentModal({
                 <div><Label>Hisob <span className="text-rose-500">*</span></Label>
                   <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className={inputCls + ' cursor-pointer'}>
                     <option value="">Tanlang...</option>
-                    {filteredAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {filteredAccounts.map((a) => <option key={a.id} value={a.id}>{a.branch ? `${a.name} — ${a.branch.name}` : a.name}</option>)}
                   </select>
                   {filteredAccounts.length === 0 && (
                     <p className="mt-1 text-xs text-amber-500">Bu kassa turi ({method}) uchun hisob yo‘q — “Hisoblar” bo‘limidan qo‘shing.</p>

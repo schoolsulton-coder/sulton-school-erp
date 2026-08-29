@@ -28,12 +28,14 @@ export class FlowAccountsController {
   list(
     @Query('branchId') branchId?: string,
     @Query('currency') currency?: string,
+    @Query('kassaTuri') kassaTuri?: string,
     @Query('userId') userId?: string,
     @Query('active') active?: string,
   ) {
     return this.service.list({
       branchId,
       currency,
+      kassaTuri,
       userId,
       active: active === 'true' ? true : active === 'false' ? false : undefined,
     });

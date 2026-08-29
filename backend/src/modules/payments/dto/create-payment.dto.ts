@@ -45,7 +45,11 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsString()
-  accountId?: string;
+  accountId?: string; // eski Moliya kassa (legacy)
+
+  @IsOptional()
+  @IsString()
+  flowAccountId?: string; // «Hisoblar» bo'limidagi kassa
 
   @IsOptional()
   @IsString()

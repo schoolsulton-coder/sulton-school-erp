@@ -36,7 +36,7 @@ export interface FlowAccountInput {
 }
 
 export const flowAccountsApi = {
-  list: (params?: { branchId?: string; currency?: string; userId?: string; active?: string }) =>
+  list: (params?: { branchId?: string; currency?: string; kassaTuri?: string; userId?: string; active?: string }) =>
     api.get<FlowAccount[]>('/flow-accounts', { params }).then((r) => r.data),
   create: (data: FlowAccountInput) =>
     api.post<FlowAccount>('/flow-accounts', data).then((r) => r.data),

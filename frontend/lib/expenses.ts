@@ -107,11 +107,15 @@ export interface ExpensePayment {
   method: string;
   accountId?: string | null;
   account?: { id: string; name: string } | null;
+  flowAccountId?: string | null;
+  flowAccount?: { id: string; name: string } | null;
   dollarAmount?: number | null;
   dollarRate?: number | null;
   dollarMethod?: string | null;
   dollarAccountId?: string | null;
   dollarAccount?: { id: string; name: string } | null;
+  dollarFlowAccountId?: string | null;
+  dollarFlowAccount?: { id: string; name: string } | null;
   paidAt: string;
   isRefund: boolean;
   note?: string | null;
@@ -147,11 +151,13 @@ export interface ExpenseFilters {
 export interface ExpensePaymentInput {
   amount?: number;
   method: string;
-  accountId?: string;
+  accountId?: string; // eski Moliya kassa (legacy)
+  flowAccountId?: string; // «Hisoblar» kassasi (so'm)
   dollarAmount?: number;
   dollarRate?: number;
   dollarMethod?: string;
-  dollarAccountId?: string;
+  dollarAccountId?: string; // eski Moliya kassa (legacy)
+  dollarFlowAccountId?: string; // «Hisoblar» kassasi (dollar)
   paidAt?: string;
   isRefund?: boolean;
   note?: string;

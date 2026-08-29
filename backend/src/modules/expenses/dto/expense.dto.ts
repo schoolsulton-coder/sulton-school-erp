@@ -47,12 +47,14 @@ export class BulkExpenseLinesDto {
 export class CreateExpensePaymentDto {
   @IsOptional() @IsNumber() @Min(0) amount?: number;
   @IsString() @IsNotEmpty() method: string;
-  @IsOptional() @IsString() accountId?: string;
+  @IsOptional() @IsString() accountId?: string; // eski Moliya kassa (legacy)
+  @IsOptional() @IsString() flowAccountId?: string; // «Hisoblar» kassasi (so'm)
   // Dollar qismi (ixtiyoriy)
   @IsOptional() @IsNumber() @Min(0) dollarAmount?: number;
   @IsOptional() @IsNumber() @Min(0) dollarRate?: number;
   @IsOptional() @IsString() dollarMethod?: string;
-  @IsOptional() @IsString() dollarAccountId?: string;
+  @IsOptional() @IsString() dollarAccountId?: string; // eski Moliya kassa (legacy)
+  @IsOptional() @IsString() dollarFlowAccountId?: string; // «Hisoblar» kassasi (dollar)
   @IsOptional() @IsString() paidAt?: string;
   @IsOptional() @IsBoolean() isRefund?: boolean;
   @IsOptional() @IsString() note?: string;

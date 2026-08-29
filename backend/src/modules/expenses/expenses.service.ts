@@ -285,6 +285,8 @@ export class ExpensesService {
           include: {
             account: { select: { id: true, name: true } },
             dollarAccount: { select: { id: true, name: true } },
+            flowAccount: { select: { id: true, name: true } },
+            dollarFlowAccount: { select: { id: true, name: true } },
           },
           orderBy: { paidAt: 'asc' },
         },
@@ -330,15 +332,7 @@ export class ExpensesService {
     const payments = await this.prisma.expensePayment.findMany({ where: { expenseId: id } });
     return this.prisma.$transaction(async (tx) => {
       for (const p of payments) {
-        const somPart = p.amount || 0;
-        const dollarSom = (p.dollarAmount || 0) * (p.dollarRate || 0);
-        const sign = p.isRefund ? 1 : -1;
-        if (p.accountId && somPart > 0) {
-          await tx.account.update({ where: { id: p.accountId }, data: { balance: { increment: -sign * somPart } } });
-        }
-        if (p.dollarAccountId && dollarSom > 0) {
-          await tx.account.update({ where: { id: p.dollarAccountId }, data: { balance: { increment: -sign * dollarSom } } });
-        }
+        await this.applyPaymentBalance(tx, p, p.isRefund ? -1 : 1);
       }
       return tx.expense.delete({ where: { id } });
     });
@@ -400,6 +394,40 @@ export class ExpensesService {
     return this.prisma.expenseLine.delete({ where: { id: lineId } });
   }
 
+  // ===== Kassa balansi =====
+  // So'm qismi — so'm hisobiga, dollar qismi — dollar hisobiga.
+  // «Hisoblar» kassasi (flow) o'z valyutasida yuritiladi (dollar hisob — dollarda),
+  // eski Moliya kassa esa doim so'mda (dollar qismi kurs bo'yicha so'mga aylantiriladi).
+  private async applyPaymentBalance(
+    tx: Prisma.TransactionClient,
+    p: {
+      amount: number | null;
+      accountId: string | null;
+      flowAccountId: string | null;
+      dollarAmount: number | null;
+      dollarRate: number | null;
+      dollarAccountId: string | null;
+      dollarFlowAccountId: string | null;
+    },
+    sign: number,
+  ) {
+    const somPart = p.amount || 0;
+    const dollarPart = p.dollarAmount || 0;
+    const dollarSom = dollarPart * (p.dollarRate || 0);
+    if (somPart > 0) {
+      if (p.flowAccountId) {
+        await tx.flowAccount.update({ where: { id: p.flowAccountId }, data: { balance: { increment: sign * somPart } } });
+      } else if (p.accountId) {
+        await tx.account.update({ where: { id: p.accountId }, data: { balance: { increment: sign * somPart } } });
+      }
+    }
+    if (p.dollarFlowAccountId && dollarPart > 0) {
+      await tx.flowAccount.update({ where: { id: p.dollarFlowAccountId }, data: { balance: { increment: sign * dollarPart } } });
+    } else if (p.dollarAccountId && dollarSom > 0) {
+      await tx.account.update({ where: { id: p.dollarAccountId }, data: { balance: { increment: sign * dollarSom } } });
+    }
+  }
+
   // ===== To'lovlar =====
   async addPayment(expenseId: string, dto: CreateExpensePaymentDto) {
     await this.ensure(expenseId);
@@ -416,22 +444,19 @@ export class ExpensesService {
           expenseId,
           amount: somPart,
           method: dto.method,
-          accountId: dto.accountId || null,
+          accountId: dto.flowAccountId ? null : dto.accountId || null,
+          flowAccountId: dto.flowAccountId || null,
           dollarAmount: dto.dollarAmount || null,
           dollarRate: dto.dollarRate || null,
           dollarMethod: dto.dollarMethod || null,
-          dollarAccountId: dto.dollarAccountId || null,
+          dollarAccountId: dto.dollarFlowAccountId ? null : dto.dollarAccountId || null,
+          dollarFlowAccountId: dto.dollarFlowAccountId || null,
           isRefund,
           note: dto.note || null,
           paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
         },
       });
-      if (payment.accountId && somPart > 0) {
-        await tx.account.update({ where: { id: payment.accountId }, data: { balance: { increment: sign * somPart } } });
-      }
-      if (payment.dollarAccountId && dollarSom > 0) {
-        await tx.account.update({ where: { id: payment.dollarAccountId }, data: { balance: { increment: sign * dollarSom } } });
-      }
+      await this.applyPaymentBalance(tx, payment, sign);
       return payment;
     });
   }
@@ -442,11 +467,22 @@ export class ExpensesService {
 
     const amount = dto.amount ?? old.amount;
     const method = dto.method ?? old.method;
-    const accountId = dto.accountId !== undefined ? dto.accountId || null : old.accountId;
+    const flowAccountId = dto.flowAccountId !== undefined ? dto.flowAccountId || null : old.flowAccountId;
+    const accountId = dto.flowAccountId
+      ? null
+      : dto.accountId !== undefined
+      ? dto.accountId || null
+      : old.accountId;
     const dollarAmount = dto.dollarAmount !== undefined ? dto.dollarAmount || null : old.dollarAmount;
     const dollarRate = dto.dollarRate !== undefined ? dto.dollarRate || null : old.dollarRate;
     const dollarMethod = dto.dollarMethod !== undefined ? dto.dollarMethod || null : old.dollarMethod;
-    const dollarAccountId = dto.dollarAccountId !== undefined ? dto.dollarAccountId || null : old.dollarAccountId;
+    const dollarFlowAccountId =
+      dto.dollarFlowAccountId !== undefined ? dto.dollarFlowAccountId || null : old.dollarFlowAccountId;
+    const dollarAccountId = dto.dollarFlowAccountId
+      ? null
+      : dto.dollarAccountId !== undefined
+      ? dto.dollarAccountId || null
+      : old.dollarAccountId;
     const isRefund = dto.isRefund ?? old.isRefund;
     const paidAt = dto.paidAt ? new Date(dto.paidAt) : old.paidAt;
     const note = dto.note !== undefined ? dto.note || null : old.note;
@@ -457,18 +493,16 @@ export class ExpensesService {
 
     return this.prisma.$transaction(async (tx) => {
       // Eski ta'sirni teskari qaytaramiz
-      const oldSom = old.amount || 0;
-      const oldDollarSom = (old.dollarAmount || 0) * (old.dollarRate || 0);
-      const oldSign = old.isRefund ? 1 : -1;
-      if (old.accountId && oldSom > 0) await tx.account.update({ where: { id: old.accountId }, data: { balance: { increment: -oldSign * oldSom } } });
-      if (old.dollarAccountId && oldDollarSom > 0) await tx.account.update({ where: { id: old.dollarAccountId }, data: { balance: { increment: -oldSign * oldDollarSom } } });
+      await this.applyPaymentBalance(tx, old, old.isRefund ? -1 : 1);
       // Yangi ta'sirni qo'llaymiz
-      const newSign = isRefund ? 1 : -1;
-      if (accountId && newSom > 0) await tx.account.update({ where: { id: accountId }, data: { balance: { increment: newSign * newSom } } });
-      if (dollarAccountId && newDollarSom > 0) await tx.account.update({ where: { id: dollarAccountId }, data: { balance: { increment: newSign * newDollarSom } } });
+      await this.applyPaymentBalance(
+        tx,
+        { amount: newSom, accountId, flowAccountId, dollarAmount, dollarRate, dollarAccountId, dollarFlowAccountId },
+        isRefund ? 1 : -1,
+      );
       return tx.expensePayment.update({
         where: { id: paymentId },
-        data: { amount: newSom, method, accountId, dollarAmount, dollarRate, dollarMethod, dollarAccountId, isRefund, paidAt, note },
+        data: { amount: newSom, method, accountId, flowAccountId, dollarAmount, dollarRate, dollarMethod, dollarAccountId, dollarFlowAccountId, isRefund, paidAt, note },
       });
     });
   }
@@ -476,17 +510,9 @@ export class ExpensesService {
   async removePayment(paymentId: string) {
     const p = await this.prisma.expensePayment.findUnique({ where: { id: paymentId } });
     if (!p) throw new NotFoundException("To'lov topilmadi");
-    const somPart = p.amount || 0;
-    const dollarSom = (p.dollarAmount || 0) * (p.dollarRate || 0);
-    const sign = p.isRefund ? 1 : -1;
     return this.prisma.$transaction(async (tx) => {
       // Asl ta'sirni teskari qaytaramiz
-      if (p.accountId && somPart > 0) {
-        await tx.account.update({ where: { id: p.accountId }, data: { balance: { increment: -sign * somPart } } });
-      }
-      if (p.dollarAccountId && dollarSom > 0) {
-        await tx.account.update({ where: { id: p.dollarAccountId }, data: { balance: { increment: -sign * dollarSom } } });
-      }
+      await this.applyPaymentBalance(tx, p, p.isRefund ? -1 : 1);
       return tx.expensePayment.delete({ where: { id: paymentId } });
     });
   }

@@ -6,10 +6,11 @@ import { CreateFlowAccountDto, UpdateFlowAccountDto } from './dto/flow-account.d
 export class FlowAccountsService {
   constructor(private prisma: PrismaService) {}
 
-  list(params: { branchId?: string; currency?: string; userId?: string; active?: boolean }) {
+  list(params: { branchId?: string; currency?: string; kassaTuri?: string; userId?: string; active?: boolean }) {
     const where: any = {};
     if (params.branchId) where.branchId = params.branchId;
     if (params.currency) where.currency = params.currency;
+    if (params.kassaTuri) where.kassaTuri = params.kassaTuri;
     if (params.userId) where.userId = params.userId;
     if (typeof params.active === 'boolean') where.active = params.active;
     return this.prisma.flowAccount.findMany({
@@ -38,19 +39,28 @@ export class FlowAccountsService {
     });
   }
 
+  /** Hisobga bog'langan harakatlar soni (maosh, o'tkazma, oldi-berdi, maktab to'lovi, xarajat) */
+  private async linkedCount(id: string) {
+    const [sal, itFrom, itTo, cpSom, cpDol, pay, expSom, expDol] = await Promise.all([
+      this.prisma.salaryPayment.count({ where: { OR: [{ somAccountId: id }, { dollarAccountId: id }] } }),
+      this.prisma.internalTransfer.count({ where: { fromAccountId: id } }),
+      this.prisma.internalTransfer.count({ where: { toAccountId: id } }),
+      this.prisma.counterpartyEntry.count({ where: { somFlowAccountId: id } }),
+      this.prisma.counterpartyEntry.count({ where: { dollarFlowAccountId: id } }),
+      this.prisma.payment.count({ where: { flowAccountId: id } }),
+      this.prisma.expensePayment.count({ where: { flowAccountId: id } }),
+      this.prisma.expensePayment.count({ where: { dollarFlowAccountId: id } }),
+    ]);
+    return sal + itFrom + itTo + cpSom + cpDol + pay + expSom + expDol;
+  }
+
   async update(id: string, dto: UpdateFlowAccountDto) {
     const cur = await this.prisma.flowAccount.findUnique({ where: { id } });
     if (!cur) throw new NotFoundException('Hisob topilmadi');
     // Valyuta o'zgartirilsa — harakatlar/qoldiq bilan desync bo'lmasin
     if (dto.currency !== undefined && dto.currency !== cur.currency) {
-      const [sal, itFrom, itTo, cpSom, cpDol] = await Promise.all([
-        this.prisma.salaryPayment.count({ where: { OR: [{ somAccountId: id }, { dollarAccountId: id }] } }),
-        this.prisma.internalTransfer.count({ where: { fromAccountId: id } }),
-        this.prisma.internalTransfer.count({ where: { toAccountId: id } }),
-        this.prisma.counterpartyEntry.count({ where: { somFlowAccountId: id } }),
-        this.prisma.counterpartyEntry.count({ where: { dollarFlowAccountId: id } }),
-      ]);
-      if (sal + itFrom + itTo + cpSom + cpDol > 0 || cur.balance !== 0) {
+      const linked = await this.linkedCount(id);
+      if (linked > 0 || cur.balance !== 0) {
         throw new BadRequestException("Hisobda harakatlar bor — valyutani o'zgartirib bo'lmaydi");
       }
     }
@@ -74,14 +84,7 @@ export class FlowAccountsService {
   async remove(id: string) {
     const acc = await this.prisma.flowAccount.findUnique({ where: { id } });
     if (!acc) throw new NotFoundException('Hisob topilmadi');
-    const [sal, itFrom, itTo, cpSom, cpDol] = await Promise.all([
-      this.prisma.salaryPayment.count({ where: { OR: [{ somAccountId: id }, { dollarAccountId: id }] } }),
-      this.prisma.internalTransfer.count({ where: { fromAccountId: id } }),
-      this.prisma.internalTransfer.count({ where: { toAccountId: id } }),
-      this.prisma.counterpartyEntry.count({ where: { somFlowAccountId: id } }),
-      this.prisma.counterpartyEntry.count({ where: { dollarFlowAccountId: id } }),
-    ]);
-    const linked = sal + itFrom + itTo + cpSom + cpDol;
+    const linked = await this.linkedCount(id);
     if (linked > 0) {
       throw new BadRequestException(
         `Bu hisobda ${linked} ta harakat bog'langan. Avval ularni o'chiring, keyin hisobni o'chiring.`,

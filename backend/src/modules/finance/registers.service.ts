@@ -192,6 +192,14 @@ export class RegistersService {
       }
     } else {
       // FLOW
+      // Maktab to'lovi (kirim) — «Hisoblar» kassasiga bog'langan
+      const pays = await this.prisma.payment.findMany({ where: { flowAccountId: id }, include: { student: { select: { firstName: true, lastName: true } } } });
+      for (const p of pays) mv.push({ date: p.paidAt, source: 'SCHOOL_PAYMENT', label: p.isRefund ? "Maktab to'lovi qaytarish" : "Maktab to'lovi", direction: p.isRefund ? 'OUT' : 'IN', amount: p.amount, currency: 'SOM', confirmed: p.confirmedAt != null, refType: 'Payment', refId: p.id, counterparty: p.student ? `${p.student.lastName} ${p.student.firstName}` : '—', note: p.note });
+      // Xarajat to'lovi (chiqim) — so'm va dollar qismlari o'z hisobiga
+      const expSom = await this.prisma.expensePayment.findMany({ where: { flowAccountId: id } });
+      for (const e of expSom) mv.push({ date: e.paidAt, source: 'EXPENSE', label: e.isRefund ? 'Xarajat qaytarish' : "Xarajat to'lovi", direction: e.isRefund ? 'IN' : 'OUT', amount: e.amount, currency: 'SOM', confirmed: true, refType: 'ExpensePayment', refId: e.id, counterparty: '—', note: e.note });
+      const expDol = await this.prisma.expensePayment.findMany({ where: { dollarFlowAccountId: id } });
+      for (const e of expDol) mv.push({ date: e.paidAt, source: 'EXPENSE', label: 'Xarajat (valyuta)', direction: e.isRefund ? 'IN' : 'OUT', amount: e.dollarAmount ?? 0, currency: 'USD', confirmed: true, refType: 'ExpensePayment', refId: e.id, counterparty: '—', note: e.note });
       // Maosh (chiqim)
       const salSom = await this.prisma.salaryPayment.findMany({ where: { somAccountId: id }, include: { employee: { include: { user: { select: { fullName: true } } } } } });
       for (const s of salSom) mv.push({ date: s.date, source: 'SALARY', label: 'Maosh', direction: 'OUT', amount: s.somAmount, currency: 'SOM', confirmed: true, refType: 'SalaryPayment', refId: s.id, counterparty: s.employee?.user?.fullName ?? '—', note: s.note });

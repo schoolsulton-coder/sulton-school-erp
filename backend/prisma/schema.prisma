@@ -646,6 +646,9 @@ model Payment {
   contract    Contract? @relation(fields: [contractId], references: [id])
   accountId   String?
   account     Account?  @relation(fields: [accountId], references: [id])
+  // Yangi hisoblar (filial/valyuta/kassa turi bilan) — «Hisoblar» bo'limidagi kassalar
+  flowAccountId String?
+  flowAccount   FlowAccount? @relation("PaymentFlowAccount", fields: [flowAccountId], references: [id])
   amount      Float
   method      String    // kassa turi: Naqd, Bank, Karta
   type        String?   // to'lov turi: Click, Payme, Terminal...
@@ -665,6 +668,7 @@ model Payment {
   @@index([studentId])
   @@index([contractId])
   @@index([accountId])
+  @@index([flowAccountId])
   @@map("payments")
 }
 
@@ -769,18 +773,26 @@ model ExpensePayment {
   method    String   // Naqd / Karta / Bank
   accountId String?
   account   Account? @relation("ExpenseSomAccount", fields: [accountId], references: [id])
+  // Yangi hisob (so'm qismi) — «Hisoblar» bo'limidagi kassa
+  flowAccountId String?
+  flowAccount   FlowAccount? @relation("ExpenseSomFlowAccount", fields: [flowAccountId], references: [id])
   // Dollar qismi (ixtiyoriy) — so'mdagi ekvivalenti = dollarAmount * dollarRate
   dollarAmount    Float?
   dollarRate      Float?
   dollarMethod    String?
   dollarAccountId String?
   dollarAccount   Account? @relation("ExpenseDollarAccount", fields: [dollarAccountId], references: [id])
+  // Yangi hisob (dollar qismi) — balans dollarda yuritiladi
+  dollarFlowAccountId String?
+  dollarFlowAccount   FlowAccount? @relation("ExpenseDollarFlowAccount", fields: [dollarFlowAccountId], references: [id])
   paidAt    DateTime @default(now())
   isRefund  Boolean  @default(false)
   note      String?
   createdAt DateTime @default(now())
 
   @@index([expenseId])
+  @@index([flowAccountId])
+  @@index([dollarFlowAccountId])
   @@map("expense_payments")
 }
 
@@ -1332,6 +1344,9 @@ model FlowAccount {
   cardType   String? // Uzcard | Humo | Visa ...
   entrySom    CounterpartyEntry[] @relation("EntrySomFlow")
   entryDollar CounterpartyEntry[] @relation("EntryDollarFlow")
+  payments             Payment[]        @relation("PaymentFlowAccount")
+  expenseSomPayments    ExpensePayment[] @relation("ExpenseSomFlowAccount")
+  expenseDollarPayments ExpensePayment[] @relation("ExpenseDollarFlowAccount")
   itFrom      InternalTransfer[]  @relation("ITFrom")
   itTo        InternalTransfer[]  @relation("ITTo")
   salarySom    SalaryPayment[]    @relation("SalarySomAccount")

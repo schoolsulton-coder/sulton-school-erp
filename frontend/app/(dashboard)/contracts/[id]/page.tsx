@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronDown, FileText, Pencil, Trash2, Plus, X } from 'luc
 import { contractsApi } from '@/lib/contracts';
 import { contractTemplatesApi } from '@/lib/contract-templates';
 import { crmApi, type ClassForm } from '@/lib/crm';
-import { financeApi } from '@/lib/finance';
+import { flowAccountsApi, flowAccountLabel } from '@/lib/flow-accounts';
 import { StudentRecords } from '@/components/student-records';
 
 const num = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -318,9 +318,9 @@ function InfoRow({ label, value, accent }: { label: string; value?: string | nul
 
 function PaymentModal({ contractId, onClose, onPaid }: { contractId: string; onClose: () => void; onPaid: () => void }) {
   const [form, setForm] = useState({ amount: '', method: 'naqd', accountId: '', note: '' });
-  const { data: accounts } = useQuery({ queryKey: ['finance-accounts'], queryFn: financeApi.accounts });
+  const { data: accounts } = useQuery({ queryKey: ['flow-acc', 'SOM'], queryFn: () => flowAccountsApi.list({ currency: 'SOM', active: 'true' }) });
   const pay = useMutation({
-    mutationFn: () => contractsApi.addPayment(contractId, { amount: Number(form.amount), method: form.method, accountId: form.accountId || undefined, note: form.note || undefined }),
+    mutationFn: () => contractsApi.addPayment(contractId, { amount: Number(form.amount), method: form.method, flowAccountId: form.accountId || undefined, note: form.note || undefined }),
     onSuccess: onPaid,
   });
   const acc = accounts?.find((a) => a.id === form.accountId);
@@ -339,7 +339,7 @@ function PaymentModal({ contractId, onClose, onPaid }: { contractId: string; onC
         <div>
           <select value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className={inp}>
             <option value="">Kassa (ixtiyoriy)...</option>
-            {accounts?.map((a) => <option key={a.id} value={a.id}>{a.name} — {num(a.balance)}</option>)}
+            {accounts?.map((a) => <option key={a.id} value={a.id}>{flowAccountLabel(a)} — {num(a.balance)}</option>)}
           </select>
           {acc && <p className="mt-1 text-xs text-slate-400">Tanlangan kassaga qo&apos;shiladi. Yangi qoldiq: {num(acc.balance + (Number(form.amount) || 0))}</p>}
         </div>
