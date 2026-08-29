@@ -4,31 +4,35 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { X, Search } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
-import { hrApi, SHARTNOMA_TURLARI, SHARTNOMA_HOLATLARI, BANDLIK_TURLARI, SHARTNOMA_TILLARI, type Employee } from '@/lib/hr';
+import { hrApi, SHARTNOMA_TURLARI, SHARTNOMA_HOLATLARI, BANDLIK_TURLARI, SHARTNOMA_TILLARI, type Employee, type ShartnomaDetail } from '@/lib/hr';
+
+/** ISO sanani <input type="date"> formatiga (YYYY-MM-DD) keltiradi */
+const dateVal = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('en-CA') : '');
 
 const lbl = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500';
 const inp = 'w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm outline-none focus:border-brand focus:bg-white';
 
-export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employeeName }: { onClose: () => void; onSaved: () => void; employeeId?: string; employeeName?: string }) {
+export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employeeName, contract }: { onClose: () => void; onSaved: () => void; employeeId?: string; employeeName?: string; contract?: ShartnomaDetail }) {
+  const isEdit = !!contract;
   const [empSearch, setEmpSearch] = useState('');
-  const [employeeId, setEmployeeId] = useState(fixedEmp ?? '');
-  const [type, setType] = useState(SHARTNOMA_TURLARI[0]);
-  const [status, setStatus] = useState('YARATILGAN');
-  const [date, setDate] = useState('');
-  const [date2, setDate2] = useState('');
-  const [number, setNumber] = useState('');
-  const [kelishSana, setKelishSana] = useState('');
-  const [kKuni, setKKuni] = useState('');
-  const [employment, setEmployment] = useState('');
-  const [stavka, setStavka] = useState('');
-  const [til, setTil] = useState('');
-  const [branchId, setBranchId] = useState('');
-  const [qoshimchaLavozim, setQL] = useState('');
-  const [qoshimchaStavka, setQS] = useState('');
-  const [modda, setModda] = useState('');
-  const [fayl1, setFayl1] = useState('');
-  const [fayl2, setFayl2] = useState('');
-  const [fayl3, setFayl3] = useState('');
+  const [employeeId, setEmployeeId] = useState(contract?.employee.id ?? fixedEmp ?? '');
+  const [type, setType] = useState(contract?.type ?? SHARTNOMA_TURLARI[0]);
+  const [status, setStatus] = useState(contract?.status ?? 'YARATILGAN');
+  const [date, setDate] = useState(dateVal(contract?.date));
+  const [date2, setDate2] = useState(dateVal(contract?.date2));
+  const [number, setNumber] = useState(contract && contract.number !== '—' ? contract.number : '');
+  const [kelishSana, setKelishSana] = useState(dateVal(contract?.kelishSana));
+  const [kKuni, setKKuni] = useState(contract?.kKuni ?? '');
+  const [employment, setEmployment] = useState(contract?.employment ?? '');
+  const [stavka, setStavka] = useState(contract?.stavka != null ? String(contract.stavka) : '');
+  const [til, setTil] = useState(contract?.til ?? '');
+  const [branchId, setBranchId] = useState(contract?.branchId ?? '');
+  const [qoshimchaLavozim, setQL] = useState(contract?.qoshimchaLavozim ?? '');
+  const [qoshimchaStavka, setQS] = useState(contract?.qoshimchaStavka != null ? String(contract.qoshimchaStavka) : '');
+  const [modda, setModda] = useState(contract?.modda ?? '');
+  const [fayl1, setFayl1] = useState(contract?.fayl1 ?? '');
+  const [fayl2, setFayl2] = useState(contract?.fayl2 ?? '');
+  const [fayl3, setFayl3] = useState(contract?.fayl3 ?? '');
   const [error, setError] = useState('');
 
   const { data: employees } = useQuery({ queryKey: ['hr-employees'], queryFn: () => hrApi.employees() });
@@ -41,27 +45,32 @@ export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employe
   const selected = (employees ?? []).find((e) => e.id === employeeId);
 
   const save = useMutation({
-    mutationFn: () =>
-      hrApi.createShartnoma({
+    mutationFn: () => {
+      // Tahrirlashda bo'sh maydon "tozalash" degani (null); yaratishda esa yuborilmaydi
+      const opt = (v: string) => (isEdit ? v || null : v || undefined);
+      const optNum = (v: string) => (isEdit ? (v ? Number(v) : null) : v ? Number(v) : undefined);
+      const payload = {
         employeeId,
         type,
         status,
-        number: number || undefined,
+        number: opt(number),
         date: date || undefined,
-        date2: date2 || undefined,
-        kelishSana: kelishSana || undefined,
-        kKuni: kKuni || undefined,
-        employment: employment || undefined,
-        stavka: stavka ? Number(stavka) : undefined,
-        til: til || undefined,
-        branchId: branchId || undefined,
-        qoshimchaLavozim: qoshimchaLavozim || undefined,
-        qoshimchaStavka: qoshimchaStavka ? Number(qoshimchaStavka) : undefined,
-        modda: modda || undefined,
-        fayl1: fayl1 || undefined,
-        fayl2: fayl2 || undefined,
-        fayl3: fayl3 || undefined,
-      }),
+        date2: opt(date2),
+        kelishSana: opt(kelishSana),
+        kKuni: opt(kKuni),
+        employment: opt(employment),
+        stavka: optNum(stavka),
+        til: opt(til),
+        branchId: opt(branchId),
+        qoshimchaLavozim: opt(qoshimchaLavozim),
+        qoshimchaStavka: optNum(qoshimchaStavka),
+        modda: opt(modda),
+        fayl1: opt(fayl1),
+        fayl2: opt(fayl2),
+        fayl3: opt(fayl3),
+      };
+      return isEdit ? hrApi.updateShartnoma(contract!.id, payload) : hrApi.createShartnoma(payload);
+    },
     onSuccess: onSaved,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
   });
@@ -78,7 +87,7 @@ export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employe
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="mt-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-800">Yangi kadrlar shartnomasi</h2>
+          <h2 className="text-lg font-bold text-slate-800">{isEdit ? 'Shartnomani tahrirlash' : 'Yangi kadrlar shartnomasi'}</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
 
@@ -86,8 +95,8 @@ export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employe
           {/* Xodim tanlash */}
           <div>
             <label className={lbl}>Xodim / Lavozim <span className="text-rose-500">*</span></label>
-            {fixedEmp ? (
-              <div className="rounded-lg border border-brand/40 bg-brand/5 px-3 py-2 text-sm font-semibold text-slate-800">{employeeName ?? selected?.user.fullName ?? 'Xodim'}</div>
+            {isEdit || fixedEmp ? (
+              <div className="rounded-lg border border-brand/40 bg-brand/5 px-3 py-2 text-sm font-semibold text-slate-800">{contract?.employee.fullName ?? employeeName ?? selected?.user.fullName ?? 'Xodim'}</div>
             ) : selected ? (
               <div className="flex items-center justify-between rounded-lg border border-brand/40 bg-brand/5 px-3 py-2 text-sm">
                 <span><span className="font-semibold text-slate-800">{selected.user.fullName}</span> <span className="text-slate-400">· {selected.position?.name ?? '—'}</span></span>
@@ -154,7 +163,7 @@ export function ShartnomaModal({ onClose, onSaved, employeeId: fixedEmp, employe
 
         <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100">Bekor</button>
-          <button onClick={submit} disabled={save.isPending} className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">{save.isPending ? 'Saqlanmoqda...' : 'Yaratish'}</button>
+          <button onClick={submit} disabled={save.isPending} className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">{save.isPending ? 'Saqlanmoqda...' : isEdit ? 'Saqlash' : 'Yaratish'}</button>
         </div>
       </div>
     </div>

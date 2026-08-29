@@ -93,10 +93,28 @@ export class HrController {
     return this.service.shartnomalar({ search, branchId, type, employment });
   }
 
+  @Get('shartnomalar/:id')
+  @Permissions('hr.view')
+  shartnoma(@Param('id') id: string) {
+    return this.service.shartnoma(id);
+  }
+
   @Post('shartnomalar')
   @Permissions('hr.create')
   createShartnoma(@Body() dto: any) {
     return this.service.createShartnoma(dto);
+  }
+
+  @Patch('shartnomalar/:id')
+  @Permissions('hr.create')
+  updateShartnoma(@Param('id') id: string, @Body() dto: any) {
+    return this.service.updateShartnoma(id, dto);
+  }
+
+  @Delete('shartnomalar/:id')
+  @Permissions('hr.create')
+  removeShartnoma(@Param('id') id: string) {
+    return this.service.removeShartnoma(id);
   }
 
   @Post('xodim')

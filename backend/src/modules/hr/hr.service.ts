@@ -207,6 +207,94 @@ export class HrService {
     return { totals: { jami, yaratilgan, ozgartirilgan, bekor }, data };
   }
 
+  /** Bitta shartnoma — detal paneli uchun */
+  async shartnoma(id: string) {
+    const c = await this.prisma.employmentContract.findUnique({
+      where: { id },
+      include: {
+        employee: {
+          include: {
+            user: { select: { fullName: true, avatar: true, phone: true } },
+            position: { select: { name: true } },
+            department: { select: { name: true } },
+          },
+        },
+        branch: { select: { id: true, name: true } },
+      },
+    });
+    if (!c) throw new NotFoundException('Shartnoma topilmadi');
+    return {
+      id: c.id,
+      number: c.number,
+      date: c.date,
+      date2: c.date2,
+      kelishSana: c.kelishSana,
+      kKuni: c.kKuni,
+      type: c.type,
+      status: c.status,
+      employment: c.employment,
+      stavka: c.stavka,
+      til: c.til,
+      branch: c.branch?.name ?? null,
+      branchId: c.branchId,
+      qoshimchaLavozim: c.qoshimchaLavozim,
+      qoshimchaStavka: c.qoshimchaStavka,
+      modda: c.modda,
+      fayllar: [c.fayl1, c.fayl2, c.fayl3].filter((f): f is string => !!f),
+      fayl1: c.fayl1,
+      fayl2: c.fayl2,
+      fayl3: c.fayl3,
+      note: c.note,
+      createdAt: c.createdAt,
+      employee: {
+        id: c.employeeId,
+        fullName: c.employee.user.fullName,
+        avatar: c.employee.user.avatar ?? null,
+        phone: c.employee.user.phone ?? null,
+        position: c.employee.position?.name ?? null,
+        department: c.employee.department?.name ?? null,
+      },
+    };
+  }
+
+  async updateShartnoma(id: string, dto: any) {
+    const exists = await this.prisma.employmentContract.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) throw new NotFoundException('Shartnoma topilmadi');
+    const set = <T,>(v: T | undefined, map?: (x: T) => any) =>
+      v === undefined ? undefined : v === null || v === '' ? null : map ? map(v) : v;
+    return this.prisma.employmentContract.update({
+      where: { id },
+      data: {
+        ...(dto.number !== undefined ? { number: dto.number || '—' } : {}),
+        ...(dto.employeeId ? { employeeId: dto.employeeId } : {}),
+        ...(dto.type ? { type: dto.type } : {}),
+        ...(dto.status ? { status: dto.status } : {}),
+        ...(dto.date !== undefined ? { date: dto.date ? new Date(dto.date) : new Date() } : {}),
+        ...(dto.date2 !== undefined ? { date2: set(dto.date2, (v: string) => new Date(v)) } : {}),
+        ...(dto.kelishSana !== undefined ? { kelishSana: set(dto.kelishSana, (v: string) => new Date(v)) } : {}),
+        ...(dto.kKuni !== undefined ? { kKuni: set(dto.kKuni) } : {}),
+        ...(dto.employment !== undefined ? { employment: set(dto.employment) } : {}),
+        ...(dto.stavka !== undefined ? { stavka: dto.stavka === null || dto.stavka === '' ? null : Number(dto.stavka) } : {}),
+        ...(dto.til !== undefined ? { til: set(dto.til) } : {}),
+        ...(dto.branchId !== undefined ? { branchId: set(dto.branchId) } : {}),
+        ...(dto.qoshimchaLavozim !== undefined ? { qoshimchaLavozim: set(dto.qoshimchaLavozim) } : {}),
+        ...(dto.qoshimchaStavka !== undefined ? { qoshimchaStavka: dto.qoshimchaStavka === null || dto.qoshimchaStavka === '' ? null : Number(dto.qoshimchaStavka) } : {}),
+        ...(dto.modda !== undefined ? { modda: set(dto.modda) } : {}),
+        ...(dto.fayl1 !== undefined ? { fayl1: set(dto.fayl1) } : {}),
+        ...(dto.fayl2 !== undefined ? { fayl2: set(dto.fayl2) } : {}),
+        ...(dto.fayl3 !== undefined ? { fayl3: set(dto.fayl3) } : {}),
+        ...(dto.note !== undefined ? { note: set(dto.note) } : {}),
+      },
+    });
+  }
+
+  async removeShartnoma(id: string) {
+    const exists = await this.prisma.employmentContract.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) throw new NotFoundException('Shartnoma topilmadi');
+    await this.prisma.employmentContract.delete({ where: { id } });
+    return { ok: true };
+  }
+
   async createShartnoma(dto: any) {
     return this.prisma.employmentContract.create({
       data: {

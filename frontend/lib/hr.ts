@@ -292,6 +292,39 @@ export const CONTRACT_STATUS: Record<string, { label: string; cls: string }> = {
   BEKOR: { label: 'Bekor qilingan', cls: 'bg-rose-50 text-rose-600' },
 };
 
+export interface ShartnomaDetail {
+  id: string;
+  number: string;
+  date: string;
+  date2: string | null;
+  kelishSana: string | null;
+  kKuni: string | null;
+  type: string;
+  status: string;
+  employment: string | null;
+  stavka: number | null;
+  til: string | null;
+  branch: string | null;
+  branchId: string | null;
+  qoshimchaLavozim: string | null;
+  qoshimchaStavka: number | null;
+  modda: string | null;
+  fayllar: string[];
+  fayl1: string | null;
+  fayl2: string | null;
+  fayl3: string | null;
+  note: string | null;
+  createdAt: string;
+  employee: {
+    id: string;
+    fullName: string;
+    avatar: string | null;
+    phone: string | null;
+    position: string | null;
+    department: string | null;
+  };
+}
+
 export const hrApi = {
   employees: (params?: { status?: string; departmentId?: string }) =>
     api.get<Employee[]>('/hr/employees', { params }).then((r) => r.data),
@@ -302,6 +335,12 @@ export const hrApi = {
   shartnomalar: (params?: { search?: string; branchId?: string; type?: string; employment?: string }) =>
     api.get<ShartnomalarResp>('/hr/shartnomalar', { params }).then((r) => r.data),
   createShartnoma: (data: any) => api.post('/hr/shartnomalar', data).then((r) => r.data),
+  shartnoma: (id: string) =>
+    api.get<ShartnomaDetail>(`/hr/shartnomalar/${id}`).then((r) => r.data),
+  updateShartnoma: (id: string, data: any) =>
+    api.patch(`/hr/shartnomalar/${id}`, data).then((r) => r.data),
+  removeShartnoma: (id: string) =>
+    api.delete(`/hr/shartnomalar/${id}`).then((r) => r.data),
   createXodim: (data: any) => api.post('/hr/xodim', data).then((r) => r.data),
   createLavozim: (data: any) => api.post('/hr/lavozim', data).then((r) => r.data),
   updateKelishuv: (employeeId: string, data: any) => api.patch(`/hr/kelishuv/${employeeId}`, data).then((r) => r.data),

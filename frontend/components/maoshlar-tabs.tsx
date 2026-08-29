@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { crmApi } from '@/lib/crm';
 import { ShartnomaModal } from '@/components/shartnoma-form';
+import { ShartnomaDetailPanel } from '@/components/shartnoma-detail';
 import { TolovModal } from '@/components/tolov-form';
 import { XodimModal, LavozimModal } from '@/components/xodim-lavozim-forms';
 import { LavozimDetailPanel } from '@/components/lavozim-detail';
@@ -192,6 +193,7 @@ export function ShartnomalarTab() {
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
   const { data, isLoading } = useQuery({
     queryKey: ['shartnomalar', search, branchId],
@@ -213,6 +215,7 @@ export function ShartnomalarTab() {
         <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"><Plus size={18} /> Yangi shartnoma</button>
       </div>
       {showForm && <ShartnomaModal onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['shartnomalar'] }); }} />}
+      {detailId && <ShartnomaDetailPanel id={detailId} onClose={() => setDetailId(null)} onChanged={() => qc.invalidateQueries({ queryKey: ['shartnomalar'] })} />}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Jami shartnomalar" value={t?.jami ?? 0} />
         <Stat label="Yaratilgan" value={t?.yaratilgan ?? 0} tone="bg-emerald-50/40" />
@@ -231,7 +234,7 @@ export function ShartnomalarTab() {
               {isLoading ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">Yuklanmoqda...</td></tr>
               ) : rows.length ? rows.map((c: ShartnomaRow) => (
-                <tr key={c.id} className="border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
+                <tr key={c.id} onClick={() => setDetailId(c.id)} className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-brand/[0.03]">
                   <td className="whitespace-nowrap px-5 py-3.5 text-slate-500">{fmtDate(c.date)}</td>
                   <td className="px-5 py-3.5 font-medium text-slate-700">{c.number}</td>
                   <td className="px-5 py-3.5"><div className="font-semibold text-slate-800">{c.xodim}</div>{c.position && <div className="text-xs text-slate-400">{c.position}</div>}</td>
