@@ -9,13 +9,19 @@ import { SECTIONS } from '@/lib/nav';
  * Sidebar guruhi (Ma'lumotlar / O'quv jarayoni / Sozlamalar) ichiga kirilganda
  * yuqorida ko'rinadigan tab'lar (dropdown o'rniga).
  */
+const ACADEMIC_ROLES = ['coordinator', 'teacher', 'curator'];
+
 export function SectionTabs() {
   const pathname = usePathname();
   const can = useAuthStore((s) => s.can);
+  const user = useAuthStore((s) => s.user);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
   const section = SECTIONS.find((s) => s.children.some((c) => isActive(c.href)));
   if (!section) return null;
+
+  // Akademik rollarda "O'quv jarayoni" chap menuda ochilgan — yuqoridagi tab qatori takror bo'lmasin
+  if (section.label === "O'quv jarayoni" && user && ACADEMIC_ROLES.includes(user.role)) return null;
 
   const tabs = section.children.filter((c) => !c.perm || can(c.perm));
   if (tabs.length === 0) return null;

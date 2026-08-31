@@ -136,24 +136,31 @@ function UserModal({
   const isTeacher = roles?.find((r) => r.id === form.roleId)?.slug === 'teacher';
 
   const save = useMutation({
-    mutationFn: () =>
-      editing
-        ? usersApi.update(user!.id, {
-            fullName: form.fullName,
-            phone: form.phone,
-            email: form.email || undefined,
-            roleId: form.roleId,
-            status: form.status as any,
-            subjectId: isTeacher ? form.subjectId || '' : '',
-          })
-        : usersApi.create({
-            fullName: form.fullName,
-            phone: form.phone,
-            email: form.email || undefined,
-            password: form.password,
-            roleId: form.roleId,
-            subjectId: isTeacher ? form.subjectId || undefined : undefined,
-          }),
+    mutationFn: async () => {
+      if (editing) {
+        await usersApi.update(user!.id, {
+          fullName: form.fullName,
+          phone: form.phone,
+          email: form.email || undefined,
+          roleId: form.roleId,
+          status: form.status as any,
+          subjectId: isTeacher ? form.subjectId || '' : '',
+        });
+        // Parol kiritilgan bo'lsa — yangilaymiz
+        if (form.password && form.password.length >= 6) {
+          await usersApi.resetPassword(user!.id, form.password);
+        }
+      } else {
+        await usersApi.create({
+          fullName: form.fullName,
+          phone: form.phone,
+          email: form.email || undefined,
+          password: form.password,
+          roleId: form.roleId,
+          subjectId: isTeacher ? form.subjectId || undefined : undefined,
+        });
+      }
+    },
     onSuccess: onDone,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
   });
@@ -169,9 +176,16 @@ function UserModal({
         <input placeholder="F.I.SH" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className={inputCls} required />
         <input placeholder="Telefon (+998...)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} required />
         <input placeholder="Email (ixtiyoriy)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} />
-        {!editing && (
-          <input type="password" placeholder="Parol" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} required minLength={6} />
-        )}
+        <input
+          type="password"
+          placeholder={editing ? "Yangi parol (bo'sh qoldiring — o'zgarmaydi)" : 'Parol (tizimga kirish uchun)'}
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          className={inputCls}
+          required={!editing}
+          minLength={6}
+          autoComplete="new-password"
+        />
         <select value={form.roleId} onChange={(e) => setForm({ ...form, roleId: e.target.value })} className={inputCls} required>
           <option value="">Rol tanlang</option>
           {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
