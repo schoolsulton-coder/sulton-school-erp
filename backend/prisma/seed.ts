@@ -59,6 +59,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'students.view',
     'students.create',
     'students.update',
+    // O'quv jarayoni ko'rinishi uchun
+    'grades.view',
+    'attendance.view',
+    'homework.view',
+    'behavior.view',
   ],
   teacher: [
     'grades.view',
@@ -69,6 +74,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'homework.view',
     'homework.create',
     'homework.update',
+    'behavior.view',
     'behavior.create',
   ],
   curator: [
@@ -76,6 +82,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'grades.view',
     'attendance.view',
     'attendance.create',
+    'homework.view',
     'behavior.view',
     'behavior.create',
   ],
