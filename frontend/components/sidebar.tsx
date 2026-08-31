@@ -49,6 +49,9 @@ const MENU: Item[] = [
   { href: '/reports', label: 'Hisobotlar', icon: BarChart3, perm: 'reports.view' },
 ];
 
+// Bu rollar uchun "O'quv jarayoni" bo'limi chap menuda ochilgan holda (bolalari bilan) ko'rinadi
+const ACADEMIC_ROLES = ['coordinator', 'teacher', 'curator'];
+
 export function Sidebar({
   collapsed,
   onToggleCollapse,
@@ -66,6 +69,7 @@ export function Sidebar({
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
   const visibleChildren = (g: NavSection) => g.children.filter((c) => !c.perm || can(c.perm));
+  const isAcademic = !!user && ACADEMIC_ROLES.includes(user.role);
 
   const onLogout = () => {
     logout();
@@ -120,6 +124,34 @@ export function Sidebar({
           if (!kids.length) return null;
           const Icon = g.icon;
           const groupActive = kids.some((c) => isActive(c.href));
+
+          // Akademik rollar (coordinator/teacher/curator) uchun "O'quv jarayoni" — ochilgan ro'yxat
+          if (isAcademic && g.label === "O'quv jarayoni" && !collapsed) {
+            return (
+              <div key={g.label} className="pt-1">
+                <div className="flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/50">
+                  <Icon size={16} className="shrink-0" />
+                  <span className="truncate">{g.label}</span>
+                </div>
+                {kids.map((c) => {
+                  const active = isActive(c.href);
+                  return (
+                    <Link
+                      key={c.href}
+                      href={c.href}
+                      onClick={onNavigate}
+                      className={`flex items-center rounded-lg py-2 pl-10 pr-3 text-sm transition ${
+                        active ? 'bg-white/15 font-semibold' : 'text-white/75 hover:bg-white/10'
+                      }`}
+                    >
+                      <span className="truncate">{c.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={g.label}
