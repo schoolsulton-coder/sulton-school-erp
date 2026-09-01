@@ -7,10 +7,18 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 
+/** O'z kabinetida qoladigan rollar — ochiq rejim ularga tegmaydi. */
+const PORTAL_ROLES = ['student', 'guardian'];
+
 /**
  * RBAC: endpoint uchun kerakli ruxsat foydalanuvchida bor-yo'qligini tekshiradi.
  * Foydalanuvchi ruxsatlari JWT payload'ida (`permissions: string[]`) keladi.
  * Administrator (`admin`) — barcha ruxsatlarga ega.
+ *
+ * VAQTINCHALIK ochiq rejim: dasturning barcha oynalari hamma xodimga ochiq —
+ * tizimga kirgan har qanday foydalanuvchi (o'quvchi/vasiydan tashqari) barcha
+ * endpointlardan foydalana oladi (frontend'dagi SHOW_ALL_MENUS bilan juft).
+ * Rollar bo'yicha qat'iy cheklovni qaytarish: `.env` da RBAC_STRICT=true.
  */
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -30,6 +38,10 @@ export class PermissionsGuard implements CanActivate {
     if (!user) throw new ForbiddenException('Avtorizatsiya talab qilinadi');
 
     if (user.role === 'superadmin') return true;
+
+    if (process.env.RBAC_STRICT !== 'true' && !PORTAL_ROLES.includes(user.role)) {
+      return true;
+    }
 
     const userPermissions: string[] = user.permissions ?? [];
     const hasAll = required.every((p) => userPermissions.includes(p));
