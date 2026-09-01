@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isOpenAccess } from '../../common/rbac-open';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
@@ -38,7 +39,7 @@ export class HomeworkService {
   /** Vazifa yaratish — butun sinf yoki tanlangan o'quvchilarga ASSIGNED yoziladi */
   async create(user: JwtUser, dto: CreateHomeworkDto) {
     // Ustoz: faqat admin/owner boshqa ustozni tanlay oladi, aks holda o'zi
-    const isAdmin = ADMIN_ROLES.includes(user.role);
+    const isAdmin = isOpenAccess(user.role) || ADMIN_ROLES.includes(user.role);
     const teacherId = isAdmin && dto.teacherId ? dto.teacherId : user.id;
 
     // O'quvchilar: tanlanган bo'lsa faqat ular (sinfga tegishlilari), aks holda butun sinf

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isOpenAccess } from '../../common/rbac-open';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { BulkGradeDto } from './dto/bulk-grade.dto';
@@ -42,7 +43,8 @@ export class GradesService {
   ) {}
 
   private canGradeAll(role?: string) {
-    return !!role && GRADE_ALL_ROLES.includes(role);
+    // Ochiq rejimda har qanday xodim barcha sinf/fanni ko'radi va baholaydi
+    return isOpenAccess(role) || (!!role && GRADE_ALL_ROLES.includes(role));
   }
 
   /** Maktab (Toshkent) mahalliy sanasi "YYYY-MM-DD" */

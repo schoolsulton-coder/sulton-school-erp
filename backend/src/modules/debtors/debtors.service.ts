@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isOpenAccess } from '../../common/rbac-open';
 
 type JwtUser = { id: string; role: string };
 
@@ -168,7 +169,7 @@ export class DebtorsService {
   async removeContact(user: JwtUser, id: string) {
     const c = await this.prisma.debtorContact.findUnique({ where: { id } });
     if (!c) throw new NotFoundException('Aloqa topilmadi');
-    if (c.authorId !== user.id && !ADMIN_ROLES.includes(user.role)) {
+    if (c.authorId !== user.id && !ADMIN_ROLES.includes(user.role) && !isOpenAccess(user.role)) {
       throw new ForbiddenException("Faqat o'zingiz yozgan aloqani o'chira olasiz");
     }
     await this.prisma.debtorContact.delete({ where: { id } });

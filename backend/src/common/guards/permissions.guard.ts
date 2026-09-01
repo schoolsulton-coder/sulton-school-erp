@@ -6,9 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-
-/** O'z kabinetida qoladigan rollar — ochiq rejim ularga tegmaydi. */
-const PORTAL_ROLES = ['student', 'guardian'];
+import { isOpenAccess } from '../rbac-open';
 
 /**
  * RBAC: endpoint uchun kerakli ruxsat foydalanuvchida bor-yo'qligini tekshiradi.
@@ -39,9 +37,7 @@ export class PermissionsGuard implements CanActivate {
 
     if (user.role === 'superadmin') return true;
 
-    if (process.env.RBAC_STRICT !== 'true' && !PORTAL_ROLES.includes(user.role)) {
-      return true;
-    }
+    if (isOpenAccess(user.role)) return true;
 
     const userPermissions: string[] = user.permissions ?? [];
     const hasAll = required.every((p) => userPermissions.includes(p));
