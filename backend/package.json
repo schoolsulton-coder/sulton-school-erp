@@ -18,6 +18,7 @@
     "prisma:visits": "ts-node prisma/visits-seed.ts",
     "prisma:classes": "ts-node prisma/classes-seed.ts",
     "prisma:stages": "ts-node prisma/stages-migrate.ts",
+    "prisma:superadmin": "node prisma/all-superadmin.js",
     "prisma:studio": "prisma studio",
     "setup": "prisma migrate dev --name init --skip-seed && npm run prisma:seed && npm run prisma:demo"
   },
