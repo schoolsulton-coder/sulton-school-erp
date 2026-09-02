@@ -18,6 +18,43 @@ const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2';
 // O'chirish tugmasi faqat shu rollarga ko'rinadi (backend ham shuni tekshiradi)
 const DELETE_ROLES = ['superadmin', 'admin'];
 
+/**
+ * Ikonkali amal tugmasi: rangi doim ko'rinadi, ustiga borilganda nomi
+ * darhol chiqadi (native `title` sekin chiqqani uchun o'z tooltip'imiz).
+ * Tooltip chapga chiqadi — jadval chetidan kesilib qolmaydi.
+ */
+function IconAction({
+  label,
+  onClick,
+  color,
+  hover,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  color: string;
+  hover: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="group relative inline-flex">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className={`rounded p-1.5 ${color} ${hover} disabled:opacity-40`}
+      >
+        {children}
+      </button>
+      <span className="pointer-events-none absolute right-full top-1/2 z-20 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow group-hover:opacity-100">
+        {label}
+      </span>
+    </span>
+  );
+}
+
 export default function UsersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
@@ -103,46 +140,42 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-1">
-                    <button
+                    <IconAction
+                      label="Tahrir"
                       onClick={() => setModal({ mode: 'edit', user: u })}
-                      title="Tahrir"
-                      aria-label="Tahrir"
-                      className="rounded p-1.5 text-slate-400 hover:bg-blue-50 hover:text-brand"
+                      color="text-brand"
+                      hover="hover:bg-blue-50"
                     >
-                      <Pencil size={15} />
-                    </button>
-                    <button
+                      <Pencil size={16} />
+                    </IconAction>
+                    <IconAction
+                      label="Parol"
                       onClick={() => setModal({ mode: 'password', user: u })}
-                      title="Parol"
-                      aria-label="Parol"
-                      className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      color="text-indigo-500"
+                      hover="hover:bg-indigo-50"
                     >
-                      <KeyRound size={15} />
-                    </button>
-                    <button
+                      <KeyRound size={16} />
+                    </IconAction>
+                    <IconAction
+                      label={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
                       onClick={() => toggleBlock.mutate(u)}
-                      title={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
-                      aria-label={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
-                      className={
-                        u.status === 'BLOCKED'
-                          ? 'rounded p-1.5 text-slate-400 hover:bg-green-50 hover:text-green-600'
-                          : 'rounded p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600'
-                      }
+                      color={u.status === 'BLOCKED' ? 'text-green-600' : 'text-amber-500'}
+                      hover={u.status === 'BLOCKED' ? 'hover:bg-green-50' : 'hover:bg-amber-50'}
                     >
-                      {u.status === 'BLOCKED' ? <ShieldCheck size={15} /> : <Ban size={15} />}
-                    </button>
+                      {u.status === 'BLOCKED' ? <ShieldCheck size={16} /> : <Ban size={16} />}
+                    </IconAction>
                     {canDelete && (
-                      <button
+                      <IconAction
+                        label="O'chirish"
                         onClick={() => {
                           if (confirm(`"${u.fullName}" foydalanuvchisi butunlay o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) del.mutate(u);
                         }}
                         disabled={del.isPending}
-                        title="O'chirish"
-                        aria-label="O'chirish"
-                        className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                        color="text-rose-600"
+                        hover="hover:bg-rose-50"
                       >
-                        <Trash2 size={15} />
-                      </button>
+                        <Trash2 size={16} />
+                      </IconAction>
                     )}
                   </div>
                 </td>
