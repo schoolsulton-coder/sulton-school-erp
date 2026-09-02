@@ -11,6 +11,7 @@ import {
 } from '@/lib/users';
 import { classesApi } from '@/lib/classes';
 import { useAuthStore } from '@/store/auth';
+import { Ban, KeyRound, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2';
 
@@ -101,14 +102,34 @@ export default function UsersPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-2 text-xs">
-                    <button onClick={() => setModal({ mode: 'edit', user: u })} className="text-brand hover:underline">Tahrir</button>
-                    <button onClick={() => setModal({ mode: 'password', user: u })} className="text-slate-500 hover:underline">Parol</button>
+                  <div className="flex justify-end gap-1">
+                    <button
+                      onClick={() => setModal({ mode: 'edit', user: u })}
+                      title="Tahrir"
+                      aria-label="Tahrir"
+                      className="rounded p-1.5 text-slate-400 hover:bg-blue-50 hover:text-brand"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => setModal({ mode: 'password', user: u })}
+                      title="Parol"
+                      aria-label="Parol"
+                      className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      <KeyRound size={15} />
+                    </button>
                     <button
                       onClick={() => toggleBlock.mutate(u)}
-                      className={u.status === 'BLOCKED' ? 'text-green-600 hover:underline' : 'text-red-500 hover:underline'}
+                      title={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
+                      aria-label={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
+                      className={
+                        u.status === 'BLOCKED'
+                          ? 'rounded p-1.5 text-slate-400 hover:bg-green-50 hover:text-green-600'
+                          : 'rounded p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600'
+                      }
                     >
-                      {u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
+                      {u.status === 'BLOCKED' ? <ShieldCheck size={15} /> : <Ban size={15} />}
                     </button>
                     {canDelete && (
                       <button
@@ -116,9 +137,11 @@ export default function UsersPage() {
                           if (confirm(`"${u.fullName}" foydalanuvchisi butunlay o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) del.mutate(u);
                         }}
                         disabled={del.isPending}
-                        className="text-red-600 hover:underline disabled:opacity-50"
+                        title="O'chirish"
+                        aria-label="O'chirish"
+                        className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
                       >
-                        O&apos;chirish
+                        <Trash2 size={15} />
                       </button>
                     )}
                   </div>
