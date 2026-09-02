@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { SECTIONS, type NavSection } from '@/lib/nav';
+import { ACADEMIC_SECTION, canSeeAcademic } from '@/lib/rbac';
 
 interface Item {
   href: string;
@@ -49,8 +50,8 @@ const MENU: Item[] = [
   { href: '/reports', label: 'Hisobotlar', icon: BarChart3, perm: 'reports.view' },
 ];
 
-// Bu rollar uchun "O'quv jarayoni" bo'limi chap menuda ochilgan holda (bolalari bilan) ko'rinadi
-const ACADEMIC_ROLES = ['coordinator', 'teacher', 'curator'];
+// "O'quv jarayoni" — faqat akademik rollarga (ustoz/kurator/koordinator) ko'rinadi
+// va ularda chap menuda ochilgan holda (bolalari bilan) turadi — qarang: lib/rbac.ts
 
 export function Sidebar({
   collapsed,
@@ -69,7 +70,7 @@ export function Sidebar({
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
   const visibleChildren = (g: NavSection) => g.children.filter((c) => !c.perm || can(c.perm));
-  const isAcademic = !!user && ACADEMIC_ROLES.includes(user.role);
+  const isAcademic = canSeeAcademic(user?.role);
 
   const onLogout = () => {
     logout();
@@ -122,11 +123,13 @@ export function Sidebar({
         {SECTIONS.map((g) => {
           const kids = visibleChildren(g);
           if (!kids.length) return null;
+          // "O'quv jarayoni" — faqat akademik rollarga
+          if (g.label === ACADEMIC_SECTION && !isAcademic) return null;
           const Icon = g.icon;
           const groupActive = kids.some((c) => isActive(c.href));
 
           // Akademik rollar (coordinator/teacher/curator) uchun "O'quv jarayoni" — ochilgan ro'yxat
-          if (isAcademic && g.label === "O'quv jarayoni" && !collapsed) {
+          if (isAcademic && g.label === ACADEMIC_SECTION && !collapsed) {
             return (
               <div key={g.label} className="pt-1">
                 <div className="flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/50">
