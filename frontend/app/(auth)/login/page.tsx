@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { ACADEMIC_HOME, canSeeAcademic } from '@/lib/rbac';
 import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
@@ -24,7 +25,14 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', { login, password });
       setAuth(data.accessToken, data.user, data.refreshToken ?? null);
       const portalRoles = ['student', 'guardian'];
-      router.push(portalRoles.includes(data.user.role) ? '/portal' : '/crm');
+      const role = data.user.role;
+      router.push(
+        portalRoles.includes(role)
+          ? '/portal'
+          : canSeeAcademic(role)
+            ? ACADEMIC_HOME // akademik rollarda Qabulxona yo'q — Ma'lumotlarga tushadi
+            : '/crm',
+      );
     } catch {
       setError("Login yoki parol noto'g'ri");
     } finally {

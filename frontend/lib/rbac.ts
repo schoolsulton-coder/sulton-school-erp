@@ -20,5 +20,14 @@ export const PORTAL_ROLES = ['student', 'guardian'];
 export const ACADEMIC_SECTION = "O'quv jarayoni";
 export const ACADEMIC_ROLES = ['coordinator', 'teacher', 'curator'];
 
+/**
+ * Akademik rollar (ustoz/kurator/koordinator) menyusida FAQAT shu ikki bo'lim bo'ladi.
+ * Qolgan hamma narsa (Qabulxona, moliya, maoshlar, hisobotlar, sozlamalar) yashiriladi.
+ */
+export const ACADEMIC_SECTIONS = ["Ma'lumotlar", ACADEMIC_SECTION];
+
+/** Akademik rol kirgandan keyin tushadigan sahifa */
+export const ACADEMIC_HOME = '/students';
+
 export const canSeeAcademic = (role?: string): boolean =>
   !!role && ACADEMIC_ROLES.includes(role);
