@@ -34,6 +34,8 @@ jobs:
           IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          # Serverdagi git GitHub'ga anonim ulana olmasa — shu token bilan oladi
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           if [ -z "$SSH_HOST" ]; then
@@ -46,5 +48,5 @@ jobs:
           PORT="${SSH_PORT:-22}"
           ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh -i ~/.ssh/id_ed25519 -p "$PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" \
-            "TELEGRAM_BOT_TOKEN='$TELEGRAM_BOT_TOKEN' META_VERIFY_TOKEN='$META_VERIFY_TOKEN' META_APP_SECRET='$META_APP_SECRET' IG_APP_SECRET='$IG_APP_SECRET' IG_PAGE_TOKEN='$IG_PAGE_TOKEN' SUPABASE_URL='$SUPABASE_URL' SUPABASE_SECRET_KEY='$SUPABASE_SECRET_KEY' bash -s" \
+            "GH_TOKEN='$GH_TOKEN' TELEGRAM_BOT_TOKEN='$TELEGRAM_BOT_TOKEN' META_VERIFY_TOKEN='$META_VERIFY_TOKEN' META_APP_SECRET='$META_APP_SECRET' IG_APP_SECRET='$IG_APP_SECRET' IG_PAGE_TOKEN='$IG_PAGE_TOKEN' SUPABASE_URL='$SUPABASE_URL' SUPABASE_SECRET_KEY='$SUPABASE_SECRET_KEY' bash -s" \
             < deploy/remote-deploy.sh

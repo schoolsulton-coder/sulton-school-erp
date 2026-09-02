@@ -21,16 +21,35 @@ echo "==> Kod yangilanmoqda"
 # Repo ochiq — URL to'g'ridan-to'g'ri beriladi va serverdagi saqlangan (eskirgan) token
 # ishlatilmaydi: `credential.helper=` bo'sh + extraheader tozalangan holda anonim fetch.
 # (Ilgari `git fetch --all` "could not read Username for github.com" bilan yiqilgan.)
-REPO_URL="${REPO_URL:-https://github.com/schoolsulton-coder/sulton-school-erp.git}"
+REPO_SLUG="${REPO_SLUG:-schoolsulton-coder/sulton-school-erp}"
 BRANCH="${BRANCH:-main}"
 export GIT_TERMINAL_PROMPT=0
-GIT_ANON=(git -c credential.helper= -c http.extraheader= -c "http.$REPO_URL.extraheader=")
+GIT_CLEAN=(git -c credential.helper= -c http.extraheader=)
 
-echo "   remote: $(git remote get-url origin 2>/dev/null | sed -E 's#//[^@]*@#//***@#')"
-if ! "${GIT_ANON[@]}" fetch --prune --quiet "$REPO_URL" "$BRANCH"; then
-  echo "   !! anonim fetch bo'lmadi — sozlamalar (maxfiy qiymatlarsiz):"
+# 1-urinish: Actions tokeni bilan (server IP anonim so'rovlarni rad etsa ham ishlaydi)
+# 2-urinish: anonim (repo ochiq)
+FETCHED=0
+if [ -n "${GH_TOKEN:-}" ]; then
+  if "${GIT_CLEAN[@]}" fetch --prune --quiet \
+       "https://x-access-token:${GH_TOKEN}@github.com/${REPO_SLUG}.git" "$BRANCH"; then
+    FETCHED=1
+    echo "   kod token bilan olindi"
+  else
+    echo "   !! token bilan fetch bo'lmadi, anonim urinilmoqda"
+  fi
+fi
+if [ "$FETCHED" -eq 0 ]; then
+  if "${GIT_CLEAN[@]}" fetch --prune --quiet "https://github.com/${REPO_SLUG}.git" "$BRANCH"; then
+    FETCHED=1
+    echo "   kod anonim olindi"
+  fi
+fi
+if [ "$FETCHED" -eq 0 ]; then
+  echo "   !! GitHub'dan kod olinmadi. Sozlamalar (maxfiy qiymatlarsiz):"
   git config --get-regexp '^(url\.|credential\.|http\.)' 2>/dev/null \
     | sed -E 's#//[^@ ]*@#//***@#g' | head -10 || true
+  echo "   !! ulanish sinovi:"; curl -sS -o /dev/null -w '   github.com → HTTP %{http_code}\n' \
+    "https://github.com/${REPO_SLUG}.git/info/refs?service=git-upload-pack" || true
   exit 1
 fi
 git reset --hard FETCH_HEAD
