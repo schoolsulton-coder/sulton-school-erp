@@ -1,0 +1,62 @@
+name: Server task (qo'lda)
+
+# Serverdagi bir martalik buyruqlarni GitHub sahifasidan bajaradi — SSH paroli kerak emas,
+# deploy'da ishlatiladigan SSH_KEY secret'i bilan kiradi.
+# Ishga tushirish: Actions → "Server task (qo'lda)" → Run workflow → vazifani tanlang.
+#
+# Maxfiy qiymatlar Secrets'dan olinadi (Settings → Secrets and variables → Actions):
+#   OWNER_PASSWORD  — set-owner uchun yangi admin paroli (majburiy, faqat shu vazifada)
+#   OWNER_PHONE     — ixtiyoriy, default +998990000000
+#   STAFF_PASSWORD  — ixtiyoriy, yangi xodimlar paroli (default sulton2026)
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Vazifa"
+        required: true
+        type: choice
+        default: staff-seed-dry
+        options:
+          - staff-seed-dry      # xodimlar ro'yxatini ko'rish (baza o'zgarmaydi)
+          - staff-seed          # xodimlarni qo'shish
+          - set-owner           # admin parolini yangilash (OWNER_PASSWORD secret)
+          - all-superadmin-dry  # kim superadmin bo'lishini ko'rish
+          - all-superadmin      # hammani superadmin qilish
+          - users               # bazadagi foydalanuvchilar ro'yxati
+
+concurrency:
+  group: server-task
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: ${{ inputs.task }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Serverda bajarish (SSH)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          OWNER_PHONE: ${{ secrets.OWNER_PHONE }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+          STAFF_PASSWORD: ${{ secrets.STAFF_PASSWORD }}
+          TASK: ${{ inputs.task }}
+        run: |
+          set -e
+          if [ -z "$SSH_HOST" ]; then
+            echo "::error::SSH_HOST secret yo'q — serverga ulanib bo'lmaydi."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" \
+            "TASK='$TASK' OWNER_PHONE='$OWNER_PHONE' OWNER_PASSWORD='$OWNER_PASSWORD' STAFF_PASSWORD='$STAFF_PASSWORD' bash -s" \
+            < deploy/server-task.sh
