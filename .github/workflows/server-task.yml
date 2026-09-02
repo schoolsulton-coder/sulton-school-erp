@@ -25,6 +25,7 @@ on:
           - all-superadmin-dry  # kim superadmin bo'lishini ko'rish
           - all-superadmin      # hammani superadmin qilish
           - users               # bazadagi foydalanuvchilar ro'yxati
+          - diag                # server holati: git, node, fayllar, pm2
 
 concurrency:
   group: server-task

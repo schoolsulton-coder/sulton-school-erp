@@ -39,6 +39,16 @@ case "${TASK:-}" in
     echo "==> Barchani superadmin qilish"
     node prisma/all-superadmin.js
     ;;
+  diag)
+    echo "==> Server holati"
+    echo "-- pwd: $(pwd)"
+    echo "-- node: $(node -v)"
+    echo "-- git remotes:"; git -C "$APP_DIR" remote -v || true
+    echo "-- git HEAD:"; git -C "$APP_DIR" log --oneline -1 || true
+    echo "-- staff-seed.js bormi:"; ls -l prisma/staff-seed.js 2>&1 || true
+    echo "-- --set-password qo'llab-quvvatlanadimi:"; grep -c 'set-password' prisma/staff-seed.js 2>/dev/null || echo 0
+    echo "-- pm2:"; pm2 list 2>/dev/null | tail -5 || true
+    ;;
   users)
     echo "==> Foydalanuvchilar (rol bo'yicha)"
     node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.findMany({select:{fullName:true,phone:true,status:true,role:{select:{slug:true}}},orderBy:{createdAt:'asc'}}).then(u=>{console.log('Jami:',u.length);u.forEach(x=>console.log(' ',x.role.slug.padEnd(13),x.phone.padEnd(15),x.status.padEnd(8),x.fullName))}).finally(()=>p.\$disconnect())"

@@ -18,8 +18,13 @@ set_env() {
 
 cd "$APP_DIR"
 echo "==> Kod yangilanmoqda"
-git fetch --all --quiet
-git reset --hard origin/main
+# Repo ochiq — URL to'g'ridan-to'g'ri beriladi, serverdagi remote sozlamasi/parolga bog'liq emas.
+# (Ilgari `git fetch --all` "could not read Username for github.com" bilan yiqilgan.)
+REPO_URL="${REPO_URL:-https://github.com/schoolsulton-coder/sulton-school-erp.git}"
+BRANCH="${BRANCH:-main}"
+export GIT_TERMINAL_PROMPT=0
+git fetch --prune --quiet "$REPO_URL" "$BRANCH"
+git reset --hard FETCH_HEAD
 
 echo "==> Maxfiy sozlamalar (.env) yangilanmoqda"
 set_env TELEGRAM_BOT_TOKEN "${TELEGRAM_BOT_TOKEN:-}"
