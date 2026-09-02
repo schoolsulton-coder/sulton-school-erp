@@ -52,6 +52,7 @@ export const usersApi = {
     api.patch(`/users/${id}/password`, { password }).then((r) => r.data),
   setStatus: (id: string, status: UserStatus) =>
     api.patch(`/users/${id}/status`, { status }).then((r) => r.data),
+  remove: (id: string) => api.delete(`/users/${id}`).then((r) => r.data),
 
   roles: () => api.get<Role[]>('/roles').then((r) => r.data),
   role: (id: string) => api.get<RoleDetail>(`/roles/${id}`).then((r) => r.data),

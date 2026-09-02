@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -16,6 +17,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -55,5 +57,11 @@ export class UsersController {
     @Body('status') status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED',
   ) {
     return this.service.setStatus(id, status);
+  }
+
+  @Delete(':id')
+  @Permissions('users.delete')
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.deleteUser(id, { id: user?.id, role: user?.role });
   }
 }

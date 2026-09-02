@@ -10,8 +10,12 @@ import {
   type ManagedUser,
 } from '@/lib/users';
 import { classesApi } from '@/lib/classes';
+import { useAuthStore } from '@/store/auth';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2';
+
+// O'chirish tugmasi faqat shu rollarga ko'rinadi (backend ham shuni tekshiradi)
+const DELETE_ROLES = ['superadmin', 'admin'];
 
 export default function UsersPage() {
   const qc = useQueryClient();
@@ -29,6 +33,19 @@ export default function UsersPage() {
     mutationFn: (u: ManagedUser) =>
       usersApi.setStatus(u.id, u.status === 'BLOCKED' ? 'ACTIVE' : 'BLOCKED'),
     onSuccess: refresh,
+  });
+
+  const me = useAuthStore((s) => s.user);
+  const canDelete = !!me && DELETE_ROLES.includes(me.role);
+
+  const [error, setError] = useState<string | null>(null);
+  const del = useMutation({
+    mutationFn: (u: ManagedUser) => usersApi.remove(u.id),
+    onSuccess: () => { setError(null); refresh(); },
+    onError: (e: any) => {
+      const msg = e?.response?.data?.message;
+      setError(Array.isArray(msg) ? msg.join(', ') : msg || "Foydalanuvchini o'chirib bo'lmadi");
+    },
   });
 
   return (
@@ -53,6 +70,13 @@ export default function UsersPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-rose-400 hover:text-rose-600">✕</button>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
@@ -86,6 +110,17 @@ export default function UsersPage() {
                     >
                       {u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
                     </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`"${u.fullName}" foydalanuvchisi butunlay o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) del.mutate(u);
+                        }}
+                        disabled={del.isPending}
+                        className="text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        O&apos;chirish
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

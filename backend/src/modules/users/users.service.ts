@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,6 +9,9 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+
+// Foydalanuvchini o'chira oladigan rollar (ochiq rejim bunga tegmaydi)
+const DELETE_ROLES = ['superadmin', 'admin'];
 
 const SAFE_SELECT = {
   id: true,
@@ -102,6 +106,34 @@ export class UsersService {
       data: { status },
       select: SAFE_SELECT,
     });
+  }
+
+  /**
+   * Foydalanuvchini butunlay o'chirish — faqat admin/superadmin.
+   * Bog'liq yozuvi bo'lsa o'chirilmaydi (bloklash tavsiya etiladi).
+   */
+  async deleteUser(id: string, current?: { id?: string; role?: string }) {
+    if (!current?.role || !DELETE_ROLES.includes(current.role)) {
+      throw new ForbiddenException(
+        "Foydalanuvchini faqat administrator yoki superadmin o'chira oladi",
+      );
+    }
+    await this.ensureUser(id);
+    if (current.id && current.id === id) {
+      throw new ConflictException("O'z hisobingizni o'chira olmaysiz");
+    }
+    try {
+      await this.prisma.user.delete({ where: { id } });
+      return { ok: true };
+    } catch (e: any) {
+      if (e?.code === 'P2003' || e?.code === 'P2014') {
+        throw new ConflictException(
+          "Bu foydalanuvchi tizimda ma'lumot qoldirgan (baho, davomat, to'lov va h.k.) — " +
+            "o'chirib bo'lmaydi. O'rniga «Bloklash» dan foydalaning.",
+        );
+      }
+      throw e;
+    }
   }
 
   private async ensureUser(id: string) {

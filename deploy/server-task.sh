@@ -16,6 +16,10 @@ case "${TASK:-}" in
     echo "==> Xodimlarni qo'shish"
     STAFF_PASSWORD="${STAFF_PASSWORD:-sulton2026}" node prisma/staff-seed.js
     ;;
+  staff-password)
+    echo "==> Ro'yxatdagi barcha xodimlarning parolini yangilash"
+    STAFF_PASSWORD="${STAFF_PASSWORD:-123456}" node prisma/staff-seed.js --set-password
+    ;;
   set-owner)
     if [ -z "${OWNER_PASSWORD:-}" ]; then
       echo "Xato: OWNER_PASSWORD secret o'rnatilmagan (Settings → Secrets → Actions)" >&2

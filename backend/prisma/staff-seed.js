@@ -2,10 +2,13 @@
 //
 //   node prisma/staff-seed.js --dry                 — o'zgartirmasdan ro'yxatni ko'rsatadi
 //   STAFF_PASSWORD='KuchliParol' node prisma/staff-seed.js
+//   STAFF_PASSWORD='123456' node prisma/staff-seed.js --set-password
+//                                                   — ro'yxatdagi HAMMANING parolini yangilaydi
 //
 // Qoidalar:
 //  - Telefon (login) bo'yicha upsert: mavjud xodimning ismi/roli/fani yangilanadi,
-//    PAROLI TEGILMAYDI. Yangi xodimga STAFF_PASSWORD (default: sulton2026) beriladi.
+//    PAROLI TEGILMAYDI (--set-password berilgan bo'lsa — yangilanadi).
+//    Yangi xodimga STAFF_PASSWORD (default: sulton2026) beriladi.
 //  - Lavozim uchun rol bo'lmasa — rol avtomatik yaratiladi (ROLES).
 //  - Fan o'qituvchilariga rol `teacher` + o'qitadigan fan biriktiriladi (fan bo'lmasa — yaratiladi).
 const argon2 = require('argon2');
@@ -13,6 +16,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const DRY = process.argv.includes('--dry');
+const SET_PASSWORD = process.argv.includes('--set-password');
 const PASSWORD = process.env.STAFF_PASSWORD || 'sulton2026';
 
 // Lavozim → rol. Bazada bo'lmagan rollar shu nom/ruxsatlar bilan yaratiladi.
@@ -175,9 +179,15 @@ async function ensureSubject(name) {
     };
     const existing = await prisma.user.findUnique({ where: { phone: r.phone } });
     if (existing) {
-      await prisma.user.update({ where: { id: existing.id }, data });
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: SET_PASSWORD ? { ...data, password: hash } : data,
+      });
       updated++;
-      console.log(`  ~ yangilandi: ${r.fullName} (${r.phone}) — parolga tegilmadi`);
+      console.log(
+        `  ~ yangilandi: ${r.fullName} (${r.phone}) — ` +
+          (SET_PASSWORD ? 'parol ham yangilandi' : 'parolga tegilmadi'),
+      );
     } else {
       await prisma.user.create({ data: { ...data, phone: r.phone, password: hash } });
       added++;
@@ -186,7 +196,9 @@ async function ensureSubject(name) {
   }
 
   console.log(`\nTayyor: ${added} ta yangi, ${updated} ta yangilangan.`);
-  if (added) console.log(`Yangi xodimlar paroli: "${PASSWORD}" — birinchi kirishdan keyin almashtirilsin.`);
+  if (added || SET_PASSWORD) {
+    console.log(`Parol: "${PASSWORD}" — birinchi kirishdan keyin almashtirilsin.`);
+  }
 })()
   .catch((e) => {
     console.error('Xato:', e.message);

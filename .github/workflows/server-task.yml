@@ -20,6 +20,7 @@ on:
         options:
           - staff-seed-dry      # xodimlar ro'yxatini ko'rish (baza o'zgarmaydi)
           - staff-seed          # xodimlarni qo'shish
+          - staff-password      # ro'yxatdagi hamma xodim parolini yangilash (default 123456)
           - set-owner           # admin parolini yangilash (OWNER_PASSWORD secret)
           - all-superadmin-dry  # kim superadmin bo'lishini ko'rish
           - all-superadmin      # hammani superadmin qilish
