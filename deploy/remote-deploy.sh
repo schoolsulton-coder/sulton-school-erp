@@ -18,12 +18,21 @@ set_env() {
 
 cd "$APP_DIR"
 echo "==> Kod yangilanmoqda"
-# Repo ochiq — URL to'g'ridan-to'g'ri beriladi, serverdagi remote sozlamasi/parolga bog'liq emas.
+# Repo ochiq — URL to'g'ridan-to'g'ri beriladi va serverdagi saqlangan (eskirgan) token
+# ishlatilmaydi: `credential.helper=` bo'sh + extraheader tozalangan holda anonim fetch.
 # (Ilgari `git fetch --all` "could not read Username for github.com" bilan yiqilgan.)
 REPO_URL="${REPO_URL:-https://github.com/schoolsulton-coder/sulton-school-erp.git}"
 BRANCH="${BRANCH:-main}"
 export GIT_TERMINAL_PROMPT=0
-git fetch --prune --quiet "$REPO_URL" "$BRANCH"
+GIT_ANON=(git -c credential.helper= -c http.extraheader= -c "http.$REPO_URL.extraheader=")
+
+echo "   remote: $(git remote get-url origin 2>/dev/null | sed -E 's#//[^@]*@#//***@#')"
+if ! "${GIT_ANON[@]}" fetch --prune --quiet "$REPO_URL" "$BRANCH"; then
+  echo "   !! anonim fetch bo'lmadi — sozlamalar (maxfiy qiymatlarsiz):"
+  git config --get-regexp '^(url\.|credential\.|http\.)' 2>/dev/null \
+    | sed -E 's#//[^@ ]*@#//***@#g' | head -10 || true
+  exit 1
+fi
 git reset --hard FETCH_HEAD
 
 echo "==> Maxfiy sozlamalar (.env) yangilanmoqda"
