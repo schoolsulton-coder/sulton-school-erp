@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { SECTIONS, type NavSection } from '@/lib/nav';
-import { ACADEMIC_SECTION, ACADEMIC_SECTIONS, canSeeAcademic } from '@/lib/rbac';
+import { ACADEMIC_SECTION, ACADEMIC_SECTIONS, canSeeAcademic, canSeeAcademicSection } from '@/lib/rbac';
 
 interface Item {
   href: string;
@@ -124,9 +124,9 @@ export function Sidebar({
         {SECTIONS.map((g) => {
           const kids = visibleChildren(g);
           if (!kids.length) return null;
-          // "O'quv jarayoni" — faqat akademik rollarga;
+          // "O'quv jarayoni" — akademik rollar + to'liq kirish rollariga (superadmin/admin);
           // akademik rollarga esa faqat "Ma'lumotlar" + "O'quv jarayoni" ko'rinadi
-          if (g.label === ACADEMIC_SECTION && !isAcademic) return null;
+          if (g.label === ACADEMIC_SECTION && !canSeeAcademicSection(user?.role)) return null;
           if (isAcademic && !ACADEMIC_SECTIONS.includes(g.label)) return null;
           const Icon = g.icon;
           const groupActive = kids.some((c) => isActive(c.href));
