@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { SECTIONS } from '@/lib/nav';
-import { ACADEMIC_SECTION } from '@/lib/rbac';
+import { ACADEMIC_SECTION, canSeeAcademic } from '@/lib/rbac';
 
 /**
  * Sidebar guruhi (Ma'lumotlar / O'quv jarayoni / Sozlamalar) ichiga kirilganda
@@ -14,14 +14,15 @@ import { ACADEMIC_SECTION } from '@/lib/rbac';
 export function SectionTabs() {
   const pathname = usePathname();
   const can = useAuthStore((s) => s.can);
+  const role = useAuthStore((s) => s.user?.role);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
   const section = SECTIONS.find((s) => s.children.some((c) => isActive(c.href)));
   if (!section) return null;
 
-  // "O'quv jarayoni" — akademik rollarda chap menuda ochilgan ro'yxat bor (tab takrorlanmasin),
-  // boshqa rollarda bu bo'lim umuman ko'rinmaydi.
-  if (section.label === ACADEMIC_SECTION) return null;
+  // "O'quv jarayoni" — akademik rollarda chap menuda ochilgan ro'yxat bor (tab takrorlanmasin).
+  // Superadmin/admin uchun bo'lim yagona havola, shuning uchun bu yerda tab'lar KERAK.
+  if (section.label === ACADEMIC_SECTION && canSeeAcademic(role)) return null;
 
   const tabs = section.children.filter((c) => !c.perm || can(c.perm));
   if (tabs.length === 0) return null;
