@@ -12,6 +12,28 @@ export interface ManagedUser {
   subject?: { id: string; name: string } | null;
 }
 
+/** Foydalanuvchi kartochkasi (batafsil oyna) */
+export interface UserDetail extends ManagedUser {
+  createdAt: string;
+  updatedAt: string;
+  employee?: {
+    hireDate: string;
+    status: string;
+    formal: boolean;
+    department?: { name: string } | null;
+    position?: { name: string } | null;
+    branch?: { name: string } | null;
+  } | null;
+  classes: { id: string; name: string; isCurator: boolean }[];
+  stats: {
+    lessons: number;
+    grades: number;
+    homeworks: number;
+    attendances: number;
+    behavior: number;
+  };
+}
+
 export interface Role {
   id: string;
   name: string;
@@ -36,6 +58,7 @@ export interface PermissionGroup {
 export const usersApi = {
   list: (params?: { search?: string; roleId?: string }) =>
     api.get<ManagedUser[]>('/users', { params }).then((r) => r.data),
+  get: (id: string) => api.get<UserDetail>(`/users/${id}`).then((r) => r.data),
   create: (data: {
     fullName: string;
     phone: string;

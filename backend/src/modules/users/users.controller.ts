@@ -32,6 +32,12 @@ export class UsersController {
     return this.service.listUsers({ search, roleId });
   }
 
+  @Get(':id')
+  @Permissions('users.view')
+  one(@Param('id') id: string) {
+    return this.service.getUser(id);
+  }
+
   @Post()
   @Permissions('users.create')
   create(@Body() dto: CreateUserDto) {

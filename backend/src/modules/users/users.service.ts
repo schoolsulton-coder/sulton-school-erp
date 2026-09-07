@@ -46,6 +46,60 @@ export class UsersService {
     });
   }
 
+  /** Foydalanuvchi kartochkasi — batafsil ma'lumot + faoliyat statistikasi */
+  async getUser(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        ...SAFE_SELECT,
+        updatedAt: true,
+        taughtClasses: {
+          select: { isCurator: true, class: { select: { id: true, name: true } } },
+        },
+        employee: {
+          select: {
+            hireDate: true,
+            status: true,
+            formal: true,
+            department: { select: { name: true } },
+            position: { select: { name: true } },
+            branch: { select: { name: true } },
+          },
+        },
+        _count: {
+          select: {
+            givenGrades: true,
+            givenHomeworks: true,
+            markedAttendances: true,
+            behaviorRecords: true,
+          },
+        },
+      },
+    });
+    if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
+
+    // Dars jadvalidagi darslar (Schedule'da User bilan bevosita bog'liqlik yo'q)
+    const lessons = await this.prisma.schedule.count({ where: { teacherId: id } });
+
+    return {
+      ...user,
+      classes: user.taughtClasses.map((t) => ({
+        id: t.class.id,
+        name: t.class.name,
+        isCurator: t.isCurator,
+      })),
+      taughtClasses: undefined,
+      stats: {
+        lessons,
+        grades: user._count.givenGrades,
+        homeworks: user._count.givenHomeworks,
+        attendances: user._count.markedAttendances,
+        behavior: user._count.behaviorRecords,
+      },
+      _count: undefined,
+    };
+  }
+
   async createUser(dto: CreateUserDto) {
     const exists = await this.prisma.user.findUnique({
       where: { phone: dto.phone },

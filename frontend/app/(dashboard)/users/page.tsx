@@ -11,7 +11,7 @@ import {
 } from '@/lib/users';
 import { classesApi } from '@/lib/classes';
 import { useAuthStore } from '@/store/auth';
-import { Ban, KeyRound, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
+import { Ban, Eye, KeyRound, Pencil, ShieldCheck, Trash2, X } from 'lucide-react';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2';
 
@@ -58,7 +58,13 @@ function IconAction({
 export default function UsersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<null | { mode: 'create' } | { mode: 'edit'; user: ManagedUser } | { mode: 'password'; user: ManagedUser }>(null);
+  const [modal, setModal] = useState<
+    | null
+    | { mode: 'create' }
+    | { mode: 'edit'; user: ManagedUser }
+    | { mode: 'password'; user: ManagedUser }
+    | { mode: 'detail'; user: ManagedUser }
+  >(null);
 
   const { data: users } = useQuery({
     queryKey: ['users', search],
@@ -130,7 +136,14 @@ export default function UsersPage() {
           <tbody>
             {users?.map((u: ManagedUser) => (
               <tr key={u.id} className="border-t border-slate-100">
-                <td className="px-4 py-3 font-medium">{u.fullName}</td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => setModal({ mode: 'detail', user: u })}
+                    className="font-medium text-slate-800 hover:text-brand hover:underline"
+                  >
+                    {u.fullName}
+                  </button>
+                </td>
                 <td className="px-4 py-3">{u.phone}</td>
                 <td className="px-4 py-3">{u.role.name}</td>
                 <td className="px-4 py-3">
@@ -140,6 +153,14 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-1">
+                    <IconAction
+                      label="Batafsil"
+                      onClick={() => setModal({ mode: 'detail', user: u })}
+                      color="text-slate-500"
+                      hover="hover:bg-slate-100"
+                    >
+                      <Eye size={16} />
+                    </IconAction>
                     <IconAction
                       label="Tahrir"
                       onClick={() => setModal({ mode: 'edit', user: u })}
@@ -197,6 +218,202 @@ export default function UsersPage() {
       {modal?.mode === 'password' && (
         <PasswordModal user={modal.user} onClose={() => setModal(null)} onDone={() => setModal(null)} />
       )}
+      {modal?.mode === 'detail' && (
+        <DetailModal
+          user={modal.user}
+          onClose={() => setModal(null)}
+          onEdit={() => setModal({ mode: 'edit', user: modal.user })}
+          onPassword={() => setModal({ mode: 'password', user: modal.user })}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===== Batafsil oyna =====
+
+const fmt = (d?: string | null) =>
+  d ? new Date(d).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+function Chip({ children, tone = 'slate' }: { children: React.ReactNode; tone?: 'slate' | 'brand' }) {
+  return (
+    <span
+      className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${
+        tone === 'brand'
+          ? 'border-blue-200 bg-blue-50 text-brand'
+          : 'border-slate-200 bg-white text-slate-600'
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{title}</div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">{children}</div>
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-right text-sm text-slate-800">{children}</span>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center">
+      <div className="text-lg font-bold text-slate-800">{value}</div>
+      <div className="text-[11px] text-slate-400">{label}</div>
+    </div>
+  );
+}
+
+function DetailModal({
+  user,
+  onClose,
+  onEdit,
+  onPassword,
+}: {
+  user: ManagedUser;
+  onClose: () => void;
+  onEdit: () => void;
+  onPassword: () => void;
+}) {
+  const { data: u, isLoading } = useQuery({
+    queryKey: ['user', user.id],
+    queryFn: () => usersApi.get(user.id),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="my-6 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl"
+      >
+        {/* Sarlavha */}
+        <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Foydalanuvchi</div>
+            <div className="text-xl font-bold text-slate-900">{u?.fullName ?? user.fullName}</div>
+          </div>
+          <button onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-5 bg-slate-50 px-6 py-5">
+          {isLoading && <div className="py-10 text-center text-sm text-slate-400">Yuklanmoqda...</div>}
+
+          {u && (
+            <>
+              {/* Yuqori kartochka */}
+              <div className="rounded-xl border border-slate-200 bg-white p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Foydalanuvchi</div>
+                    <div className="text-2xl font-bold text-slate-900">{u.fullName}</div>
+                    <div className="mt-1 font-mono text-sm text-slate-500">{u.phone}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={onPassword}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Parolni reset
+                    </button>
+                    <button
+                      onClick={onEdit}
+                      className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                    >
+                      Tahrirlash
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Chip tone="brand">{u.role.name}</Chip>
+                  {u.subject?.name && <Chip>{u.subject.name}</Chip>}
+                  <Chip>{STATUS_LABEL[u.status]}</Chip>
+                  {u.employee?.position?.name && <Chip>{u.employee.position.name}</Chip>}
+                  {u.employee?.department?.name && <Chip>{u.employee.department.name}</Chip>}
+                  {u.employee?.branch?.name && <Chip>{u.employee.branch.name}</Chip>}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card title="Asosiy">
+                  <Row label="F.I.SH">{u.fullName}</Row>
+                  <Row label="Login">
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{u.phone}</span>
+                  </Row>
+                  <Row label="Email">{u.email || '—'}</Row>
+                  <Row label="Rol">{u.role.name}</Row>
+                  <Row label="Fan">{u.subject?.name || '—'}</Row>
+                  <Row label="Holat">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[u.status]}`}>
+                      {STATUS_LABEL[u.status]}
+                    </span>
+                  </Row>
+                </Card>
+
+                <Card title="Xodim profili">
+                  {u.employee ? (
+                    <>
+                      <Row label="Lavozim">{u.employee.position?.name || '—'}</Row>
+                      <Row label="Bo'lim">{u.employee.department?.name || '—'}</Row>
+                      <Row label="Filial">{u.employee.branch?.name || '—'}</Row>
+                      <Row label="Ishga qabul">{fmt(u.employee.hireDate)}</Row>
+                      <Row label="Rasmiylik">{u.employee.formal ? 'Rasmiy' : 'Norasmiy'}</Row>
+                    </>
+                  ) : (
+                    <p className="py-4 text-center text-sm text-slate-400">Xodim profili biriktirilmagan</p>
+                  )}
+                </Card>
+              </div>
+
+              <Card title="Faoliyat">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  <Stat label="Darslar" value={u.stats.lessons} />
+                  <Stat label="Baholar" value={u.stats.grades} />
+                  <Stat label="Vazifalar" value={u.stats.homeworks} />
+                  <Stat label="Davomat" value={u.stats.attendances} />
+                  <Stat label="Ahloqiy" value={u.stats.behavior} />
+                </div>
+              </Card>
+
+              <Card title="Sinflar">
+                {u.classes.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {u.classes.map((c) => (
+                      <Chip key={c.id} tone={c.isCurator ? 'brand' : 'slate'}>
+                        {c.name}
+                        {c.isCurator ? ' · kurator' : ''}
+                      </Chip>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-2 text-center text-sm text-slate-400">Sinf biriktirilmagan</p>
+                )}
+              </Card>
+
+              <Card title="Texnik">
+                <Row label="Yaratilgan">{fmt(u.createdAt)}</Row>
+                <Row label="Yangilangan">{fmt(u.updatedAt)}</Row>
+                <Row label="ID">
+                  <span className="font-mono text-xs text-slate-500">{u.id}</span>
+                </Row>
+              </Card>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
