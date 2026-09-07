@@ -53,7 +53,7 @@ export function DistributeModal({
   initialSubjectId?: string;
   initialHours?: number;
   onClose: () => void;
-  onSaved: (created: number, skipped: number) => void;
+  onSaved: (created: number, skipped: number, deleted?: number) => void;
 }) {
   const qc = useQueryClient();
   const [subjectId, setSubjectId] = useState(initialSubjectId ?? '');
@@ -69,11 +69,25 @@ export function DistributeModal({
     enabled: !!classId,
   });
 
+  // Shu fanning mavjud darslari — ular "band" emas, tahrirlanadigan joylashuv
+  const ownLessons = useMemo(
+    () => (avail?.classBusy ?? []).filter((s) => subjectId && s.subjectId === subjectId),
+    [avail, subjectId],
+  );
+  const own = useMemo(() => {
+    const m = new Map<string, BusySlot>();
+    ownLessons.forEach((s) => m.set(key(s.weekday, s.start), s));
+    return m;
+  }, [ownLessons]);
+  const editingPlacement = ownLessons.length > 0;
+
   const classBusy = useMemo(() => {
     const m = new Map<string, BusySlot>();
-    (avail?.classBusy ?? []).forEach((s) => m.set(key(s.weekday, s.start), s));
+    (avail?.classBusy ?? [])
+      .filter((s) => !subjectId || s.subjectId !== subjectId)
+      .forEach((s) => m.set(key(s.weekday, s.start), s));
     return m;
-  }, [avail]);
+  }, [avail, subjectId]);
   const teacherBusy = useMemo(() => {
     const m = new Map<string, BusySlot>();
     (avail?.teacherBusy ?? []).forEach((s) => m.set(key(s.weekday, s.start), s));
@@ -92,12 +106,23 @@ export function DistributeModal({
   }, [classBusy, teacherBusy]);
 
   const n = Math.max(0, Number(hours) || 0);
-  // Avtomatik tanlash — bo'sh slotlar, soat yoki ustoz o'zgarganda qayta hisoblanadi
+  // Avtomatik tanlash: mavjud darslar doim tanlangan, qolgani bo'sh slotlardan to'ldiriladi
   const freeSig = freeSlots.map((s) => key(s.weekday, s.start)).join(',');
+  const ownSig = [...own.keys()].sort().join(',');
   useEffect(() => {
-    setSelected(autoPick(freeSlots, n));
+    const ownKeys = [...own.keys()];
+    const need = Math.max(0, n - ownKeys.length);
+    const rest = freeSlots.filter((s) => !own.has(key(s.weekday, s.start)));
+    setSelected(new Set([...ownKeys, ...autoPick(rest, need)]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freeSig, n]);
+  }, [freeSig, ownSig, n]);
+
+  // Mavjud darsning ustozini formaga olib qo'yamiz (bir xil bo'lsa)
+  useEffect(() => {
+    const ids = [...new Set(ownLessons.map((l) => l.teacherId ?? ''))];
+    if (ids.length === 1 && ids[0]) setTeacherId(ids[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownSig]);
 
   const toggle = (k: string) => {
     setSelected((prev) => {
@@ -105,7 +130,8 @@ export function DistributeModal({
       if (next.has(k)) {
         next.delete(k);
       } else {
-        if (next.size >= n) return prev; // belgilangan soatdan ko'p tanlab bo'lmaydi
+        // mavjud darsni qaytarish har doim mumkin, yangi tanlash — limit ichida
+        if (!own.has(k) && next.size >= n) return prev;
         next.add(k);
       }
       return next;
@@ -113,25 +139,49 @@ export function DistributeModal({
   };
 
   const save = useMutation({
-    mutationFn: () => {
-      const slots = [...selected].map((k) => {
-        const [wd, start] = k.split('-');
-        const period = PERIODS.find((p) => p.start === start)!;
-        return { weekday: Number(wd), startTime: start, endTime: period.end };
-      });
-      return classesApi.bulkAddLessons({
-        classId,
-        subjectId,
-        teacherId: teacherId || undefined,
-        room: room || undefined,
-        slots,
-      });
+    mutationFn: async () => {
+      // Farqni qo'llaymiz: yangi tanlanganlar qo'shiladi, olib tashlanganlar o'chiriladi
+      const toCreate = [...selected].filter((k) => !own.has(k));
+      const toDelete = [...own.entries()]
+        .filter(([k]) => !selected.has(k))
+        .map(([, l]) => l.id)
+        .filter(Boolean) as string[];
+      const keep = [...own.entries()].filter(([k]) => selected.has(k)).map(([, l]) => l);
+
+      for (const id of toDelete) await classesApi.removeLesson(id);
+
+      // Ustoz almashtirilgan bo'lsa — qoladigan darslarga ham qo'llanadi
+      if (teacherId) {
+        for (const l of keep) {
+          if (l.id && l.teacherId !== teacherId) await classesApi.updateLesson(l.id, { teacherId });
+        }
+      }
+
+      let created = 0;
+      let skipped = 0;
+      if (toCreate.length) {
+        const slots = toCreate.map((k) => {
+          const [wd, start] = k.split('-');
+          const period = PERIODS.find((p) => p.start === start)!;
+          return { weekday: Number(wd), startTime: start, endTime: period.end };
+        });
+        const res = await classesApi.bulkAddLessons({
+          classId,
+          subjectId,
+          teacherId: teacherId || undefined,
+          room: room || undefined,
+          slots,
+        });
+        created = res.created;
+        skipped = res.skipped.length;
+      }
+      return { created, skipped, deleted: toDelete.length };
     },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['class-schedule', classId] });
       qc.invalidateQueries({ queryKey: ['norms', classId] });
       qc.invalidateQueries({ queryKey: ['availability', classId] });
-      onSaved(res.created, res.skipped.length);
+      onSaved(res.created, res.skipped, res.deleted);
     },
     onError: (e: any) =>
       setError(
@@ -187,8 +237,15 @@ export function DistributeModal({
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand/10 text-brand"><Wand2 size={20} /></div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Fanni jadvalga taqsimlash</h2>
-              <p className="text-xs text-slate-400">{className} sinfi · bo&apos;sh para va ustoz vaqtiga qarab bittada joylash</p>
+              <h2 className="text-lg font-bold text-slate-800">
+                {editingPlacement ? 'Fan jadvalini tahrirlash' : 'Fanni jadvalga taqsimlash'}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {className} sinfi ·{' '}
+                {editingPlacement
+                  ? "mavjud darslar belgilangan — bosib olib tashlang yoki yangi para tanlang"
+                  : "bo'sh para va ustoz vaqtiga qarab bittada joylash"}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={20} /></button>
@@ -291,6 +348,46 @@ export function DistributeModal({
                           </div>
                         </td>
                       );
+                    const mine = own.get(k);
+                    if (mine)
+                      return (
+                        <td key={k}>
+                          <div
+                            draggable={!!mine.id}
+                            onDragStart={() => mine.id && setDragId(mine.id)}
+                            onDragEnd={() => { setDragId(null); setDropKey(null); }}
+                            onClick={() => toggle(k)}
+                            title={sel ? "Bosing — bu dars o'chiriladi · sudrab ko'chiring" : 'Bosing — dars qoladi'}
+                            className={`group relative flex h-14 w-full cursor-pointer flex-col justify-center gap-0.5 rounded-lg px-1.5 leading-tight transition ${
+                              sel
+                                ? 'bg-brand text-white shadow-sm'
+                                : 'bg-rose-50 text-rose-400 line-through ring-1 ring-rose-200'
+                            } ${dragId === mine.id ? 'opacity-40' : ''}`}
+                          >
+                            <span className="truncate pr-4 text-[11px] font-semibold">{mine.label}</span>
+                            <span className={`truncate text-[10px] ${sel ? 'text-white/70' : 'text-rose-400'}`}>
+                              {sel ? 'mavjud dars' : "o'chiriladi"}
+                            </span>
+                            {mine.id && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`"${mine.label}" darsi jadvaldan o'chirilsinmi?`)) removeLesson.mutate(mine.id!);
+                                }}
+                                disabled={removeLesson.isPending}
+                                title="O'chirish"
+                                aria-label="O'chirish"
+                                className={`absolute right-1 top-1 rounded p-0.5 opacity-0 transition group-hover:opacity-100 ${
+                                  sel ? 'text-white/70 hover:bg-white/20' : 'text-rose-300 hover:bg-rose-100'
+                                }`}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      );
                     if (tBusy)
                       return (
                         <td key={k}>
@@ -359,11 +456,21 @@ export function DistributeModal({
             <div className="flex gap-2">
               <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100">Bekor qilish</button>
               <button
-                onClick={() => { setError(''); if (!subjectId) return setError('Fan tanlang'); if (selected.size === 0) return setError('Kamida bitta para tanlang'); save.mutate(); }}
-                disabled={save.isPending || !subjectId || selected.size === 0}
+                onClick={() => {
+                  setError('');
+                  if (!subjectId) return setError('Fan tanlang');
+                  if (!editingPlacement && selected.size === 0) return setError('Kamida bitta para tanlang');
+                  save.mutate();
+                }}
+                disabled={save.isPending || !subjectId || (!editingPlacement && selected.size === 0)}
                 className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
               >
-                <Target size={16} /> {save.isPending ? 'Joylanmoqda...' : `Joylash (${selected.size})`}
+                <Target size={16} />
+                {save.isPending
+                  ? 'Saqlanmoqda...'
+                  : editingPlacement
+                    ? `Saqlash (${selected.size})`
+                    : `Joylash (${selected.size})`}
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Target, Plus, Trash2, Wand2 } from 'lucide-react';
+import { Target, Pencil, Plus, Trash2, Wand2 } from 'lucide-react';
 import { classesApi, type Subject, type SubjectNormRow } from '@/lib/classes';
 
 /** Sinf bo'yicha haftalik fan normasi (reja soati). Schedule va sinf detali sahifalarida ishlatiladi. */
@@ -184,11 +184,11 @@ function NormRow({
         <div className="flex items-center justify-end gap-1">
           {onDistribute && (
             <button
-              onClick={() => onDistribute(norm.subjectId, remaining > 0 ? remaining : norm.weeklyHours)}
+              onClick={() => onDistribute(norm.subjectId, norm.weeklyHours)}
               className="inline-flex items-center gap-1 rounded-lg bg-brand/10 px-2 py-1 text-xs font-medium text-brand hover:bg-brand/20"
-              title="Jadvalga joylash"
+              title={norm.placed > 0 ? 'Joylashuvni tahrirlash' : 'Jadvalga joylash'}
             >
-              <Wand2 size={13} /> Joylash
+              {norm.placed > 0 ? <><Pencil size={13} /> Tahrirlash</> : <><Wand2 size={13} /> Joylash</>}
             </button>
           )}
           <button

@@ -64,6 +64,8 @@ export interface SubjectNormRow {
 /** Band slot — jadval to'ldirishda bo'sh paralarni hisoblash uchun */
 export interface BusySlot {
   id?: string; // dars id — sudrab ko'chirish/o'chirish uchun (faqat shu sinf darslarida)
+  subjectId?: string; // qaysi fan — mavjud joylashuvni tahrirlash uchun
+  teacherId?: string | null;
   weekday: number;
   start: string; // "08:30"
   label: string; // band sabab: fan nomi yoki "Sinf · Fan"

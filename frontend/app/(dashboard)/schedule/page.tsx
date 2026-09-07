@@ -256,11 +256,13 @@ function ScheduleManager() {
           initialSubjectId={distribute.subjectId}
           initialHours={distribute.hours}
           onClose={() => setDistribute(null)}
-          onSaved={(created, skipped) => {
+          onSaved={(created, skipped, deleted) => {
             setDistribute(null);
-            setToast(
-              `${created} ta dars joylandi` + (skipped ? ` · ${skipped} ta o'tkazib yuborildi` : ''),
-            );
+            const parts: string[] = [];
+            if (created) parts.push(`${created} ta dars joylandi`);
+            if (deleted) parts.push(`${deleted} ta o'chirildi`);
+            if (skipped) parts.push(`${skipped} ta o'tkazib yuborildi`);
+            setToast(parts.length ? parts.join(' · ') : "Jadval o'zgarmadi");
             setTimeout(() => setToast(''), 4000);
           }}
         />
