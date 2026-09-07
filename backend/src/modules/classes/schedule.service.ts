@@ -163,7 +163,9 @@ export class ScheduleService {
       : [];
     const stripUstoz = (s: string) => s.replace(/\s*\(ustoz\)\s*$/i, '').trim();
     const tName = new Map(tUsers.map((u) => [u.id, stripUstoz(u.fullName)]));
+    // id — darsni jadvalda sudrab ko'chirish va o'chirish uchun kerak
     const classBusy = classRows.map((r) => ({
+      id: r.id,
       weekday: r.weekday,
       start: normTime(r.startTime),
       label: r.subject.name,

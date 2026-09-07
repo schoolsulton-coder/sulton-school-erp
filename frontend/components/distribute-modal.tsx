@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Wand2, Target, Check, AlertTriangle, User, Info } from 'lucide-react';
+import { X, Wand2, Target, Check, AlertTriangle, User, Info, Trash2, Move } from 'lucide-react';
 import { classesApi, type Subject, type BusySlot } from '@/lib/classes';
 import { teacherLabel, type ManagedUser } from '@/lib/users';
 import { PERIODS, WEEKDAYS } from '@/lib/schedule';
@@ -141,6 +141,40 @@ export function DistributeModal({
       ),
   });
 
+  // ===== Mavjud darsni sudrab ko'chirish / o'chirish =====
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropKey, setDropKey] = useState<string | null>(null);
+
+  const refreshSchedule = () => {
+    qc.invalidateQueries({ queryKey: ['availability', classId] });
+    qc.invalidateQueries({ queryKey: ['class-schedule', classId] });
+    qc.invalidateQueries({ queryKey: ['norms', classId] });
+  };
+
+  const moveLesson = useMutation({
+    mutationFn: ({ id, weekday, start }: { id: string; weekday: number; start: string }) => {
+      const period = PERIODS.find((p) => p.start === start)!;
+      return classesApi.updateLesson(id, { weekday, startTime: start, endTime: period.end });
+    },
+    onSuccess: () => { setError(''); refreshSchedule(); },
+    onError: (e: any) =>
+      setError(e?.response?.data?.message ?? "Darsni ko'chirib bo'lmadi"),
+  });
+
+  const removeLesson = useMutation({
+    mutationFn: (id: string) => classesApi.removeLesson(id),
+    onSuccess: () => { setError(''); refreshSchedule(); },
+    onError: (e: any) => setError(e?.response?.data?.message ?? "Darsni o'chirib bo'lmadi"),
+  });
+
+  /** Bo'sh (yoki ustoz band) katakka tashlanganda darsni o'sha vaqtga ko'chiradi */
+  const dropTo = (weekday: number, start: string) => {
+    const id = dragId;
+    setDragId(null);
+    setDropKey(null);
+    if (id) moveLesson.mutate({ id, weekday, start });
+  };
+
   const subjectName = subjects.find((s) => s.id === subjectId)?.name ?? '';
   const enough = selected.size >= n && n > 0;
   const atLimit = selected.size >= n; // belgilangan soat to'ldi — ko'p tanlab bo'lmaydi
@@ -193,6 +227,9 @@ export function DistributeModal({
             <Lg cls="bg-emerald-100 ring-1 ring-emerald-200" t="bo'sh" />
             <Lg cls="bg-slate-100 ring-1 ring-slate-200" t="sinf band" />
             <Lg cls="bg-amber-100 ring-1 ring-amber-200" t="ustoz band" />
+            <span className="inline-flex items-center gap-1 text-slate-400">
+              <Move size={12} /> darsni sudrab ko&apos;chiring · <Trash2 size={12} /> o&apos;chirish
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <span className={`font-semibold ${enough ? 'text-emerald-600' : 'text-amber-600'}`}>Tanlangan {selected.size} / {n}</span>
@@ -226,16 +263,45 @@ export function DistributeModal({
                     if (cBusy)
                       return (
                         <td key={k}>
-                          <div className="flex h-14 w-full flex-col justify-center gap-0.5 rounded-lg bg-slate-100 px-1.5 leading-tight ring-1 ring-slate-200">
-                            <span className="truncate text-[11px] font-semibold text-slate-600">{cBusy.label}</span>
+                          <div
+                            draggable={!!cBusy.id}
+                            onDragStart={() => cBusy.id && setDragId(cBusy.id)}
+                            onDragEnd={() => { setDragId(null); setDropKey(null); }}
+                            title={cBusy.id ? "Sudrab boshqa kunga ko'chiring" : undefined}
+                            className={`group relative flex h-14 w-full flex-col justify-center gap-0.5 rounded-lg bg-slate-100 px-1.5 leading-tight ring-1 ring-slate-200 ${
+                              cBusy.id ? 'cursor-grab active:cursor-grabbing' : ''
+                            } ${dragId === cBusy.id ? 'opacity-40' : ''}`}
+                          >
+                            <span className="truncate pr-4 text-[11px] font-semibold text-slate-600">{cBusy.label}</span>
                             <span className="truncate text-[10px] text-slate-400">{cBusy.teacher ?? 'ustozsiz'}</span>
+                            {cBusy.id && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`"${cBusy.label}" darsi jadvaldan o'chirilsinmi?`)) removeLesson.mutate(cBusy.id!);
+                                }}
+                                disabled={removeLesson.isPending}
+                                title="O'chirish"
+                                aria-label="O'chirish"
+                                className="absolute right-1 top-1 rounded p-0.5 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       );
                     if (tBusy)
                       return (
                         <td key={k}>
-                          <div className="flex h-14 w-full flex-col justify-center gap-0.5 rounded-lg bg-amber-50 px-1.5 leading-tight ring-1 ring-amber-200">
+                          <div
+                            onDragOver={(e) => { if (dragId) { e.preventDefault(); setDropKey(k); } }}
+                            onDragLeave={() => setDropKey((v) => (v === k ? null : v))}
+                            onDrop={(e) => { e.preventDefault(); dropTo(wd.n, p.start); }}
+                            className={`flex h-14 w-full flex-col justify-center gap-0.5 rounded-lg bg-amber-50 px-1.5 leading-tight ring-1 ${
+                              dropKey === k ? 'ring-2 ring-brand' : 'ring-amber-200'
+                            }`}
+                          >
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600"><User size={11} /> ustoz band</span>
                             <span className="truncate text-[10px] text-amber-500">{tBusy.label}</span>
                           </div>
@@ -247,13 +313,18 @@ export function DistributeModal({
                           type="button"
                           onClick={() => toggle(k)}
                           disabled={!sel && atLimit}
+                          onDragOver={(e) => { if (dragId) { e.preventDefault(); setDropKey(k); } }}
+                          onDragLeave={() => setDropKey((v) => (v === k ? null : v))}
+                          onDrop={(e) => { e.preventDefault(); dropTo(wd.n, p.start); }}
                           title={!sel && atLimit ? `Belgilangan soat (${n}) to'ldi` : undefined}
                           className={`grid h-14 w-full place-items-center rounded-lg text-[11px] font-medium transition ${
-                            sel
-                              ? 'bg-brand text-white shadow-sm'
-                              : atLimit
-                                ? 'cursor-not-allowed bg-slate-50 text-slate-300 ring-1 ring-slate-100'
-                                : 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200 hover:bg-emerald-100'
+                            dropKey === k
+                              ? 'bg-brand/10 ring-2 ring-brand'
+                              : sel
+                                ? 'bg-brand text-white shadow-sm'
+                                : atLimit
+                                  ? 'cursor-not-allowed bg-slate-50 text-slate-300 ring-1 ring-slate-100'
+                                  : 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200 hover:bg-emerald-100'
                           }`}
                         >
                           {sel ? <Check size={16} /> : ''}
