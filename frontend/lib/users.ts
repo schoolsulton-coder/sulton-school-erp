@@ -17,12 +17,15 @@ export interface UserDetail extends ManagedUser {
   createdAt: string;
   updatedAt: string;
   employee?: {
+    id: string;
     hireDate: string;
     status: string;
     formal: boolean;
-    department?: { name: string } | null;
-    position?: { name: string } | null;
-    branch?: { name: string } | null;
+    departmentId?: string | null;
+    department?: { id: string; name: string } | null;
+    position?: { id: string; name: string } | null;
+    branch?: { id: string; name: string } | null;
+    branchLinks?: { branch: { id: string; name: string } }[];
   } | null;
   classes: { id: string; name: string; isCurator: boolean }[];
   stats: {
@@ -69,7 +72,12 @@ export const usersApi = {
   }) => api.post('/users', data).then((r) => r.data),
   update: (
     id: string,
-    data: Partial<ManagedUser> & { roleId?: string; subjectId?: string | null },
+    data: Partial<ManagedUser> & {
+      roleId?: string;
+      subjectId?: string | null;
+      departmentId?: string;
+      branchIds?: string[];
+    },
   ) => api.patch(`/users/${id}`, data).then((r) => r.data),
   resetPassword: (id: string, password: string) =>
     api.patch(`/users/${id}/password`, { password }).then((r) => r.data),

@@ -58,12 +58,15 @@ export class UsersService {
         },
         employee: {
           select: {
+            id: true,
             hireDate: true,
             status: true,
             formal: true,
-            department: { select: { name: true } },
-            position: { select: { name: true } },
-            branch: { select: { name: true } },
+            departmentId: true,
+            department: { select: { id: true, name: true } },
+            position: { select: { id: true, name: true } },
+            branch: { select: { id: true, name: true } },
+            branchLinks: { select: { branch: { select: { id: true, name: true } } } },
           },
         },
         _count: {
@@ -134,14 +137,48 @@ export class UsersService {
         throw new ConflictException('Bu telefon boshqa foydalanuvchida');
       }
     }
-    return this.prisma.user.update({
+    const { departmentId, branchIds, ...userDto } = dto;
+
+    const user = await this.prisma.user.update({
       where: { id },
       data: {
-        ...dto,
+        ...userDto,
         ...(dto.subjectId !== undefined ? { subjectId: dto.subjectId || null } : {}),
       },
       select: SAFE_SELECT,
     });
+
+    // Bo'lim/filiallar xodim kartasida saqlanadi — karta bo'lmasa, jim o'tkazib yuboriladi
+    if (departmentId !== undefined || branchIds !== undefined) {
+      const employee = await this.prisma.employee.findUnique({
+        where: { userId: id },
+        select: { id: true },
+      });
+      if (employee) {
+        if (departmentId !== undefined) {
+          await this.prisma.employee.update({
+            where: { id: employee.id },
+            data: { departmentId: departmentId || null },
+          });
+        }
+        if (branchIds !== undefined) {
+          await this.prisma.employeeBranch.deleteMany({ where: { employeeId: employee.id } });
+          if (branchIds.length) {
+            await this.prisma.employeeBranch.createMany({
+              data: branchIds.map((branchId) => ({ employeeId: employee.id, branchId })),
+              skipDuplicates: true,
+            });
+            // Asosiy filial — ro'yxatdagi birinchisi
+            await this.prisma.employee.update({
+              where: { id: employee.id },
+              data: { branchId: branchIds[0] },
+            });
+          }
+        }
+      }
+    }
+
+    return user;
   }
 
   async resetPassword(id: string, password: string) {

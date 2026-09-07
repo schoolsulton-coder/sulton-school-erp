@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,8 +10,10 @@ import {
   type ManagedUser,
 } from '@/lib/users';
 import { classesApi } from '@/lib/classes';
+import { hrApi } from '@/lib/hr';
+import { crmApi } from '@/lib/crm';
 import { useAuthStore } from '@/store/auth';
-import { Ban, Eye, KeyRound, Pencil, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Ban, Check, Eye, KeyRound, Pencil, ShieldCheck, Trash2, X } from 'lucide-react';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2';
 
@@ -213,7 +215,22 @@ export default function UsersPage() {
         <UserModal onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />
       )}
       {modal?.mode === 'edit' && (
-        <UserModal user={modal.user} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); }} />
+        <UserModal
+          user={modal.user}
+          onClose={() => setModal(null)}
+          onDone={() => { setModal(null); refresh(); }}
+          onDelete={
+            canDelete
+              ? () => {
+                  const u = modal.user;
+                  if (confirm(`"${u.fullName}" foydalanuvchisi butunlay o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) {
+                    setModal(null);
+                    del.mutate(u);
+                  }
+                }
+              : undefined
+          }
+        />
       )}
       {modal?.mode === 'password' && (
         <PasswordModal user={modal.user} onClose={() => setModal(null)} onDone={() => setModal(null)} />
@@ -418,14 +435,90 @@ function DetailModal({
   );
 }
 
+// ===== Tahrirlash / yangi foydalanuvchi formasi =====
+
+function FormCard({
+  title,
+  desc,
+  children,
+}: {
+  title: string;
+  desc?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{title}</div>
+      {desc && <p className="mt-1 text-xs leading-relaxed text-slate-400">{desc}</p>}
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </label>
+      {children}
+      {hint && <p className="mt-1 text-xs leading-relaxed text-slate-400">{hint}</p>}
+    </div>
+  );
+}
+
+function CheckChip({
+  label,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked
+          ? 'border-brand bg-brand text-white'
+          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+      }`}
+    >
+      <span
+        className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${
+          checked ? 'border-white/70 bg-white/20' : 'border-slate-300'
+        }`}
+      >
+        {checked && <Check size={11} />}
+      </span>
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
 function UserModal({
   user,
   onClose,
   onDone,
+  onDelete,
 }: {
   user?: ManagedUser;
   onClose: () => void;
   onDone: () => void;
+  onDelete?: () => void;
 }) {
   const editing = !!user;
   const [form, setForm] = useState({
@@ -437,11 +530,29 @@ function UserModal({
     status: user?.status ?? 'ACTIVE',
     subjectId: user?.subject?.id ?? '',
   });
-  const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: usersApi.roles });
-  const { data: subjects } = useQuery({ queryKey: ['subjects'], queryFn: classesApi.subjects });
+  const [departmentId, setDepartmentId] = useState('');
+  const [branchIds, setBranchIds] = useState<string[]>([]);
   const [error, setError] = useState('');
 
+  const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: usersApi.roles });
+  const { data: subjects } = useQuery({ queryKey: ['subjects'], queryFn: classesApi.subjects });
+  const { data: departments } = useQuery({ queryKey: ['hr-departments'], queryFn: hrApi.departments });
+  const { data: branches } = useQuery({ queryKey: ['crm-branches'], queryFn: crmApi.branches });
+  const { data: detail } = useQuery({
+    queryKey: ['user', user?.id],
+    queryFn: () => usersApi.get(user!.id),
+    enabled: editing,
+  });
+
+  // Xodim kartasidagi bo'lim/filiallarni formaga yuklaymiz
+  useEffect(() => {
+    if (!detail?.employee) return;
+    setDepartmentId(detail.employee.department?.id ?? '');
+    setBranchIds(detail.employee.branchLinks?.map((b) => b.branch.id) ?? []);
+  }, [detail]);
+
   const isTeacher = roles?.find((r) => r.id === form.roleId)?.slug === 'teacher';
+  const employee = detail?.employee;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -453,6 +564,7 @@ function UserModal({
           roleId: form.roleId,
           status: form.status as any,
           subjectId: isTeacher ? form.subjectId || '' : '',
+          ...(employee ? { departmentId, branchIds } : {}),
         });
         // Parol kiritilgan bo'lsa — yangilaymiz
         if (form.password && form.password.length >= 6) {
@@ -470,54 +582,223 @@ function UserModal({
       }
     },
     onSuccess: onDone,
-    onError: (e: any) => setError(e?.response?.data?.message ?? 'Xatolik'),
+    onError: (e: any) => {
+      const msg = e?.response?.data?.message;
+      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Xatolik');
+    },
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      onClick={onClose}
+    >
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
-        className="w-full max-w-sm space-y-3 rounded-2xl bg-white p-6 shadow-xl"
+        className="my-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl"
       >
-        <h2 className="text-lg font-bold">{editing ? 'Tahrirlash' : 'Yangi foydalanuvchi'}</h2>
-        <input placeholder="F.I.SH" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className={inputCls} required />
-        <input placeholder="Telefon (+998...)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} required />
-        <input placeholder="Email (ixtiyoriy)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} />
-        <input
-          type="password"
-          placeholder={editing ? "Yangi parol (bo'sh qoldiring — o'zgarmaydi)" : 'Parol (tizimga kirish uchun)'}
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          className={inputCls}
-          required={!editing}
-          minLength={6}
-          autoComplete="new-password"
-        />
-        <select value={form.roleId} onChange={(e) => setForm({ ...form, roleId: e.target.value })} className={inputCls} required>
-          <option value="">Rol tanlang</option>
-          {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
-        {isTeacher && (
+        {/* Sarlavha */}
+        <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
           <div>
-            <select value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })} className={inputCls}>
-              <option value="">Fan tanlang (o&apos;qitadigan)</option>
-              {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {(subjects?.length ?? 0) === 0 && (
-              <p className="mt-1 text-xs text-slate-400">Fan yo&apos;q — Sozlamalar → Fanlar&apos;dan qo&apos;shing</p>
-            )}
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              {editing ? 'Tahrirlash' : 'Yangi foydalanuvchi'}
+            </div>
+            <div className="text-xl font-bold text-slate-900">{form.fullName || '—'}</div>
           </div>
-        )}
-        {editing && (
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as any })} className={inputCls}>
-            <option value="ACTIVE">Faol</option>
-            <option value="INACTIVE">Nofaol</option>
-            <option value="BLOCKED">Bloklangan</option>
-          </select>
-        )}
-        {error && <p className="text-sm text-red-500">{error}</p>}
-        <Actions onClose={onClose} pending={save.isPending} />
+          <button type="button" onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-4 bg-slate-50 px-6 py-5">
+          {/* Shaxsiy */}
+          <FormCard title="Shaxsiy">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="F.I.SH *">
+                <input
+                  value={form.fullName}
+                  onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                  className={inputCls}
+                  required
+                />
+              </Field>
+              <Field
+                label="Login *"
+                hint="Tizimga kirishda ishlatiladi — telefon raqami (+998...). Bo'sh joysiz yozing."
+              >
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className={inputCls}
+                  placeholder="+998901234567"
+                  required
+                />
+              </Field>
+              <Field label="Email" hint="Ixtiyoriy — email orqali ham kirish mumkin.">
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Rollar *">
+                <select
+                  value={form.roleId}
+                  onChange={(e) => setForm({ ...form, roleId: e.target.value })}
+                  className={inputCls}
+                  required
+                >
+                  <option value="">Rol tanlang</option>
+                  {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </Field>
+              {isTeacher && (
+                <Field
+                  label="Fan (o'qitadigan)"
+                  hint={(subjects?.length ?? 0) === 0 ? "Fan yo'q — Sozlamalar → Fanlar'dan qo'shing" : undefined}
+                >
+                  <select
+                    value={form.subjectId}
+                    onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
+                    className={inputCls}
+                  >
+                    <option value="">Fan tanlang</option>
+                    {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </Field>
+              )}
+              {editing && (
+                <Field label="Holat">
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+                    className={inputCls}
+                  >
+                    <option value="ACTIVE">Faol</option>
+                    <option value="INACTIVE">Nofaol</option>
+                    <option value="BLOCKED">Bloklangan</option>
+                  </select>
+                </Field>
+              )}
+            </div>
+          </FormCard>
+
+          {/* Xodim kartasi */}
+          <FormCard
+            title="ERP userni xodim kartasiga bog'lash"
+            desc="Xodim kartasi Maoshlar → Xodimlar bo'limida yaratiladi. Bo'lim va filial shu karta orqali biriktiriladi; rol ruxsatlari alohida ishlaydi."
+          >
+            {!editing ? (
+              <p className="text-sm text-slate-400">Avval foydalanuvchini saqlang.</p>
+            ) : employee ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip tone="brand">{employee.position?.name || 'Lavozimsiz'}</Chip>
+                {employee.department?.name && <Chip>{employee.department.name}</Chip>}
+                <Chip>Ishga qabul: {fmt(employee.hireDate)}</Chip>
+                <Link href="/maoshlar" className="ml-auto text-sm font-medium text-brand hover:underline">
+                  Xodimlar bo&apos;limida ochish →
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">
+                Xodim kartasi biriktirilmagan — bo&apos;lim va filial tanlash uchun avval{' '}
+                <Link href="/maoshlar" className="font-medium text-brand hover:underline">Maoshlar → Xodimlar</Link>
+                {' '}da karta yarating.
+              </p>
+            )}
+          </FormCard>
+
+          {/* Bo'lim */}
+          <FormCard
+            title="Bo'lim"
+            desc="Xodim kartasidagi bo'lim. Xarajatlar ruxsati shu bo'lim bo'yicha cheklanadi."
+          >
+            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+              {departments?.map((d) => (
+                <CheckChip
+                  key={d.id}
+                  label={d.name}
+                  checked={departmentId === d.id}
+                  disabled={!employee}
+                  onToggle={() => setDepartmentId(departmentId === d.id ? '' : d.id)}
+                />
+              ))}
+            </div>
+            {!departments?.length && <p className="text-sm text-slate-400">Bo&apos;lim yo&apos;q</p>}
+          </FormCard>
+
+          {/* Filiallar */}
+          <FormCard title="Filiallar" desc="Foydalanuvchi bir nechta filialga tegishli bo'lishi mumkin.">
+            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+              {branches?.map((b) => (
+                <CheckChip
+                  key={b.id}
+                  label={b.name}
+                  checked={branchIds.includes(b.id)}
+                  disabled={!employee}
+                  onToggle={() =>
+                    setBranchIds((prev) =>
+                      prev.includes(b.id) ? prev.filter((x) => x !== b.id) : [...prev, b.id],
+                    )
+                  }
+                />
+              ))}
+            </div>
+            {!branches?.length && <p className="text-sm text-slate-400">Filial yo&apos;q</p>}
+          </FormCard>
+
+          {/* Parol */}
+          <FormCard
+            title="Tizimga kirish paroli"
+            desc={
+              editing
+                ? "Foydalanuvchi yuqoridagi Login + shu parol orqali ERPga kiradi. Bo'sh qoldirilsa, mavjud parol o'zgarmaydi."
+                : 'Foydalanuvchi yuqoridagi Login + shu parol orqali ERPga kiradi.'
+            }
+          >
+            <Field label="Yangi parol">
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className={inputCls}
+                placeholder={editing ? "O'zgartirmaslik uchun bo'sh qoldiring" : 'Kamida 6 ta belgi'}
+                required={!editing}
+                minLength={6}
+                autoComplete="new-password"
+              />
+            </Field>
+          </FormCard>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+        </div>
+
+        {/* Pastki panel */}
+        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={save.isPending}
+              className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+            >
+              {save.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
+            </button>
+            <button type="button" onClick={onClose} className="text-sm font-medium text-slate-500 hover:text-slate-700">
+              Bekor
+            </button>
+          </div>
+          {editing && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="text-sm font-medium text-rose-600 hover:underline"
+            >
+              O&apos;chirish
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );

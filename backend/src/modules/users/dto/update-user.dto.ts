@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -29,4 +30,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   subjectId?: string;
+
+  // Xodim kartasi (Maoshlar → Xodimlar) maydonlari — karta mavjud bo'lsagina qo'llanadi
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  branchIds?: string[];
 }
