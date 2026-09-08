@@ -26,6 +26,7 @@ on:
           - all-superadmin      # hammani superadmin qilish
           - users               # bazadagi foydalanuvchilar ro'yxati
           - diag                # server holati: git, node, fayllar, pm2
+          - logs                # backend loglari (xatolikni ko'rish uchun)
 
 concurrency:
   group: server-task

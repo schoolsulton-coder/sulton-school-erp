@@ -39,6 +39,10 @@ case "${TASK:-}" in
     echo "==> Barchani superadmin qilish"
     node prisma/all-superadmin.js
     ;;
+  logs)
+    echo "==> Backend loglari (oxirgi 150 qator)"
+    pm2 logs sulton-backend --lines 150 --nostream 2>/dev/null | tail -170
+    ;;
   diag)
     echo "==> Server holati"
     echo "-- pwd: $(pwd)"

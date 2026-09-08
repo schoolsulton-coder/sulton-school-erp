@@ -39,13 +39,26 @@ export class ContractsService {
   }
 
   // ===== Shartnoma raqami: SHRT-YYYY-NNNN =====
-  private async nextNumber(year: number): Promise<string> {
-    const from = new Date(year, 0, 1);
-    const to = new Date(year + 1, 0, 1);
-    const count = await this.prisma.contract.count({
-      where: { createdAt: { gte: from, lt: to } },
+  /**
+   * Shu yil uchun keyingi raqam — mavjud eng katta raqamdan +1.
+   * (Ilgari yil bo'yicha `count+1` olinardi: o'chirilgan shartnoma yoki boshqa
+   * yilda yaratilgan yozuv bo'lsa raqam takrorlanib, `number` unique xatosi —
+   * "Internal server error" chiqardi.)
+   */
+  private async nextNumber(year: number, attempt = 0): Promise<string> {
+    const prefix = `SHRT-${year}-`;
+    const last = await this.prisma.contract.findFirst({
+      where: { number: { startsWith: prefix } },
+      orderBy: { number: 'desc' },
+      select: { number: true },
     });
-    return `SHRT-${year}-${String(count + 1).padStart(4, '0')}`;
+    const lastSeq = last ? Number(last.number.slice(prefix.length)) || 0 : 0;
+    return `${prefix}${String(lastSeq + 1 + attempt).padStart(4, '0')}`;
+  }
+
+  /** Raqam bandligi (unique) xatosimi — bir vaqtda ikki shartnoma tuzilganda bo'ladi */
+  private isDuplicateNumber(e: any): boolean {
+    return e?.code === 'P2002' && JSON.stringify(e?.meta ?? {}).includes('number');
   }
 
   // ===== Yaratish + oyma-oy jadval =====
@@ -75,22 +88,29 @@ export class ContractsService {
       installments.push({ dueDate: due, amount: monthly });
     }
 
-    const number = await this.nextNumber(start.getFullYear());
-
-    return this.prisma.contract.create({
-      data: {
-        number,
-        studentId: dto.studentId,
-        startDate: start,
-        endDate,
-        monthlyAmount: dto.monthlyAmount,
-        type: dto.type ?? 'MONTHLY',
-        discountId: dto.discountId,
-        status: 'ACTIVE',
-        installments: { create: installments },
-      },
-      include: { installments: { orderBy: { dueDate: 'asc' } } },
-    });
+    // Raqam band bo'lsa — keyingisini olib qayta urinamiz
+    for (let attempt = 0; ; attempt++) {
+      const number = await this.nextNumber(start.getFullYear(), attempt);
+      try {
+        return await this.prisma.contract.create({
+          data: {
+            number,
+            studentId: dto.studentId,
+            startDate: start,
+            endDate,
+            monthlyAmount: dto.monthlyAmount,
+            type: dto.type ?? 'MONTHLY',
+            discountId: dto.discountId,
+            status: 'ACTIVE',
+            installments: { create: installments },
+          },
+          include: { installments: { orderBy: { dueDate: 'asc' } } },
+        });
+      } catch (e) {
+        if (attempt < 5 && this.isDuplicateNumber(e)) continue;
+        throw e;
+      }
+    }
   }
 
   // ===== Qabul (lead) kartasidan shartnoma tuzish — ATOMIK =====
@@ -130,10 +150,50 @@ export class ContractsService {
       installments.push({ dueDate: due, amount: monthly });
     }
 
-    const number = await this.nextNumber(start.getFullYear());
     const stages = await this.prisma.leadStage.findMany();
     const doneStage = stages.find((s) => /tuzdi|tuzildi/i.test(s.name));
 
+    // Raqam band bo'lsa — keyingisi bilan qayta urinamiz
+    for (let attempt = 0; ; attempt++) {
+      const number = await this.nextNumber(start.getFullYear(), attempt);
+      try {
+        return await this.createFromLeadTx({
+          leadId,
+          lead,
+          dto,
+          number,
+          start,
+          endDate,
+          installments,
+          doneStage,
+        });
+      } catch (e) {
+        if (attempt < 5 && this.isDuplicateNumber(e)) continue;
+        throw e;
+      }
+    }
+  }
+
+  /** createFromLead ning tranzaksiya qismi (raqam takrorlansa qayta chaqiriladi) */
+  private createFromLeadTx({
+    leadId,
+    lead,
+    dto,
+    number,
+    start,
+    endDate,
+    installments,
+    doneStage,
+  }: {
+    leadId: string;
+    lead: any;
+    dto: CreateFromLeadDto;
+    number: string;
+    start: Date;
+    endDate: Date;
+    installments: { dueDate: Date; amount: number }[];
+    doneStage?: { id: string };
+  }) {
     return this.prisma.$transaction(
       async (tx) => {
         let studentId = lead.student?.id;
