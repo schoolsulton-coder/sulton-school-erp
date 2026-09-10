@@ -62,8 +62,8 @@ case "${TASK:-}" in
     echo "-- pm2:"; pm2 list 2>/dev/null | tail -5 || true
     ;;
   users)
-    echo "==> Foydalanuvchilar (rol bo'yicha)"
-    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.findMany({select:{fullName:true,phone:true,status:true,role:{select:{slug:true}}},orderBy:{createdAt:'asc'}}).then(u=>{console.log('Jami:',u.length);u.forEach(x=>console.log(' ',x.role.slug.padEnd(13),x.phone.padEnd(15),x.status.padEnd(8),x.fullName))}).finally(()=>p.\$disconnect())"
+    echo "==> Foydalanuvchilar (rol · xodim kartasi holati)"
+    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.findMany({select:{fullName:true,phone:true,status:true,role:{select:{slug:true}},employee:{select:{id:true}}},orderBy:{createdAt:'asc'}}).then(u=>{console.log('Jami:',u.length,'· xodim kartasi bor:',u.filter(x=>x.employee).length);u.forEach(x=>console.log(' ',x.role.slug.padEnd(13),x.phone.padEnd(15),x.status.padEnd(8),(x.employee?'karta+':'karta-').padEnd(7),x.fullName))}).finally(()=>p.\$disconnect())"
     ;;
   *)
     echo "Noma'lum vazifa: '${TASK:-}'" >&2
