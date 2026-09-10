@@ -22,6 +22,14 @@ export default function HomeworkPage() {
 
   // Ustoz/kurator — faqat o'ziga biriktirilgan sinflar, boshqalar — barchasi
   const { classes, scoped } = useMyClasses();
+
+  // Bitta sinf biriktirilgan bo'lsa — filtrda o'sha sinf darhol tanlanadi
+  useEffect(() => {
+    if (scoped && classes.length === 1) {
+      setF((prev) => (prev.classId ? prev : { ...prev, classId: classes[0].id }));
+    }
+  }, [scoped, classes]);
+
   const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => usersApi.list() });
   const teachers = useMemo(() => (staff ?? []).filter((u) => !['student', 'guardian'].includes(u.role.slug)), [staff]);
   const { data: roster } = useQuery({
