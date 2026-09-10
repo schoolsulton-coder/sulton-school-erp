@@ -54,6 +54,14 @@ export default function GradesPage() {
 
   const { data: my } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
 
+  // Bitta sinf/fan biriktirilgan bo'lsa — tanlab o'tirmasdan darhol ochiladi
+  useEffect(() => {
+    if (!my) return;
+    if (!classId && my.classes.length === 1) setClassId(my.classes[0].id);
+    if (!subjectId && my.subjects.length === 1) setSubjectId(my.subjects[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [my]);
+
   const subjectOptions = useMemo(() => {
     if (!my) return [];
     if (my.canGradeAll) return my.subjects;
@@ -193,7 +201,7 @@ export default function GradesPage() {
 
       {!classId || !subjectId ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
-          {my && !my.classes.length ? 'Sizga fan biriktirilmagan' : 'Sinf va fanni tanlang'}
+          {my && !my.classes.length ? "Sizga sinf biriktirilmagan — Ma'lumotlar → Sinflar bo'limida kurator qilib biriktirilishi yoki dars jadvaliga qo'yilishi kerak" : 'Sinf va fanni tanlang'}
         </div>
       ) : (
         <>

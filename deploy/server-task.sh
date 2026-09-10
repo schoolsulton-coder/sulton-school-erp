@@ -39,6 +39,10 @@ case "${TASK:-}" in
     echo "==> Barchani superadmin qilish"
     node prisma/all-superadmin.js
     ;;
+  teachers)
+    echo "==> Ustoz/kurator/koordinator: biriktirilgan fan, sinflar va dars soni"
+    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();(async()=>{const us=await p.user.findMany({where:{role:{slug:{in:['teacher','curator','coordinator']}}},select:{id:true,fullName:true,phone:true,role:{select:{slug:true}},subject:{select:{name:true}},taughtClasses:{select:{class:{select:{name:true}}}}},orderBy:{fullName:'asc'}});console.log('Jami:',us.length);for(const u of us){const sch=await p.schedule.count({where:{teacherId:u.id}});const cls=u.taughtClasses.map(t=>t.class.name).join(', ')||'-';console.log(' ',u.phone.padEnd(15),u.role.slug.padEnd(12),'fan:',(u.subject?u.subject.name:'-').padEnd(18),'sinflar:',cls.padEnd(28),'jadval:',String(sch).padEnd(3),u.fullName)}})().catch(e=>console.error(e.message)).finally(()=>p.\$disconnect())"
+    ;;
   employees-sync-dry)
     echo "==> Kimga xodim kartasi ochilishini ko'rish (baza o'zgarmaydi)"
     node prisma/employees-backfill.js --dry

@@ -25,6 +25,7 @@ on:
           - all-superadmin-dry  # kim superadmin bo'lishini ko'rish
           - all-superadmin      # hammani superadmin qilish
           - users               # bazadagi foydalanuvchilar ro'yxati
+          - teachers            # ustozlarga biriktirilgan fan va sinflar
           - employees-sync-dry  # kimga xodim kartasi ochilishini ko'rish
           - employees-sync      # foydalanuvchilarga xodim kartasi ochish
           - diag                # server holati: git, node, fayllar, pm2

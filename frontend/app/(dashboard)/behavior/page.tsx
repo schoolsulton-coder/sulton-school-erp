@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Trash2 } from 'lucide-react';
@@ -111,6 +111,11 @@ export default function BehaviorPage() {
 function AddRecord({ onAdded, onError }: { onAdded: () => void; onError: (m: string) => void }) {
   const [form, setForm] = useState({ classId: '', studentId: '', type: 'POSITIVE', points: '5', description: '' });
   const { classes } = useMyClasses();
+
+  // Bitta sinf biriktirilgan bo'lsa — o'sha sinf darhol tanlanadi
+  useEffect(() => {
+    if (classes.length === 1) setForm((f) => (f.classId ? f : { ...f, classId: classes[0].id }));
+  }, [classes]);
   const { data: students } = useQuery({
     queryKey: ['behavior-students', form.classId],
     queryFn: () => studentsApi.list({ classId: form.classId || undefined, status: 'ACTIVE', limit: 500 }).then((r) => r.data),

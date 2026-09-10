@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Paperclip, Users, Filter } from 'lucide-react';
@@ -99,7 +99,13 @@ export default function HomeworkPage() {
           );
         })}
         {!list?.length && (
-          <p className="col-span-full py-8 text-center text-slate-400">{isLoading ? 'Yuklanmoqda…' : 'Vazifa yo\'q'}</p>
+          <p className="col-span-full py-8 text-center text-slate-400">
+            {isLoading
+              ? 'Yuklanmoqda…'
+              : scoped && !classes.length
+                ? "Sizga sinf biriktirilmagan — Ma'lumotlar → Sinflar bo'limida kurator qilib biriktirilishi yoki dars jadvaliga qo'yilishi kerak"
+                : "Vazifa yo'q"}
+          </p>
         )}
       </div>
 
@@ -138,6 +144,14 @@ function NewHomeworkModal({ teachers, onClose, onCreated }: { teachers: { id: st
     enabled: mine !== undefined && mine.canGradeAll,
   });
   const subjects = mine && !mine.canGradeAll ? mine.subjects : allSubjects;
+
+  // Bitta sinf/fan biriktirilgan bo'lsa — tanlab o'tirmasdan to'ldiriladi
+  useEffect(() => {
+    if (classes.length === 1) setForm((f) => (f.classId ? f : { ...f, classId: classes[0].id }));
+  }, [classes]);
+  useEffect(() => {
+    if (subjects?.length === 1) setForm((f) => (f.subjectId ? f : { ...f, subjectId: subjects[0].id }));
+  }, [subjects]);
   const { data: types } = useQuery({ queryKey: ['hw-types'], queryFn: homeworkApi.types });
   const { data: roster, isLoading: rosterLoading } = useQuery({
     queryKey: ['class-students', form.classId],

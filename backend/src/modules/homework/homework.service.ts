@@ -113,13 +113,16 @@ export class HomeworkService {
     const where: any = {};
     if (params.classId) where.classId = params.classId;
 
-    // Ustoz/kurator/koordinator — faqat o'ziga biriktirilgan sinflar vazifalari
+    // Ustoz/kurator/koordinator — o'ziga biriktirilgan sinflar vazifalari
+    // va o'zi bergan vazifalar (sinf biriktirilmagan bo'lsa ham ko'rinadi)
     if (!canSeeAllClasses(user.role) && !ADMIN_ROLES.includes(user.role)) {
       const mine = await ownClassIds(this.prisma, user.id);
-      where.classId =
+      const classFilter =
         params.classId && mine.includes(params.classId)
           ? params.classId
           : { in: mine };
+      where.OR = [{ classId: classFilter }, { teacherId: user.id }];
+      delete where.classId;
     }
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.teacherId) where.teacherId = params.teacherId;

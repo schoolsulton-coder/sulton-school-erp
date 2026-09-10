@@ -27,6 +27,12 @@ export default function AttendancePage() {
   const [errMsg, setErrMsg] = useState('');
 
   const { data: my } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
+
+  // Bitta sinf biriktirilgan bo'lsa — darhol o'sha sinf ochiladi
+  useEffect(() => {
+    if (my && !classId && my.classes.length === 1) setClassId(my.classes[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [my]);
   const { data: rows, isLoading: rowsLoading } = useQuery({
     queryKey: ['attendance', classId, date],
     queryFn: () => attendanceApi.classDay(classId, date),
@@ -134,7 +140,7 @@ export default function AttendancePage() {
 
       {!classId ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
-          {my && !my.classes.length ? 'Sizga sinf biriktirilmagan' : 'Sinfni tanlang'}
+          {my && !my.classes.length ? "Sizga sinf biriktirilmagan — Ma'lumotlar → Sinflar bo'limida kurator qilib biriktirilishi yoki dars jadvaliga qo'yilishi kerak" : 'Sinfni tanlang'}
         </div>
       ) : (
         <>
