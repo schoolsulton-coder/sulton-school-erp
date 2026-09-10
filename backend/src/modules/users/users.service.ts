@@ -160,6 +160,15 @@ export class UsersService {
     }
     const { departmentId, branchIds, ...userDto } = dto;
 
+    // Rol portal (o'quvchi/vasiy) dan xodim roliga o'zgarsa — xodim kartasi ochiladi
+    if (dto.roleId) {
+      const role = await this.prisma.role.findUnique({
+        where: { id: dto.roleId },
+        select: { slug: true },
+      });
+      if (role) await this.ensureEmployeeCard(id, role.slug);
+    }
+
     const user = await this.prisma.user.update({
       where: { id },
       data: {
