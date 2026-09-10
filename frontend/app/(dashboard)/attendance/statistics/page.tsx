@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
@@ -17,6 +17,12 @@ export default function AttendanceStatsPage() {
   const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
 
   const { data: my } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
+
+  // Bitta sinf biriktirilgan bo'lsa — avtomatik tanlanadi
+  useEffect(() => {
+    if (my && !classId && my.classes.length === 1) setClassId(my.classes[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [my]);
   const { data: stats, isLoading, isError } = useQuery({
     queryKey: ['att-stats-page', classId, from, to],
     queryFn: () => attendanceApi.classStats(classId, from || undefined, to || undefined),

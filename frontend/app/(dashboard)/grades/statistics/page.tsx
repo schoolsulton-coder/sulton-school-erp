@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
@@ -20,6 +20,14 @@ export default function GradeStatsPage() {
   const isPeriodType = type === 'QUARTER' || type === 'YEAR';
 
   const { data: my } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
+
+  // Bitta sinf/fan biriktirilgan bo'lsa — avtomatik tanlanadi
+  useEffect(() => {
+    if (!my) return;
+    if (!classId && my.classes.length === 1) setClassId(my.classes[0].id);
+    if (!subjectId && my.subjects.length === 1) setSubjectId(my.subjects[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [my]);
   const subjectOptions = useMemo(() => {
     if (!my) return [];
     if (my.canGradeAll || !classId) return my.subjects;

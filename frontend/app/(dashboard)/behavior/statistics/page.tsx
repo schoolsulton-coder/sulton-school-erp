@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
 import { behaviorApi } from '@/lib/behavior';
-import { classesApi } from '@/lib/classes';
+import { useMyClasses } from '@/lib/use-my-classes';
 
 const sel = 'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand';
 
@@ -14,7 +14,13 @@ export default function BehaviorStatsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
-  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  const { classes } = useMyClasses();
+
+  // Bitta sinf biriktirilgan bo'lsa — avtomatik tanlanadi
+  useEffect(() => {
+    if (!classId && classes.length === 1) setClassId(classes[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classes]);
   const { data: stats, isLoading, isError } = useQuery({
     queryKey: ['behavior-stats', classId, from, to],
     queryFn: () => behaviorApi.classStats(classId, from || undefined, to || undefined),
