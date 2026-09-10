@@ -89,6 +89,12 @@ export const classesApi = {
     api.patch<ClassRow>(`/classes/${id}`, data).then((r) => r.data),
   remove: (id: string) => api.delete(`/classes/${id}`).then((r) => r.data),
 
+  // sinfga ustoz/kurator biriktirish
+  assignTeacher: (classId: string, data: { teacherId: string; isCurator?: boolean }) =>
+    api.post(`/classes/${classId}/teachers`, data).then((r) => r.data),
+  removeTeacher: (classId: string, teacherId: string) =>
+    api.delete(`/classes/${classId}/teachers/${teacherId}`).then((r) => r.data),
+
   // jadval
   schedule: (classId: string) =>
     api.get<ScheduleDay[]>(`/classes/${classId}/schedule`).then((r) => r.data),

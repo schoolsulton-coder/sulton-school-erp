@@ -149,6 +149,7 @@ export default function ClassesPage() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                 <th className="px-5 py-3">Sinf</th>
+                <th className="px-5 py-3">Kurator</th>
                 <th className="px-5 py-3">Filial · Yil</th>
                 <th className="px-5 py-3 text-center">Joy</th>
                 <th className="px-5 py-3 text-center">O&apos;quvchi</th>
@@ -225,6 +226,16 @@ function ClassRowItem({ c, onClick }: { c: ClassRow; onClick: () => void }) {
             )}
           </div>
         </div>
+      </td>
+      <td className="px-5 py-3.5">
+        {(() => {
+          const t = c.teachers?.find((x) => x.isCurator) ?? c.teachers?.[0];
+          return t ? (
+            <span className="text-slate-700">{t.teacher.fullName.replace(/\s*\(ustoz\)\s*$/i, '')}</span>
+          ) : (
+            <span className="text-slate-300">—</span>
+          );
+        })()}
       </td>
       <td className="px-5 py-3.5">
         <div className="text-slate-700">{c.branch?.name ?? '—'}</div>

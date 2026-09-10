@@ -5,6 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Save, GraduationCap } from 'lucide-react';
 import { classesApi, type ClassRow, type ClassInput } from '@/lib/classes';
 import { crmApi } from '@/lib/crm';
+import { usersApi, teacherLabel } from '@/lib/users';
+
+// Sinfga biriktirish mumkin bo'lgan rollar
+const TEACHER_ROLES = ['teacher', 'curator'];
 
 const LANGS = ["O'zbek", 'Rus', 'Ingliz'];
 const STATUSES = ['Faol', 'Nofaol', 'Arxiv'];
@@ -33,6 +37,16 @@ export function ClassFormModal({
     queryKey: ['academic-years'],
     queryFn: crmApi.academicYears,
   });
+  const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => usersApi.list() });
+  const teachers = useMemo(
+    () => (staff ?? []).filter((u) => TEACHER_ROLES.includes(u.role.slug)),
+    [staff],
+  );
+  // Sinfga biriktirilgan kurator (bo'lmasa — birinchi ustoz)
+  const currentTeacherId =
+    editing?.teachers?.find((t) => t.isCurator)?.teacher.id ??
+    editing?.teachers?.[0]?.teacher.id ??
+    '';
 
   const [form, setForm] = useState({
     branchId: editing?.branchId ?? '',
@@ -44,6 +58,7 @@ export function ClassFormModal({
     room: editing?.room ?? '',
     status: editing?.status ?? 'Faol',
     telegramGroup: editing?.telegramGroup ?? '',
+    teacherId: '',
   });
   const [error, setError] = useState('');
 
@@ -63,6 +78,11 @@ export function ClassFormModal({
     }
   }, [years, editing, form.academicYear]);
 
+  // Tahrirlashda mavjud kuratorni formaga qo'yamiz
+  useEffect(() => {
+    if (currentTeacherId) setForm((f) => ({ ...f, teacherId: currentTeacherId }));
+  }, [currentTeacherId]);
+
   // Select opsiyalari — joriy qiymat doim ro'yxatda bo'lishini kafolatlaydi
   const yearOptions = useMemo(() => {
     const names = (years ?? []).map((y) => y.name);
@@ -78,7 +98,7 @@ export function ClassFormModal({
   }, [form.gradeLevel, form.letter, form.language]);
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload: ClassInput = {
         name: `${form.gradeLevel}-${form.letter.toUpperCase()}`,
         gradeLevel: Number(form.gradeLevel),
@@ -90,9 +110,19 @@ export function ClassFormModal({
         status: form.status || undefined,
         telegramGroup: form.telegramGroup || undefined,
       };
-      return editing
-        ? classesApi.update(editing.id, payload)
-        : classesApi.create(payload);
+      const saved = editing
+        ? await classesApi.update(editing.id, payload)
+        : await classesApi.create(payload);
+
+      // Kurator (ustoz) biriktirish — o'zgargan bo'lsa eskisi olib tashlanadi
+      const classId = editing?.id ?? saved.id;
+      if (form.teacherId !== currentTeacherId) {
+        if (currentTeacherId) await classesApi.removeTeacher(classId, currentTeacherId);
+        if (form.teacherId) {
+          await classesApi.assignTeacher(classId, { teacherId: form.teacherId, isCurator: true });
+        }
+      }
+      return saved;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['classes'] });
@@ -244,6 +274,28 @@ export function ClassFormModal({
               ))}
             </select>
           </Field>
+
+          <div className="sm:col-span-2">
+            <Field label="Kurator / o'qituvchi">
+              <select
+                value={form.teacherId}
+                onChange={(e) => set('teacherId', e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Biriktirilmagan</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {teacherLabel(t)}
+                  </option>
+                ))}
+              </select>
+              {teachers.length === 0 && (
+                <p className="mt-1 text-xs text-slate-400">
+                  Ustoz yo&apos;q — Sozlamalar → Foydalanuvchilar&apos;da &quot;Ustoz&quot; roli bilan qo&apos;shing
+                </p>
+              )}
+            </Field>
+          </div>
 
           <div className="sm:col-span-2">
             <Field label="Telegram guruh (ixtiyoriy)">

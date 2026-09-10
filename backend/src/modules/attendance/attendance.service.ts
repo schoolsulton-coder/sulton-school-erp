@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { isOpenAccess } from '../../common/rbac-open';
+import { canSeeAllClasses } from '../../common/rbac-open';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 
@@ -32,8 +32,9 @@ export class AttendanceService {
   ) {}
 
   private canMarkAll(role?: string) {
-    // Ochiq rejimda har qanday xodim istalgan sinf davomatini ko'radi/belgilaydi
-    return isOpenAccess(role) || (!!role && MARK_ALL_ROLES.includes(role));
+    // Ochiq rejimda xodimlar istalgan sinf davomatini ko'radi —
+    // ustoz/kurator/koordinator esa faqat o'z sinflarini
+    return canSeeAllClasses(role) || (!!role && MARK_ALL_ROLES.includes(role));
   }
 
   private schoolToday(): string {

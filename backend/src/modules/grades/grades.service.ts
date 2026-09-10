@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { isOpenAccess } from '../../common/rbac-open';
+import { canSeeAllClasses } from '../../common/rbac-open';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { BulkGradeDto } from './dto/bulk-grade.dto';
@@ -43,8 +43,9 @@ export class GradesService {
   ) {}
 
   private canGradeAll(role?: string) {
-    // Ochiq rejimda har qanday xodim barcha sinf/fanni ko'radi va baholaydi
-    return isOpenAccess(role) || (!!role && GRADE_ALL_ROLES.includes(role));
+    // Ochiq rejimda xodimlar barcha sinf/fanni ko'radi —
+    // ustoz/kurator/koordinator esa faqat o'ziga biriktirilganini
+    return canSeeAllClasses(role) || (!!role && GRADE_ALL_ROLES.includes(role));
   }
 
   /** Maktab (Toshkent) mahalliy sanasi "YYYY-MM-DD" */
@@ -99,58 +100,68 @@ export class GradesService {
       return { canGradeAll: true, classes, subjects, assignments: [] as any[] };
     }
 
-    const sched = await this.prisma.schedule.findMany({
-      where: { teacherId: user.id },
-      select: {
-        classId: true,
-        subjectId: true,
-        class: { select: { name: true } },
-        subject: { select: { name: true } },
-      },
-    });
+    // Ustozning sinflari: dars jadvali + sinfga biriktirilganlar (kurator/fan o'qituvchisi).
+    // Fani: Foydalanuvchilar oynasida biriktirilgan fan (User.subjectId) + jadvaldagilar.
+    const [sched, assigned, u] = await Promise.all([
+      this.prisma.schedule.findMany({
+        where: { teacherId: user.id },
+        select: {
+          classId: true,
+          subjectId: true,
+          class: { select: { name: true } },
+          subject: { select: { name: true } },
+        },
+      }),
+      this.prisma.classTeacher.findMany({
+        where: { teacherId: user.id },
+        select: { class: { select: { id: true, name: true } } },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { subjectId: true, subject: { select: { name: true } } },
+      }),
+    ]);
 
-    if (sched.length) {
-      const seen = new Set<string>();
-      const assignments: { classId: string; className: string; subjectId: string; subjectName: string }[] = [];
-      const classMap = new Map<string, string>();
-      const subjMap = new Map<string, string>();
-      for (const s of sched) {
-        const key = `${s.classId}:${s.subjectId}`;
+    const classMap = new Map<string, string>();
+    const subjMap = new Map<string, string>();
+    const seen = new Set<string>();
+    const assignments: { classId: string; className: string; subjectId: string; subjectName: string }[] = [];
+
+    for (const s of sched) {
+      const key = `${s.classId}:${s.subjectId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        assignments.push({
+          classId: s.classId,
+          className: s.class.name,
+          subjectId: s.subjectId,
+          subjectName: s.subject.name,
+        });
+      }
+      classMap.set(s.classId, s.class.name);
+      subjMap.set(s.subjectId, s.subject.name);
+    }
+    for (const a of assigned) classMap.set(a.class.id, a.class.name);
+
+    // Biriktirilgan fan — sinflari bilan juftlanadi (jadvalda bo'lmasa ham baholay oladi)
+    if (u?.subjectId) {
+      const subjName = u.subject?.name ?? 'Fan';
+      subjMap.set(u.subjectId, subjName);
+      for (const [classId, className] of classMap) {
+        const key = `${classId}:${u.subjectId}`;
         if (!seen.has(key)) {
           seen.add(key);
-          assignments.push({ classId: s.classId, className: s.class.name, subjectId: s.subjectId, subjectName: s.subject.name });
+          assignments.push({ classId, className, subjectId: u.subjectId, subjectName: subjName });
         }
-        classMap.set(s.classId, s.class.name);
-        subjMap.set(s.subjectId, s.subject.name);
       }
-      return {
-        canGradeAll: false,
-        classes: [...classMap].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
-        subjects: [...subjMap].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
-        assignments,
-      };
     }
 
-    // Dars jadvalida biriktirilmagan bo'lsa — asosiy fani (User.subjectId) bo'yicha barcha faol sinflar
-    const u = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      select: { subjectId: true, subject: { select: { name: true } } },
-    });
-    if (u?.subjectId) {
-      const classes = await this.prisma.class.findMany({
-        where: { status: 'Faol' },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      });
-      const subj = { id: u.subjectId, name: u.subject?.name ?? 'Fan' };
-      return {
-        canGradeAll: false,
-        classes,
-        subjects: [subj],
-        assignments: classes.map((c) => ({ classId: c.id, className: c.name, subjectId: subj.id, subjectName: subj.name })),
-      };
-    }
-    return { canGradeAll: false, classes: [], subjects: [], assignments: [] };
+    return {
+      canGradeAll: false,
+      classes: [...classMap].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+      subjects: [...subjMap].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+      assignments,
+    };
   }
 
   /** Mavjud bahoni topib yangilaydi, aks holda yaratadi (dublikatsiz — DB unique'siz) */

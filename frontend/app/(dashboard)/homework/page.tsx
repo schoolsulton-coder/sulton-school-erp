@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Paperclip, Users, Filter } from 'lucide-react';
 import { homeworkApi, type HomeworkListItem, type HomeworkFilters, type HwFile } from '@/lib/homework';
 import { classesApi } from '@/lib/classes';
+import { attendanceApi } from '@/lib/attendance';
 import { studentsApi } from '@/lib/students';
 import { usersApi } from '@/lib/users';
 import { useAuthStore } from '@/store/auth';
@@ -18,7 +19,14 @@ export default function HomeworkPage() {
   const [showForm, setShowForm] = useState(false);
   const [f, setF] = useState<HomeworkFilters>({});
 
-  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  // Ustoz/kurator — faqat o'ziga biriktirilgan sinflar, boshqalar — barchasi
+  const { data: myClasses } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
+  const { data: allClasses } = useQuery({
+    queryKey: ['classes-mini'],
+    queryFn: () => classesApi.list(),
+    enabled: myClasses?.canMarkAll !== false,
+  });
+  const classes = myClasses?.canMarkAll === false ? myClasses.classes : allClasses;
   const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => usersApi.list() });
   const teachers = useMemo(() => (staff ?? []).filter((u) => !['student', 'guardian'].includes(u.role.slug)), [staff]);
   const { data: roster } = useQuery({
@@ -123,7 +131,14 @@ function NewHomeworkModal({ teachers, onClose, onCreated }: { teachers: { id: st
   const [selected, setSelected] = useState<string[]>([]);
   const [files, setFiles] = useState<HwFile[]>([]);
 
-  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  // Ustoz/kurator — faqat o'ziga biriktirilgan sinflar, boshqalar — barchasi
+  const { data: myClasses } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
+  const { data: allClasses } = useQuery({
+    queryKey: ['classes-mini'],
+    queryFn: () => classesApi.list(),
+    enabled: myClasses?.canMarkAll !== false,
+  });
+  const classes = myClasses?.canMarkAll === false ? myClasses.classes : allClasses;
   const { data: subjects } = useQuery({ queryKey: ['subjects'], queryFn: classesApi.subjects });
   const { data: types } = useQuery({ queryKey: ['hw-types'], queryFn: homeworkApi.types });
   const { data: roster, isLoading: rosterLoading } = useQuery({
