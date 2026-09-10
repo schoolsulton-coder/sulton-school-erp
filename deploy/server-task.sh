@@ -39,6 +39,14 @@ case "${TASK:-}" in
     echo "==> Barchani superadmin qilish"
     node prisma/all-superadmin.js
     ;;
+  employees-sync-dry)
+    echo "==> Kimga xodim kartasi ochilishini ko'rish (baza o'zgarmaydi)"
+    node prisma/employees-backfill.js --dry
+    ;;
+  employees-sync)
+    echo "==> Foydalanuvchilarga xodim kartasi ochish"
+    node prisma/employees-backfill.js
+    ;;
   logs)
     echo "==> Backend loglari (oxirgi 150 qator)"
     pm2 logs sulton-backend --lines 150 --nostream 2>/dev/null | tail -170

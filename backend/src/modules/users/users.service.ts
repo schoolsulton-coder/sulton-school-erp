@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PORTAL_ROLES } from '../../common/rbac-open';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -114,7 +115,7 @@ export class UsersService {
     });
     if (!role) throw new NotFoundException('Rol topilmadi');
 
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         fullName: dto.fullName,
         phone: dto.phone,
@@ -125,6 +126,26 @@ export class UsersService {
       },
       select: SAFE_SELECT,
     });
+
+    // Xodim kartasi (Maoshlar → Xodimlar) avtomatik ochiladi — portal akkauntlaridan tashqari
+    await this.ensureEmployeeCard(user.id, role.slug);
+
+    return user;
+  }
+
+  /** Foydalanuvchiga xodim kartasi bo'lmasa — yaratadi (xato bo'lsa user yaratish buzilmaydi) */
+  private async ensureEmployeeCard(userId: string, roleSlug: string) {
+    if (PORTAL_ROLES.includes(roleSlug)) return;
+    try {
+      const exists = await this.prisma.employee.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (exists) return;
+      await this.prisma.employee.create({ data: { userId, hireDate: new Date() } });
+    } catch {
+      // karta ochilmasa ham foydalanuvchi yaratilgan bo'ladi — Xodimlar oynasidan qo'lda qo'shiladi
+    }
   }
 
   async updateUser(id: string, dto: UpdateUserDto) {
