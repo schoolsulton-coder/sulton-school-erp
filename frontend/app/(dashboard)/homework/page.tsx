@@ -6,7 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Paperclip, Users, Filter } from 'lucide-react';
 import { homeworkApi, type HomeworkListItem, type HomeworkFilters, type HwFile } from '@/lib/homework';
 import { classesApi } from '@/lib/classes';
-import { attendanceApi } from '@/lib/attendance';
+import { gradesApi } from '@/lib/grades';
+import { useMyClasses } from '@/lib/use-my-classes';
 import { studentsApi } from '@/lib/students';
 import { usersApi } from '@/lib/users';
 import { useAuthStore } from '@/store/auth';
@@ -20,13 +21,7 @@ export default function HomeworkPage() {
   const [f, setF] = useState<HomeworkFilters>({});
 
   // Ustoz/kurator — faqat o'ziga biriktirilgan sinflar, boshqalar — barchasi
-  const { data: myClasses } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
-  const { data: allClasses } = useQuery({
-    queryKey: ['classes-mini'],
-    queryFn: () => classesApi.list(),
-    enabled: myClasses?.canMarkAll !== false,
-  });
-  const classes = myClasses?.canMarkAll === false ? myClasses.classes : allClasses;
+  const { classes, scoped } = useMyClasses();
   const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => usersApi.list() });
   const teachers = useMemo(() => (staff ?? []).filter((u) => !['student', 'guardian'].includes(u.role.slug)), [staff]);
   const { data: roster } = useQuery({
@@ -54,10 +49,12 @@ export default function HomeworkPage() {
       {/* Filtrlar */}
       <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5">
         <Filter size={16} className="text-slate-400" />
-        <select value={f.teacherId ?? ''} onChange={(e) => setF({ ...f, teacherId: e.target.value || undefined })} className={selCls}>
-          <option value="">Barcha ustozlar</option>
-          {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
-        </select>
+        {!scoped && (
+          <select value={f.teacherId ?? ''} onChange={(e) => setF({ ...f, teacherId: e.target.value || undefined })} className={selCls}>
+            <option value="">Barcha ustozlar</option>
+            {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+          </select>
+        )}
         <select value={f.classId ?? ''} onChange={(e) => setF({ ...f, classId: e.target.value || undefined, studentId: undefined })} className={selCls}>
           <option value="">Barcha sinflar</option>
           {classes?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -132,14 +129,15 @@ function NewHomeworkModal({ teachers, onClose, onCreated }: { teachers: { id: st
   const [files, setFiles] = useState<HwFile[]>([]);
 
   // Ustoz/kurator — faqat o'ziga biriktirilgan sinflar, boshqalar — barchasi
-  const { data: myClasses } = useQuery({ queryKey: ['att-my-classes'], queryFn: attendanceApi.myClasses });
-  const { data: allClasses } = useQuery({
-    queryKey: ['classes-mini'],
-    queryFn: () => classesApi.list(),
-    enabled: myClasses?.canMarkAll !== false,
+  const { classes, scoped } = useMyClasses();
+  // Fan: ustozga biriktirilgani (Foydalanuvchilar oynasi / dars jadvali), qolganlarga — barchasi
+  const { data: mine } = useQuery({ queryKey: ['grades-my-subjects'], queryFn: gradesApi.mySubjects });
+  const { data: allSubjects } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: classesApi.subjects,
+    enabled: mine !== undefined && mine.canGradeAll,
   });
-  const classes = myClasses?.canMarkAll === false ? myClasses.classes : allClasses;
-  const { data: subjects } = useQuery({ queryKey: ['subjects'], queryFn: classesApi.subjects });
+  const subjects = mine && !mine.canGradeAll ? mine.subjects : allSubjects;
   const { data: types } = useQuery({ queryKey: ['hw-types'], queryFn: homeworkApi.types });
   const { data: roster, isLoading: rosterLoading } = useQuery({
     queryKey: ['class-students', form.classId],

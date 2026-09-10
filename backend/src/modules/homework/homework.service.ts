@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
+import { ownClassIds } from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
@@ -98,16 +99,28 @@ export class HomeworkService {
     return hw;
   }
 
-  async findAll(params: {
-    classId?: string;
-    subjectId?: string;
-    teacherId?: string;
-    studentId?: string;
-    from?: string;
-    to?: string;
-  }) {
+  async findAll(
+    user: JwtUser,
+    params: {
+      classId?: string;
+      subjectId?: string;
+      teacherId?: string;
+      studentId?: string;
+      from?: string;
+      to?: string;
+    },
+  ) {
     const where: any = {};
     if (params.classId) where.classId = params.classId;
+
+    // Ustoz/kurator/koordinator — faqat o'ziga biriktirilgan sinflar vazifalari
+    if (!canSeeAllClasses(user.role) && !ADMIN_ROLES.includes(user.role)) {
+      const mine = await ownClassIds(this.prisma, user.id);
+      where.classId =
+        params.classId && mine.includes(params.classId)
+          ? params.classId
+          : { in: mine };
+    }
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.teacherId) where.teacherId = params.teacherId;
     if (params.studentId) where.submissions = { some: { studentId: params.studentId } };

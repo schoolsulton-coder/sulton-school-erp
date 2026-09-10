@@ -28,6 +28,7 @@ export class HomeworkController {
   @Get()
   @Permissions('homework.view')
   findAll(
+    @CurrentUser() user: any,
     @Query('classId') classId?: string,
     @Query('subjectId') subjectId?: string,
     @Query('teacherId') teacherId?: string,
@@ -35,7 +36,7 @@ export class HomeworkController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.service.findAll({ classId, subjectId, teacherId, studentId, from, to });
+    return this.service.findAll(user, { classId, subjectId, teacherId, studentId, from, to });
   }
 
   // Vazifa turlari (":id" dan OLDIN bo'lishi shart — aks holda "types" -> :id)

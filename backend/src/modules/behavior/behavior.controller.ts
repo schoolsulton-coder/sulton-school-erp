@@ -26,13 +26,14 @@ export class BehaviorController {
   @Get()
   @Permissions('behavior.view')
   list(
+    @CurrentUser() user: any,
     @Query('studentId') studentId?: string,
     @Query('type') type?: string,
     @Query('classId') classId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.service.list({ studentId, type, classId, from, to });
+    return this.service.list(user, { studentId, type, classId, from, to });
   }
 
   @Get('student/:studentId')

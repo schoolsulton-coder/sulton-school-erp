@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { canSeeAllClasses } from '../../common/rbac-open';
+import { ownClassIds } from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateBehaviorDto } from './dto/create-behavior.dto';
 
@@ -39,11 +41,22 @@ export class BehaviorService {
     return rec;
   }
 
-  list(params: { studentId?: string; type?: string; classId?: string; from?: string; to?: string }) {
+  async list(
+    user: { id: string; role: string },
+    params: { studentId?: string; type?: string; classId?: string; from?: string; to?: string },
+  ) {
     const where: any = {};
     if (params.studentId) where.studentId = params.studentId;
     if (params.type) where.type = params.type;
     if (params.classId) where.student = { classId: params.classId };
+
+    // Ustoz/kurator/koordinator — faqat o'z sinflari o'quvchilarining yozuvlari
+    if (!canSeeAllClasses(user.role)) {
+      const mine = await ownClassIds(this.prisma, user.id);
+      const classId =
+        params.classId && mine.includes(params.classId) ? params.classId : { in: mine };
+      where.student = { ...(where.student ?? {}), classId };
+    }
     if (params.from || params.to) {
       where.date = {};
       if (params.from) where.date.gte = dayFromStr(params.from);

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Trash2 } from 'lucide-react';
 import { behaviorApi, type BehaviorRecord, type RankingItem } from '@/lib/behavior';
 import { studentsApi } from '@/lib/students';
-import { classesApi } from '@/lib/classes';
+import { useMyClasses } from '@/lib/use-my-classes';
 import { useAuthStore } from '@/store/auth';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand';
@@ -20,7 +20,7 @@ export default function BehaviorPage() {
   const [fType, setFType] = useState('');
   const [err, setErr] = useState('');
 
-  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  const { classes } = useMyClasses();
   const { data: records, isLoading } = useQuery({
     queryKey: ['behavior', fClass, fType],
     queryFn: () => behaviorApi.list({ classId: fClass || undefined, type: fType || undefined }),
@@ -110,7 +110,7 @@ export default function BehaviorPage() {
 
 function AddRecord({ onAdded, onError }: { onAdded: () => void; onError: (m: string) => void }) {
   const [form, setForm] = useState({ classId: '', studentId: '', type: 'POSITIVE', points: '5', description: '' });
-  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  const { classes } = useMyClasses();
   const { data: students } = useQuery({
     queryKey: ['behavior-students', form.classId],
     queryFn: () => studentsApi.list({ classId: form.classId || undefined, status: 'ACTIVE', limit: 500 }).then((r) => r.data),
@@ -156,7 +156,7 @@ function AddRecord({ onAdded, onError }: { onAdded: () => void; onError: (m: str
 
 function ClassRanking() {
   const [classId, setClassId] = useState('');
-  const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
+  const { classes } = useMyClasses();
   const { data: ranking, isLoading } = useQuery({
     queryKey: ['behavior-ranking', classId],
     queryFn: () => behaviorApi.classRanking(classId),
