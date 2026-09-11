@@ -572,6 +572,7 @@ model Schedule {
   subject   Subject @relation(fields: [subjectId], references: [id])
 
   @@index([classId])
+  @@index([teacherId])
   @@map("schedules")
 }
 
@@ -640,6 +641,7 @@ model ContractInstallment {
 
   @@index([contractId])
   @@index([status])
+  @@index([dueDate])
   @@map("contract_installments")
 }
 
@@ -674,6 +676,8 @@ model Payment {
   @@index([contractId])
   @@index([accountId])
   @@index([flowAccountId])
+  @@index([paidAt])
+  @@index([confirmedAt])
   @@map("payments")
 }
 
@@ -798,6 +802,8 @@ model ExpensePayment {
   @@index([expenseId])
   @@index([flowAccountId])
   @@index([dollarFlowAccountId])
+  @@index([accountId])
+  @@index([dollarAccountId])
   @@map("expense_payments")
 }
 
@@ -815,6 +821,7 @@ model Transaction {
 
   @@index([type])
   @@index([date])
+  @@index([accountId])
   @@map("transactions")
 }
 
@@ -946,6 +953,9 @@ model SalaryPayment {
 
   @@index([employeeId])
   @@index([date])
+  @@index([somAccountId])
+  @@index([dollarAccountId])
+  @@index([periodYear, periodMonth])
   @@map("salary_payments")
 }
 
@@ -1105,6 +1115,7 @@ model Attendance {
 
   @@unique([studentId, date])
   @@index([date])
+  @@index([classId, date])
   @@map("attendances")
 }
 
@@ -1126,6 +1137,8 @@ model Homework {
   submissions HomeworkSubmission[]
 
   @@index([classId])
+  @@index([teacherId])
+  @@index([dueDate])
   @@map("homeworks")
 }
 
@@ -1344,6 +1357,7 @@ model CounterpartyEntry {
   @@index([transferPairId])
   @@index([somFlowAccountId])
   @@index([dollarFlowAccountId])
+  @@index([date])
   @@map("counterparty_entries")
 }
 
@@ -1409,5 +1423,7 @@ model InternalTransfer {
 
   @@index([kind])
   @@index([date])
+  @@index([fromAccountId])
+  @@index([toAccountId])
   @@map("internal_transfers")
 }

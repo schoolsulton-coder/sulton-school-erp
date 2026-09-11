@@ -1,23 +1,34 @@
 // Xodimlar ro'yxatini "Foydalanuvchilar" oynasiga qo'shadi (jonli bazada, oddiy `node` bilan).
 //
 //   node prisma/staff-seed.js --dry                 — o'zgartirmasdan ro'yxatni ko'rsatadi
+//   node prisma/staff-seed.js                       — yangi xodimlarga TASODIFIY kuchli parol
+//                                                     (oxirida "telefon → parol" ro'yxati chiqadi)
 //   STAFF_PASSWORD='KuchliParol' node prisma/staff-seed.js
-//   STAFF_PASSWORD='123456' node prisma/staff-seed.js --set-password
-//                                                   — ro'yxatdagi HAMMANING parolini yangilaydi
+//                                                   — hammaga bitta parol (env'dan)
+//   node prisma/staff-seed.js --set-password        — ro'yxatdagi HAMMANING parolini yangilaydi
 //
 // Qoidalar:
+//  - Kodda qotirilgan parol YO'Q. STAFF_PASSWORD berilmasa — har bir xodimga
+//    crypto.randomBytes bilan tasodifiy parol generatsiya qilinadi va konsolga
+//    ro'yxat qilib chiqariladi (admin tarqatishi uchun).
 //  - Telefon (login) bo'yicha upsert: mavjud xodimning ismi/roli/fani yangilanadi,
 //    PAROLI TEGILMAYDI (--set-password berilgan bo'lsa — yangilanadi).
-//    Yangi xodimga STAFF_PASSWORD (default: sulton2026) beriladi.
 //  - Lavozim uchun rol bo'lmasa — rol avtomatik yaratiladi (ROLES).
 //  - Fan o'qituvchilariga rol `teacher` + o'qitadigan fan biriktiriladi (fan bo'lmasa — yaratiladi).
 const argon2 = require('argon2');
+const { randomBytes } = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const DRY = process.argv.includes('--dry');
 const SET_PASSWORD = process.argv.includes('--set-password');
-const PASSWORD = process.env.STAFF_PASSWORD || 'sulton2026';
+// Bo'sh bo'lsa — har bir xodimga alohida tasodifiy parol beriladi.
+const ENV_PASSWORD = process.env.STAFF_PASSWORD || null;
+
+/** Tasodifiy kuchli parol (12 belgi, URL-xavfsiz) */
+function genPassword() {
+  return randomBytes(9).toString('base64url');
+}
 
 // Lavozim → rol. Bazada bo'lmagan rollar shu nom/ruxsatlar bilan yaratiladi.
 // permissions: null — mavjud rolga tegilmaydi; ['*'] — barcha ruxsatlar.
@@ -168,7 +179,7 @@ async function ensureSubject(name) {
   }
 
   // 4) Foydalanuvchilar
-  const hash = await argon2.hash(PASSWORD);
+  const issued = []; // parol berilganlar: { phone, fullName, password }
   let added = 0;
   let updated = 0;
   for (const r of rows) {
@@ -179,9 +190,15 @@ async function ensureSubject(name) {
     };
     const existing = await prisma.user.findUnique({ where: { phone: r.phone } });
     if (existing) {
+      let passwordPatch = {};
+      if (SET_PASSWORD) {
+        const password = ENV_PASSWORD || genPassword();
+        passwordPatch = { password: await argon2.hash(password) };
+        issued.push({ phone: r.phone, fullName: r.fullName, password });
+      }
       await prisma.user.update({
         where: { id: existing.id },
-        data: SET_PASSWORD ? { ...data, password: hash } : data,
+        data: { ...data, ...passwordPatch },
       });
       updated++;
       console.log(
@@ -189,15 +206,27 @@ async function ensureSubject(name) {
           (SET_PASSWORD ? 'parol ham yangilandi' : 'parolga tegilmadi'),
       );
     } else {
-      await prisma.user.create({ data: { ...data, phone: r.phone, password: hash } });
+      const password = ENV_PASSWORD || genPassword();
+      await prisma.user.create({
+        data: { ...data, phone: r.phone, password: await argon2.hash(password) },
+      });
+      issued.push({ phone: r.phone, fullName: r.fullName, password });
       added++;
       console.log(`  + qo'shildi:  ${r.fullName} (${r.phone}) — ${r.position}`);
     }
   }
 
   console.log(`\nTayyor: ${added} ta yangi, ${updated} ta yangilangan.`);
-  if (added || SET_PASSWORD) {
-    console.log(`Parol: "${PASSWORD}" — birinchi kirishdan keyin almashtirilsin.`);
+  if (issued.length) {
+    if (ENV_PASSWORD) {
+      console.log('Parol: STAFF_PASSWORD env dan olindi — birinchi kirishdan keyin almashtirilsin.');
+    } else {
+      console.log("Parollar (tasodifiy — faqat shu yerda ko'rinadi, xodimlarga yetkazing;");
+      console.log('birinchi kirishdan keyin almashtirilsin):');
+      for (const i of issued) {
+        console.log(`  ${i.phone}  ${i.password.padEnd(14)} ${i.fullName}`);
+      }
+    }
   }
 })()
   .catch((e) => {

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -386,7 +387,13 @@ export class HrService {
       if (exists) throw new ConflictException('Bu telefon allaqachon mavjud');
     }
     const fullName = [dto.familiya, dto.ism, dto.middleName].filter(Boolean).join(' ').trim();
-    const hashed = await argon2.hash(dto.password || 'parol123');
+    // Parol MAJBURIY — ilgari bo'sh qoldirilsa hammaga bir xil 'parol123' berilardi
+    // (kim shu yo'l bilan yaratilgan bo'lsa, uning akkaunti ochiq qolardi).
+    const password = String(dto.password ?? '');
+    if (password.length < 6) {
+      throw new BadRequestException("Parol kamida 6 belgi bo'lishi kerak");
+    }
+    const hashed = await argon2.hash(password);
     const branchIds = (dto.branchIds ?? []).filter(Boolean);
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({ data: { fullName, phone: dto.phone, password: hashed, roleId: dto.roleId } });
@@ -558,6 +565,14 @@ export class HrService {
   async createTolov(dto: any) {
     const som = dto.somAmount ?? 0;
     const usd = dto.dollarAmount ?? 0;
+    const rate = Number(dto.dollarRate ?? 0) || 0;
+    // Dollar kiritilsa kurs majburiy — aks holda so'mdagi ekvivalent 0 bo'lib,
+    // xodim "maosh olmagan" ko'rinadi va unga qayta to'lanishi mumkin
+    if (usd > 0 && rate <= 0) {
+      throw new BadRequestException(
+        'Dollar summasi kiritilgan — kursni ham kiriting',
+      );
+    }
     return this.prisma.$transaction(async (tx) => {
       const pay = await tx.salaryPayment.create({
         data: {
@@ -568,7 +583,7 @@ export class HrService {
           somAmount: som,
           somAccountId: dto.somAccountId ?? null,
           dollarAmount: usd || null,
-          dollarRate: dto.dollarRate ?? null,
+          dollarRate: usd > 0 ? rate : null,
           dollarKassa: dto.dollarKassa ?? null,
           dollarAccountId: dto.dollarAccountId ?? null,
           periodYear: dto.periodYear ?? null,

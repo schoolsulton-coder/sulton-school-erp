@@ -1,3 +1,14 @@
+/**
+ * Asosiy seed — rollar, ruxsatlar, superadmin va reference ma'lumotlar.
+ *
+ * Superadmin paroli KODDA SAQLANMAYDI — ADMIN_PASSWORD env'dan olinadi va
+ * berilmasa seed xato bilan to'xtaydi (zaif parol bilan admin yaratilmasin):
+ *   ADMIN_PASSWORD='KuchliParol' npx prisma db seed
+ *   ADMIN_PHONE='+998901234567' ADMIN_PASSWORD='KuchliParol' npm run prisma:seed
+ *
+ * ADMIN_PHONE berilmasa +998990000000 ishlatiladi. Mavjud adminning paroli
+ * o'zgartirilmaydi — faqat yangi yaratilganda ADMIN_PASSWORD qo'llanadi.
+ */
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 
@@ -89,6 +100,15 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 async function main() {
+  // Parol koddan emas — env'dan. Yo'q bo'lsa boshidayoq to'xtaymiz.
+  const adminPhone = process.env.ADMIN_PHONE ?? '+998990000000';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error(
+      "ADMIN_PASSWORD env kerak — masalan: ADMIN_PASSWORD='KuchliParol' npx prisma db seed",
+    );
+  }
+
   console.log('🌱 Seed boshlandi...');
 
   // 1) Ruxsatlar
@@ -149,9 +169,7 @@ async function main() {
     }
   }
 
-  // 4) Admin foydalanuvchi
-  const adminPhone = process.env.ADMIN_PHONE ?? '+998990000000';
-  const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123';
+  // 4) Admin foydalanuvchi (mavjud bo'lsa — paroliga tegilmaydi)
   await prisma.user.upsert({
     where: { phone: adminPhone },
     update: { roleId: superadminRole!.id },
@@ -214,7 +232,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Seed tugadi. Admin: ${adminPhone} / ${adminPassword}`);
+  console.log(`✅ Seed tugadi. Admin: ${adminPhone} (parol — ADMIN_PASSWORD env'dan)`);
 }
 
 main()

@@ -268,11 +268,15 @@ export class FinanceService {
     const to = toIso ? new Date(toIso) : now;
 
     // 1) Shartnoma to'lovlari (asosiy daromad)
+    // Qaytarilgan to'lov (isRefund) daromadni kamaytiradi — minus bilan yig'iladi
     const payments = await this.prisma.payment.findMany({
       where: { paidAt: { gte: from, lte: to } },
-      select: { amount: true },
+      select: { amount: true, isRefund: true },
     });
-    const contractIncome = payments.reduce((s, p) => s + p.amount, 0);
+    const contractIncome = payments.reduce(
+      (s, p) => s + (p.isRefund ? -p.amount : p.amount),
+      0,
+    );
 
     // 2) Moliya tranzaksiyalari
     const txns = await this.prisma.transaction.findMany({

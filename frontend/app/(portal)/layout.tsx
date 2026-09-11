@@ -23,7 +23,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const onLogout = () => {
     logout();
-    router.push('/login');
+    // To'liq qayta yuklash — react-query keshi va butun JS holati tozalanadi
+    // (umumiy kompyuterda keyingi foydalanuvchi eski ma'lumotni ko'rmasligi uchun)
+    window.location.replace('/login');
   };
 
   return (

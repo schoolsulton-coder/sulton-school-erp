@@ -92,7 +92,27 @@ export class TelegramService implements OnModuleInit {
     });
 
     this.bot.on('contact', async (ctx: any) => {
-      const raw: string = ctx.message.contact.phone_number;
+      const contact = ctx.message?.contact;
+      const fromId = ctx.from?.id;
+      // Xavfsizlik: faqat O'Z kontaktini ulashishga ruxsat. Qo'lda kiritilgan
+      // kontaktda user_id umuman bo'lmaydi — uni ham rad etamiz, aks holda
+      // begona odam boshqa vasiyning raqami bilan ulanib, uning farzandi
+      // ma'lumotlari va login/parolini olishi mumkin edi.
+      if (!contact?.user_id || !fromId || String(contact.user_id) !== String(fromId)) {
+        return ctx.reply(
+          '❌ Bu kontakt sizga tegishli emas.\n\n' +
+            'Iltimos, PASTDAGI «📱 Telefonni ulashish» tugmasi orqali O‘Z kontaktingizni yuboring 👇',
+          {
+            reply_markup: {
+              keyboard: [[{ text: '📱 Telefonni ulashish', request_contact: true }]],
+              resize_keyboard: true,
+              one_time_keyboard: true,
+            },
+          },
+        );
+      }
+
+      const raw: string = contact.phone_number;
       const digits = raw.replace(/\D/g, '');
       const user = await this.findUserByPhone(digits);
       if (!user) {

@@ -44,7 +44,7 @@ export default function PaymentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const notify = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(''), 2500); };
 
-  const { data } = useQuery({
+  const { data, refetch, isLoading, isError, error, isFetching } = useQuery({
     queryKey: ['payments', filters, search],
     queryFn: () => paymentsApi.list({ ...filters, search: search || undefined }),
   });
@@ -108,6 +108,10 @@ export default function PaymentsPage() {
   if (filters.from) activeChips.push({ key: 'from', label: `${filters.from} dan` });
   if (filters.to) activeChips.push({ key: 'to', label: `${filters.to} gacha` });
 
+  // Xato matni (agar backend xabar bergan bo'lsa) + stat kartochkalarda holat
+  const errText = (error as any)?.response?.data?.message ?? (error as any)?.message ?? '';
+  const statVal = (v: string) => (isLoading ? '…' : isError ? '—' : v);
+
   const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleCollapse = (k: string) => setCollapsed((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
@@ -117,7 +121,9 @@ export default function PaymentsPage() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Maktab to‘lovlari</h1>
-          <p className="text-sm text-slate-400">{stats?.count ?? 0} ta to‘lov topildi</p>
+          <p className="text-sm text-slate-400">
+            {isLoading ? 'Yuklanmoqda…' : isError ? <span className="font-medium text-rose-600">{"Ma'lumot yuklanmadi"}</span> : `${stats?.count ?? 0} ta to‘lov topildi`}
+          </p>
         </div>
         <button onClick={() => setShowNew(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark">
           <Plus size={18} /> To‘lov qo‘shish
@@ -126,11 +132,11 @@ export default function PaymentsPage() {
 
       {/* Stat kartochkalar */}
       <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <Stat tone="blue" label="Jami (filtr)" value={money(stats?.total ?? 0)} />
-        <Stat tone="emerald" label="Naqd" value={money(stats?.naqd ?? 0)} />
-        <Stat tone="amber" label="Karta / terminal" value={money(stats?.karta ?? 0)} />
-        <Stat tone="slate" label="Bank" value={money(stats?.bank ?? 0)} />
-        <Stat tone="rose" label="Tasdiqlanmagan" value={`${stats?.unconfirmedCount ?? 0} ta`} sub={money(stats?.unconfirmedSum ?? 0)} />
+        <Stat tone="blue" label="Jami (filtr)" value={statVal(money(stats?.total ?? 0))} />
+        <Stat tone="emerald" label="Naqd" value={statVal(money(stats?.naqd ?? 0))} />
+        <Stat tone="amber" label="Karta / terminal" value={statVal(money(stats?.karta ?? 0))} />
+        <Stat tone="slate" label="Bank" value={statVal(money(stats?.bank ?? 0))} />
+        <Stat tone="rose" label="Tasdiqlanmagan" value={statVal(`${stats?.unconfirmedCount ?? 0} ta`)} sub={statVal(money(stats?.unconfirmedSum ?? 0))} />
       </div>
 
       {/* Qidiruv + Filterlar + Tasdiqlash */}
@@ -199,7 +205,7 @@ export default function PaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {groups.map(([key, list]) => {
+              {!isLoading && !isError && groups.map(([key, list]) => {
                 const h = dateHead(key);
                 const isCol = collapsed.has(key);
                 const dayTotal = list.reduce((s, p) => s + (p.isRefund ? -p.amount : p.amount), 0);
@@ -282,7 +288,27 @@ export default function PaymentsPage() {
                   </Fragment>
                 );
               })}
-              {!rows.length && <tr><td colSpan={10} className="px-4 py-12 text-center text-slate-400">To‘lov topilmadi</td></tr>}
+              {isLoading ? (
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-slate-400">Yuklanmoqda…</td></tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-10">
+                    <div className="mx-auto max-w-md rounded-2xl border border-rose-200 bg-rose-50/60 px-5 py-5 text-center">
+                      <div className="text-sm font-semibold text-rose-600">{"Ma'lumotni yuklab bo'lmadi"}</div>
+                      {errText && <div className="mt-1 text-xs text-rose-500">{errText}</div>}
+                      <button
+                        onClick={() => refetch()}
+                        disabled={isFetching}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        {isFetching ? 'Urinilmoqda…' : 'Qayta urinish'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : !rows.length ? (
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-slate-400">To‘lov topilmadi</td></tr>
+              ) : null}
             </tbody>
           </table>
         </div>

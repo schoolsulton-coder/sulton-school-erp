@@ -2,11 +2,24 @@
  * Tashriflar (Qabul) demo seed — Rejadagi/Real tashriflar, yillik taqqoslash, qabul rejasi.
  * Qo'shimcha skript (boshqa ma'lumotga tegmaydi). Bir marta ishlating:
  *   npm run prisma:visits
+ *
+ * Parollar kodda QOTIRILMAGAN:
+ *   npm run prisma:visits                          — yangi operatorlarga tasodifiy parol
+ *                                                    (oxirida "telefon → parol" ro'yxati chiqadi)
+ *   VISITS_PASSWORD='KuchliParol' npm run prisma:visits
+ *                                                  — hammaga bitta parol (env'dan)
  */
+import { randomBytes } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
+
+// Bo'sh bo'lsa — har bir yangi operatorga alohida tasodifiy parol beriladi.
+const ENV_PASSWORD = process.env.VISITS_PASSWORD || null;
+
+/** Tasodifiy kuchli parol (12 belgi, URL-xavfsiz) */
+const genPassword = () => randomBytes(9).toString('base64url');
 
 const FILIALS = ["Farg'ona", 'Lokomotiv', 'Chilonzor'];
 const WHO = ['Ota va farzand', 'Ona', 'Ona va farzand', 'Ota'];
@@ -18,7 +31,8 @@ const NAMES = [
 
 async function main() {
   console.log('🌱 Tashriflar seed boshlandi...');
-  const hash = await argon2.hash('demo1234');
+  // Yangi yaratilgan operatorlarning loginlari (parollari bilan) — oxirida chiqadi
+  const issued: { phone: string; password: string }[] = [];
 
   const salesRole = await prisma.role.findUnique({ where: { slug: 'sales' } });
   if (!salesRole) throw new Error("'sales' roli yo'q — avval npm run prisma:seed");
@@ -31,11 +45,22 @@ async function main() {
   const operators: { id: string }[] = [];
   for (let i = 1; i <= 3; i++) {
     const phone = `+99899000010${i}`;
-    const op = await prisma.user.upsert({
-      where: { phone },
-      update: {},
-      create: { fullName: `${i}-operator`, phone, password: hash, roleId: salesRole.id },
+    // Mavjud operatorning PAROLIGA TEGILMAYDI
+    const existing = await prisma.user.findUnique({ where: { phone } });
+    if (existing) {
+      operators.push(existing);
+      continue;
+    }
+    const password = ENV_PASSWORD || genPassword();
+    const op = await prisma.user.create({
+      data: {
+        fullName: `${i}-operator`,
+        phone,
+        password: await argon2.hash(password),
+        roleId: salesRole.id,
+      },
     });
+    issued.push({ phone, password });
     operators.push(op);
   }
 
@@ -103,7 +128,14 @@ async function main() {
   }
 
   console.log(`✅ Tashriflar seed tugadi: ${created} tashrif, 44 tarixiy lead, 3 reja`);
-  console.log('   Operatorlar: +998990000101/102/103 (parol: demo1234)');
+  if (!issued.length) {
+    console.log('   Operatorlar allaqachon mavjud — parollariga tegilmadi.');
+  } else if (ENV_PASSWORD) {
+    console.log('   Operatorlar: ' + issued.map((i) => i.phone).join(', ') + ' (parol: VISITS_PASSWORD env dan)');
+  } else {
+    console.log("   Operatorlar (parollar tasodifiy — faqat shu yerda ko'rinadi):");
+    for (const i of issued) console.log(`     ${i.phone}  parol: ${i.password}`);
+  }
 }
 
 main()

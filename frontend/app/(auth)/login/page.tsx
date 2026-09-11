@@ -33,8 +33,19 @@ export default function LoginPage() {
             ? ACADEMIC_HOME // akademik rollarda Qabulxona yo'q — Ma'lumotlarga tushadi
             : '/crm',
       );
-    } catch {
-      setError("Login yoki parol noto'g'ri");
+    } catch (err: any) {
+      const status = err?.response?.status;
+      // 429 — urinishlar chegarasi (backend ThrottlerGuard). Aks holda foydalanuvchi
+      // to'g'ri parol kiritsa ham "parol noto'g'ri" ko'rib, chalkashib ketardi.
+      if (status === 429) {
+        setError("Urinishlar ko'p bo'ldi. 1 daqiqadan so'ng qayta urinib ko'ring.");
+      } else if (!err?.response) {
+        setError("Serverga ulanib bo'lmadi. Internetni tekshiring va qayta urining.");
+      } else if (status && status >= 500) {
+        setError("Server javob bermayapti. Birozdan so'ng qayta urining.");
+      } else {
+        setError("Login yoki parol noto'g'ri");
+      }
     } finally {
       setLoading(false);
     }

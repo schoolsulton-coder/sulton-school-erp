@@ -19,21 +19,40 @@ function forceLogout() {
   if (typeof window !== 'undefined') window.location.href = '/login';
 }
 
+// Javob umuman kelmadi: tarmoq uzildi / timeout / CORS — sessiya aybdor emas
+function isNetworkError(error: any): boolean {
+  return !error?.response;
+}
+
+// Server vaqtincha yo'q (deploy, restart, proxy) — sessiya aybdor emas
+function isServerUnavailable(status?: number): boolean {
+  return status === 502 || status === 503 || status === 504;
+}
+
+// Refresh natijasi: token olindi (token) yoki sessiya haqiqatan tugadi (sessionExpired).
+// Ikkovi ham bo'lmasa — vaqtincha xato, keyingi urinishda qayta sinaladi.
+type RefreshResult = { token: string | null; sessionExpired: boolean };
+
 // Bir vaqtda ko'p 401 bo'lsa — bitta refresh so'rovi ishlaydi (dedup)
-let refreshing: Promise<string | null> | null = null;
-async function refreshAccessToken(): Promise<string | null> {
+let refreshing: Promise<RefreshResult> | null = null;
+async function refreshAccessToken(): Promise<RefreshResult> {
   const rt = useAuthStore.getState().refreshToken;
-  if (!rt) return null;
+  if (!rt) return { token: null, sessionExpired: true };
   try {
     // Interceptorlarsiz toza so'rov (aylanma logout bo'lmasin)
     const res = await axios.post(`${baseURL}/auth/refresh`, { refreshToken: rt });
     const { accessToken, user } = res.data;
-    if (!accessToken) return null;
+    if (!accessToken) return { token: null, sessionExpired: true };
     if (user) useAuthStore.getState().setAuth(accessToken, user, rt);
     else useAuthStore.getState().setToken(accessToken);
-    return accessToken;
-  } catch {
-    return null;
+    return { token: accessToken, sessionExpired: false };
+  } catch (err: any) {
+    const status = err?.response?.status;
+    // Faqat haqiqiy 401/403 — refresh kalit yaroqsiz, sessiya tugagan
+    if (status === 401 || status === 403) return { token: null, sessionExpired: true };
+    // Tarmoq uzildi, server vaqtincha yo'q yoki boshqa xato —
+    // 7 kunlik refresh kalitni o'chirmaymiz, keyin qayta urinamiz
+    return { token: null, sessionExpired: false };
   }
 }
 
@@ -45,6 +64,11 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const url: string = original?.url ?? '';
 
+    // Tarmoq uzilishi / timeout / CORS — sessiyaga TEGMAYMIZ, foydalanuvchi sahifada qoladi
+    if (isNetworkError(error)) return Promise.reject(error);
+    // Server vaqtincha yo'q (502/503/504) — bu ham sessiya tugagani emas
+    if (isServerUnavailable(status)) return Promise.reject(error);
+
     if (status !== 401 || !original || original._retry) return Promise.reject(error);
     // Login/refresh so'rovining o'zi 401 bersa — refresh urinmaymiz
     if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
@@ -54,13 +78,15 @@ api.interceptors.response.use(
 
     original._retry = true;
     if (!refreshing) refreshing = refreshAccessToken().finally(() => { refreshing = null; });
-    const newToken = await refreshing;
+    const result = await refreshing;
+    const newToken = result?.token;
     if (newToken) {
       original.headers = original.headers ?? {};
       original.headers.Authorization = `Bearer ${newToken}`;
       return api(original);
     }
-    forceLogout();
+    // Faqat sessiya haqiqatan tugaganda logout; tarmoq/server xatosida kutamiz
+    if (result?.sessionExpired) forceLogout();
     return Promise.reject(error);
   },
 );

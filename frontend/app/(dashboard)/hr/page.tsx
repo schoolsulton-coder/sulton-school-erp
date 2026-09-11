@@ -27,7 +27,7 @@ export default function HrPage() {
         <div>
           <h1 className="text-2xl font-bold">HR — Xodimlar</h1>
           <p className="text-sm text-slate-500">
-            Jami: {employees?.length ?? 0} · <Link href="/payroll" className="text-brand">Oylik hisob-kitob →</Link>
+            Jami: {employees?.length ?? 0} · <Link href="/maoshlar" className="text-brand">Maoshlar →</Link>
           </p>
         </div>
         <button onClick={() => setShowHire(true)} className="rounded-lg bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark">

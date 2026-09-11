@@ -14,11 +14,13 @@ case "${TASK:-}" in
     ;;
   staff-seed)
     echo "==> Xodimlarni qo'shish"
-    STAFF_PASSWORD="${STAFF_PASSWORD:-sulton2026}" node prisma/staff-seed.js
+    # Parol KODDA QOTIRILMAYDI: STAFF_PASSWORD secret berilmasa — staff-seed.js
+    # har bir xodimga tasodifiy kuchli parol beradi va ro'yxatini chiqaradi.
+    STAFF_PASSWORD="${STAFF_PASSWORD:-}" node prisma/staff-seed.js
     ;;
   staff-password)
     echo "==> Ro'yxatdagi barcha xodimlarning parolini yangilash"
-    STAFF_PASSWORD="${STAFF_PASSWORD:-123456}" node prisma/staff-seed.js --set-password
+    STAFF_PASSWORD="${STAFF_PASSWORD:-}" node prisma/staff-seed.js --set-password
     ;;
   set-owner)
     if [ -z "${OWNER_PASSWORD:-}" ]; then

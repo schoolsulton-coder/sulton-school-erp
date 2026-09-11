@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Logo } from './logo';
 import {
   ShieldCheck,
@@ -63,7 +63,6 @@ export function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const can = useAuthStore((s) => s.can);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -76,7 +75,9 @@ export function Sidebar({
 
   const onLogout = () => {
     logout();
-    router.push('/login');
+    // To'liq qayta yuklash — react-query keshi va butun JS holati tozalanadi
+    // (umumiy kompyuterda keyingi foydalanuvchi eski ma'lumotni ko'rmasligi uchun)
+    window.location.replace('/login');
   };
 
   return (

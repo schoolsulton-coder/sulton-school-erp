@@ -95,7 +95,7 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Foydalanuvchilar</h1>
@@ -124,91 +124,94 @@ export default function UsersPage() {
         </div>
       )}
 
+      {/* Telefonda jadval toshib ketmasin — gorizontal surish */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="px-4 py-3">F.I.SH</th>
-              <th className="px-4 py-3">Telefon</th>
-              <th className="px-4 py-3">Rol</th>
-              <th className="px-4 py-3">Holat</th>
-              <th className="px-4 py-3 text-right">Amallar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users?.map((u: ManagedUser) => (
-              <tr key={u.id} className="border-t border-slate-100">
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => setModal({ mode: 'detail', user: u })}
-                    className="font-medium text-slate-800 hover:text-brand hover:underline"
-                  >
-                    {u.fullName}
-                  </button>
-                </td>
-                <td className="px-4 py-3">{u.phone}</td>
-                <td className="px-4 py-3">{u.role.name}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[u.status]}`}>
-                    {STATUS_LABEL[u.status]}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <IconAction
-                      label="Batafsil"
-                      onClick={() => setModal({ mode: 'detail', user: u })}
-                      color="text-slate-500"
-                      hover="hover:bg-slate-100"
-                    >
-                      <Eye size={16} />
-                    </IconAction>
-                    <IconAction
-                      label="Tahrir"
-                      onClick={() => setModal({ mode: 'edit', user: u })}
-                      color="text-brand"
-                      hover="hover:bg-blue-50"
-                    >
-                      <Pencil size={16} />
-                    </IconAction>
-                    <IconAction
-                      label="Parol"
-                      onClick={() => setModal({ mode: 'password', user: u })}
-                      color="text-indigo-500"
-                      hover="hover:bg-indigo-50"
-                    >
-                      <KeyRound size={16} />
-                    </IconAction>
-                    <IconAction
-                      label={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
-                      onClick={() => toggleBlock.mutate(u)}
-                      color={u.status === 'BLOCKED' ? 'text-green-600' : 'text-amber-500'}
-                      hover={u.status === 'BLOCKED' ? 'hover:bg-green-50' : 'hover:bg-amber-50'}
-                    >
-                      {u.status === 'BLOCKED' ? <ShieldCheck size={16} /> : <Ban size={16} />}
-                    </IconAction>
-                    {canDelete && (
-                      <IconAction
-                        label="O'chirish"
-                        onClick={() => {
-                          if (confirm(`"${u.fullName}" foydalanuvchisi butunlay o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) del.mutate(u);
-                        }}
-                        disabled={del.isPending}
-                        color="text-rose-600"
-                        hover="hover:bg-rose-50"
-                      >
-                        <Trash2 size={16} />
-                      </IconAction>
-                    )}
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-4 py-3">F.I.SH</th>
+                <th className="px-4 py-3">Telefon</th>
+                <th className="px-4 py-3">Rol</th>
+                <th className="px-4 py-3">Holat</th>
+                <th className="px-4 py-3 text-right">Amallar</th>
               </tr>
-            ))}
-            {!users?.length && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Foydalanuvchi yo&apos;q</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users?.map((u: ManagedUser) => (
+                <tr key={u.id} className="border-t border-slate-100">
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => setModal({ mode: 'detail', user: u })}
+                      className="font-medium text-slate-800 hover:text-brand hover:underline"
+                    >
+                      {u.fullName}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">{u.phone}</td>
+                  <td className="px-4 py-3">{u.role.name}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[u.status]}`}>
+                      {STATUS_LABEL[u.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-1">
+                      <IconAction
+                        label="Batafsil"
+                        onClick={() => setModal({ mode: 'detail', user: u })}
+                        color="text-slate-500"
+                        hover="hover:bg-slate-100"
+                      >
+                        <Eye size={16} />
+                      </IconAction>
+                      <IconAction
+                        label="Tahrir"
+                        onClick={() => setModal({ mode: 'edit', user: u })}
+                        color="text-brand"
+                        hover="hover:bg-blue-50"
+                      >
+                        <Pencil size={16} />
+                      </IconAction>
+                      <IconAction
+                        label="Parol"
+                        onClick={() => setModal({ mode: 'password', user: u })}
+                        color="text-indigo-500"
+                        hover="hover:bg-indigo-50"
+                      >
+                        <KeyRound size={16} />
+                      </IconAction>
+                      <IconAction
+                        label={u.status === 'BLOCKED' ? 'Faollashtirish' : 'Bloklash'}
+                        onClick={() => toggleBlock.mutate(u)}
+                        color={u.status === 'BLOCKED' ? 'text-green-600' : 'text-amber-500'}
+                        hover={u.status === 'BLOCKED' ? 'hover:bg-green-50' : 'hover:bg-amber-50'}
+                      >
+                        {u.status === 'BLOCKED' ? <ShieldCheck size={16} /> : <Ban size={16} />}
+                      </IconAction>
+                      {canDelete && (
+                        <IconAction
+                          label="O'chirish"
+                          onClick={() => {
+                            if (confirm(`"${u.fullName}" foydalanuvchisi butunlay o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) del.mutate(u);
+                          }}
+                          disabled={del.isPending}
+                          color="text-rose-600"
+                          hover="hover:bg-rose-50"
+                        >
+                          <Trash2 size={16} />
+                        </IconAction>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!users?.length && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Foydalanuvchi yo&apos;q</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {modal?.mode === 'create' && (

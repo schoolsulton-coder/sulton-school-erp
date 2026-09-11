@@ -47,6 +47,8 @@ export function TolovModal({ onClose, onSaved }: { onClose: () => void; onSaved:
   }, [employees, empSearch]);
   const selected = (employees ?? []).find((e) => e.id === employeeId);
   const somAcc = somAccs?.find((a) => a.id === somAccountId);
+  // Dollar kiritilgan, lekin kurs yo'q — saqlashga ruxsat berilmaydi
+  const kursYoq = (Number(usd) || 0) > 0 && (Number(rate) || 0) <= 0;
 
   const save = useMutation({
     mutationFn: () =>
@@ -65,6 +67,8 @@ export function TolovModal({ onClose, onSaved }: { onClose: () => void; onSaved:
     setError('');
     if (!employeeId) return setError('Xodimni tanlang');
     if ((Number(som) || 0) <= 0 && (Number(usd) || 0) <= 0) return setError('Summa kiriting');
+    // Dollar kiritilgan bo'lsa kurs majburiy — aks holda so'mdagi ekvivalent 0 bo'lib qoladi
+    if (kursYoq) return setError('Dollar kursini kiriting');
     save.mutate();
   };
 
@@ -129,8 +133,9 @@ export function TolovModal({ onClose, onSaved }: { onClose: () => void; onSaved:
             <div className="mb-2 text-xs font-bold uppercase text-slate-500">Dollar to&apos;lovi <span className="font-normal normal-case text-slate-400">(ixtiyoriy)</span></div>
             <div className="mb-2 grid grid-cols-2 gap-3">
               <input type="number" value={usd} onChange={(e) => setUsd(e.target.value)} placeholder="Dollar" className={inp} />
-              <input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Kurs" className={inp} />
+              <input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={(Number(usd) || 0) > 0 ? 'Kurs *' : 'Kurs'} className={`${inp} ${kursYoq ? '!border-rose-400 ring-1 ring-rose-200' : ''}`} />
             </div>
+            {kursYoq && <p className="mb-2 text-xs font-medium text-rose-500">Dollar kiritilgan — kursni ham kiriting</p>}
             {(Number(usd) || 0) > 0 && (
               <div className="grid grid-cols-2 gap-3">
                 <select value={usdKassa} onChange={(e) => setUsdKassa(e.target.value)} className={inp}>{KASSA.map((k) => <option key={k}>{k}</option>)}</select>

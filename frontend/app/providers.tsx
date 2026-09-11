@@ -10,10 +10,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Reference ma'lumot (filial, o'quv yili...) doim yangi bo'lsin —
-            // sozlamalarda o'zgargani ochiq sahifada ham darhol ko'rinadi.
-            staleTime: 0,
-            refetchOnMount: 'always',
+            // 30 soniya "toza" oyna: ma'lumot deyarli real vaqt qoladi
+            // (sozlamadagi o'zgarish yarim daqiqada hamma joyda ko'rinadi),
+            // ammo har oyna almashganda hamma so'rov qaytadan ketmaydi —
+            // 1GB serverga tushadigan takroriy yuk keskin kamayadi.
+            staleTime: 30_000,
+            // 'always' emas: mount'da faqat eskirgan (stale) so'rov qayta yuklanadi.
+            refetchOnMount: true,
             refetchOnWindowFocus: true,
             retry: 1,
           },

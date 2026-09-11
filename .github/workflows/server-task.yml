@@ -7,7 +7,8 @@ name: Server task (qo'lda)
 # Maxfiy qiymatlar Secrets'dan olinadi (Settings → Secrets and variables → Actions):
 #   OWNER_PASSWORD  — set-owner uchun yangi admin paroli (majburiy, faqat shu vazifada)
 #   OWNER_PHONE     — ixtiyoriy, default +998990000000
-#   STAFF_PASSWORD  — ixtiyoriy, yangi xodimlar paroli (default sulton2026)
+#   STAFF_PASSWORD  — ixtiyoriy, yangi xodimlar paroli. Berilmasa har bir xodimga
+#                     tasodifiy kuchli parol beriladi (ro'yxat vazifa logida chiqadi)
 
 on:
   workflow_dispatch:

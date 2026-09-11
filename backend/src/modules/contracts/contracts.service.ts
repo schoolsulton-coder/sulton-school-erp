@@ -572,6 +572,7 @@ export class ContractsService {
           where: { contractId: id },
           select: {
             accountId: true,
+            flowAccountId: true,
             amount: true,
             isRefund: true,
             confirmedAt: true,
@@ -585,12 +586,22 @@ export class ContractsService {
           );
         }
 
-        // Har bir to'lov uchun kassa (account) balansini teskari qaytarish
+        // Har bir to'lov uchun kassa balansini teskari qaytarish.
+        // To'lov «Hisoblar» kassasiga (flowAccount) YOKI eski Moliya kassaga (account)
+        // bog'langan bo'ladi — payments.service'dagi applyBalance bilan bir xil tartib:
+        // avval flowAccount, aks holda account (ikki marta qaytarilmasin).
         for (const p of payments) {
-          if (p.accountId) {
+          const delta = p.isRefund ? p.amount : -p.amount;
+          if (!delta) continue;
+          if (p.flowAccountId) {
+            await tx.flowAccount.update({
+              where: { id: p.flowAccountId },
+              data: { balance: { increment: delta } },
+            });
+          } else if (p.accountId) {
             await tx.account.update({
               where: { id: p.accountId },
-              data: { balance: { increment: p.isRefund ? p.amount : -p.amount } },
+              data: { balance: { increment: delta } },
             });
           }
         }

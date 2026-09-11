@@ -1,14 +1,35 @@
 /**
  * Demo seed — namuna ma'lumotlar (portal, hisobotlar va modullarni ko'rish uchun).
  * Avval asosiy seed ishga tushirilgan bo'lishi kerak (rollar, ruxsatlar):
- *   npm run prisma:seed   →   npm run prisma:demo
+ *   ADMIN_PASSWORD='KuchliParol' npm run prisma:seed   →   npm run prisma:demo
  * Toza (yangi) bazada ishlatish tavsiya etiladi.
+ *
+ * Parollar kodda QOTIRILMAGAN:
+ *   npm run prisma:demo                       — har bir demo foydalanuvchiga tasodifiy parol,
+ *                                               oxirida "telefon → parol" ro'yxati chiqadi
+ *   DEMO_PASSWORD='KuchliParol' npm run prisma:demo
+ *                                             — hammaga bitta parol (env'dan)
  */
+import { randomBytes } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
-const DEMO_PASS = 'demo1234';
+// Bo'sh bo'lsa — har bir demo foydalanuvchiga alohida tasodifiy parol beriladi.
+const ENV_PASSWORD = process.env.DEMO_PASSWORD || null;
+
+// Yaratilgan demo loginlar: konsolga ro'yxat qilib chiqariladi
+const credentials: { label: string; phone: string; password: string }[] = [];
+
+/** Tasodifiy kuchli parol (12 belgi, URL-xavfsiz) */
+const genPassword = () => randomBytes(9).toString('base64url');
+
+/** Yangi foydalanuvchi uchun parol hash'i (parolning o'zi ro'yxatga yoziladi) */
+async function newPasswordHash(label: string, phone: string) {
+  const password = ENV_PASSWORD || genPassword();
+  credentials.push({ label, phone, password });
+  return argon2.hash(password);
+}
 
 const MALE = ['Ali', 'Sardor', 'Jasur', 'Bekzod', 'Aziz', 'Doniyor', 'Otabek', 'Shahzod'];
 const FEMALE = ['Aziza', 'Madina', 'Nilufar', 'Sevara', 'Dilnoza', 'Malika', 'Zarina', 'Gulnoza'];
@@ -19,7 +40,6 @@ const pad = (n: number, w = 4) => String(n).padStart(w, '0');
 
 async function main() {
   console.log('🌱 Demo seed boshlandi...');
-  let hash = await argon2.hash(DEMO_PASS);
 
   // ---- Rollar ----
   const roles = await prisma.role.findMany();
@@ -51,7 +71,7 @@ async function main() {
       data: {
         fullName: `${LAST[i]} ${MALE[i]} (ustoz)`,
         phone: phone(100 + i),
-        password: hash,
+        password: await newPasswordHash('👤 Ustoz', phone(100 + i)),
         roleId: roleId('teacher'),
       },
     });
@@ -103,7 +123,6 @@ async function main() {
   // ---- O'quvchilar (+ vasiy, baho, davomat, xulq, shartnoma) ----
   let n = 0;
   let demoStudentId = '';
-  let demoParentLogin = '';
 
   for (let c = 0; c < classes.length; c++) {
     for (let k = 0; k < 5; k++) {
@@ -140,15 +159,25 @@ async function main() {
       // Demo oila — portal loginlari
       if (isDemoFamily) {
         const gUser = await prisma.user.create({
-          data: { fullName: guardian.fullName, phone: guardianPhone, password: hash, roleId: roleId('guardian') },
+          data: {
+            fullName: guardian.fullName,
+            phone: guardianPhone,
+            password: await newPasswordHash('👪 Ota-ona (portal)', guardianPhone),
+            roleId: roleId('guardian'),
+          },
         });
         await prisma.guardian.update({ where: { id: guardian.id }, data: { userId: gUser.id } });
+        const studentLogin = '+998901112244';
         const sUser = await prisma.user.create({
-          data: { fullName: `${last} ${first}`, phone: '+998901112244', password: hash, roleId: roleId('student') },
+          data: {
+            fullName: `${last} ${first}`,
+            phone: studentLogin,
+            password: await newPasswordHash("🎓 O'quvchi (portal)", studentLogin),
+            roleId: roleId('student'),
+          },
         });
         await prisma.student.update({ where: { id: student.id }, data: { userId: sUser.id } });
         demoStudentId = student.id;
-        demoParentLogin = guardianPhone;
       }
 
       // Baholar (har fan: 4 kunlik + 1 chorak)
@@ -294,11 +323,17 @@ async function main() {
   }
 
   console.log('\n✅ Demo seed tugadi!\n');
-  console.log('— Demo kirish ma\'lumotlari (parol: ' + DEMO_PASS + ') —');
-  console.log('  👤 Ustoz:       ' + phone(100));
-  console.log('  👪 Ota-ona:     ' + demoParentLogin + '   (portal)');
-  console.log('  🎓 O\'quvchi:    +998901112244        (portal)');
-  console.log('  🛠  Admin:       .env dagi ADMIN_PHONE / ADMIN_PASSWORD');
+  console.log(
+    ENV_PASSWORD
+      ? "— Demo kirish ma'lumotlari (parol: DEMO_PASSWORD env dan) —"
+      : "— Demo kirish ma'lumotlari (parollar tasodifiy, faqat shu yerda ko'rinadi) —",
+  );
+  for (const c of credentials) {
+    console.log(
+      `  ${c.label.padEnd(20)} ${c.phone}` + (ENV_PASSWORD ? '' : `   parol: ${c.password}`),
+    );
+  }
+  console.log('  🛠  Admin:            .env dagi ADMIN_PHONE / ADMIN_PASSWORD');
   console.log('  Demo o\'quvchi id: ' + demoStudentId + '\n');
 }
 

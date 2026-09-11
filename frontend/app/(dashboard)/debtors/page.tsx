@@ -18,7 +18,7 @@ import {
 import { DebtorContactModal } from '@/components/debtor-contact-modal';
 
 export default function DebtorsPage() {
-  const { data, refetch } = useQuery({ queryKey: ['debtors'], queryFn: debtorsApi.list });
+  const { data, refetch, isLoading, isError, error, isFetching } = useQuery({ queryKey: ['debtors'], queryFn: debtorsApi.list });
 
   const [q, setQ] = useState('');
   const [branch, setBranch] = useState('');
@@ -60,13 +60,23 @@ export default function DebtorsPage() {
   }, [filtered]);
 
   const active = branch || year || q;
+  // Xato matni (agar backend xabar bergan bo'lsa)
+  const errText = (error as any)?.response?.data?.message ?? (error as any)?.message ?? '';
 
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-3">
         <h1 className="text-2xl font-bold">Qarzdorlar</h1>
         <p className="text-sm text-slate-500">
-          {filtered.length} ta shartnoma · Umumiy qarz: <b className="text-red-600">{money(totals.grand)}</b>
+          {isLoading ? (
+            'Yuklanmoqda…'
+          ) : isError ? (
+            <span className="font-medium text-red-600">{"Ma'lumot yuklanmadi"}</span>
+          ) : (
+            <>
+              {filtered.length} ta shartnoma · Umumiy qarz: <b className="text-red-600">{money(totals.grand)}</b>
+            </>
+          )}
         </p>
       </div>
 
@@ -112,7 +122,23 @@ export default function DebtorsPage() {
         )}
       </div>
 
-      {!filtered.length ? (
+      {isLoading ? (
+        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
+          Yuklanmoqda…
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-6 text-center">
+          <div className="text-sm font-semibold text-red-700">{"Ma'lumotni yuklab bo'lmadi"}</div>
+          {errText && <div className="mt-1 text-xs text-red-600">{errText}</div>}
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            {isFetching ? 'Urinilmoqda…' : 'Qayta urinish'}
+          </button>
+        </div>
+      ) : !filtered.length ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
           {rows.length ? 'Filtrga mos qarzdor yo‘q' : 'Qarzdor yo‘q 🎉'}
         </div>
