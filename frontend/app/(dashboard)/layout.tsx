@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
+import { PORTAL_ROLES } from '@/lib/rbac';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { SectionTabs } from '@/components/section-tabs';
@@ -13,6 +14,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const [mounted, setMounted] = useState(false);
@@ -26,8 +28,11 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!mounted) return;
     if (!token) router.replace('/login');
-    else if (user && ['student', 'guardian'].includes(user.role)) router.replace('/portal');
+    else if (user && PORTAL_ROLES.includes(user.role)) router.replace('/portal');
   }, [mounted, token, user, router]);
+
+  // Sahifa almashganda mobil menyu yopiladi (orqaga tugmasi, ichki yo'naltirish...)
+  useEffect(() => setMobileOpen(false), [pathname]);
 
   const toggleCollapse = () => {
     setCollapsed((v) => {
@@ -37,7 +42,9 @@ export default function DashboardLayout({
     });
   };
 
-  if (!mounted || !token) {
+  // O'quvchi/vasiy portalga yo'naltirilguncha ERP oynasi ko'rinib qolmasin
+  const isPortalUser = !!user && PORTAL_ROLES.includes(user.role);
+  if (!mounted || !token || isPortalUser) {
     return <div className="flex h-screen items-center justify-center">Yuklanmoqda...</div>;
   }
 

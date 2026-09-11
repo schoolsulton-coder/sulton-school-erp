@@ -43,6 +43,7 @@ export const SECTIONS: NavSection[] = [
     icon: Settings,
     children: [
       { href: '/users', label: 'Foydalanuvchilar', perm: 'users.view' },
+      { href: '/roles', label: 'Rollar va ruxsatlar', perm: 'users.view' },
       { href: '/settings/subjects', label: 'Fanlar', perm: 'classes.view' },
       { href: '/settings/categories', label: 'Xarajat kategoriyalari', perm: 'finance.view' },
       { href: '/settings/contract-templates', label: 'Shartnoma shablonlari', perm: 'contracts.view' },
@@ -56,7 +57,21 @@ export const SECTIONS: NavSection[] = [
  * Manzilga eng aniq mos keladigan havolani tanlaydi (eng uzun mos prefiks).
  * Shu bilan `/coins/statistics` da `/coins` ham yonib turmaydi — faqat bittasi belgilanadi.
  */
+/**
+ * Menyuda alohida bandi yo'q, lekin ochiladigan sahifalar — qaysi bandga tegishli.
+ * (Masalan xodim kartasi /hr/<id> ochilganda chapda "Maoshlar" yonib tursin.)
+ */
+const NAV_ALIASES: Record<string, string> = {
+  '/hr': '/maoshlar',
+  '/payroll': '/maoshlar',
+};
+
 export function activeHref(pathname: string, hrefs: string[]): string | null {
+  for (const [prefix, target] of Object.entries(NAV_ALIASES)) {
+    if (pathname === prefix || pathname.startsWith(prefix + '/')) {
+      return hrefs.includes(target) ? target : null;
+    }
+  }
   let best: string | null = null;
   for (const href of hrefs) {
     if (pathname === href || pathname.startsWith(href + '/')) {
