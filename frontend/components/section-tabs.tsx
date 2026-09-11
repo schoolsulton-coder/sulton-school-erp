@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { SECTIONS } from '@/lib/nav';
+import { SECTIONS, activeHref, allNavHrefs } from '@/lib/nav';
 import { ACADEMIC_SECTION, canSeeAcademic } from '@/lib/rbac';
 
 /**
@@ -16,7 +16,9 @@ export function SectionTabs() {
   const can = useAuthStore((s) => s.can);
   const role = useAuthStore((s) => s.user?.role);
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  // Eng aniq mos keladigan tab belgilanadi (ikkita tab bir vaqtda yonmasin)
+  const current = activeHref(pathname, allNavHrefs());
+  const isActive = (href: string) => current === href;
   const section = SECTIONS.find((s) => s.children.some((c) => isActive(c.href)));
   if (!section) return null;
 

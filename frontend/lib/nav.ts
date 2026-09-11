@@ -51,3 +51,22 @@ export const SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/**
+ * Manzilga eng aniq mos keladigan havolani tanlaydi (eng uzun mos prefiks).
+ * Shu bilan `/coins/statistics` da `/coins` ham yonib turmaydi — faqat bittasi belgilanadi.
+ */
+export function activeHref(pathname: string, hrefs: string[]): string | null {
+  let best: string | null = null;
+  for (const href of hrefs) {
+    if (pathname === href || pathname.startsWith(href + '/')) {
+      if (!best || href.length > best.length) best = href;
+    }
+  }
+  return best;
+}
+
+/** Sidebar va tab'lardagi barcha havolalar (eng aniq moslikni topish uchun) */
+export function allNavHrefs(extra: string[] = []): string[] {
+  return [...extra, ...SECTIONS.flatMap((s) => s.children.map((c) => c.href))];
+}

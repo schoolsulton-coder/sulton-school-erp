@@ -20,7 +20,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
-import { SECTIONS, type NavSection } from '@/lib/nav';
+import { SECTIONS, activeHref, allNavHrefs, type NavSection } from '@/lib/nav';
 import { ACADEMIC_SECTION, ACADEMIC_SECTIONS, canSeeAcademic, canSeeAcademicSection } from '@/lib/rbac';
 
 interface Item {
@@ -68,7 +68,9 @@ export function Sidebar({
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  // Eng aniq mos keladigan havola belgilanadi (masalan /coins/statistics da /coins yonmaydi)
+  const current = activeHref(pathname, allNavHrefs(MENU.map((m) => m.href)));
+  const isActive = (href: string) => current === href;
   const visibleChildren = (g: NavSection) => g.children.filter((c) => !c.perm || can(c.perm));
   const isAcademic = canSeeAcademic(user?.role);
 
