@@ -49,7 +49,8 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    // h-[100dvh]: mobil brauzerda manzil paneli chiqib-kirganda ham to'g'ri balandlik
+    <div className="flex h-[100dvh] overflow-hidden bg-slate-50">
       {/* Desktop sidebar */}
       <div className="hidden md:block">
         <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapse} />
@@ -68,7 +69,8 @@ export default function DashboardLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar onMenu={() => setMobileOpen(true)} />
         <SectionTabs />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        {/* pb-[safe-area]: iPhone'da pastdagi "home indicator" kontentni to'smasin */}
+        <main className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">{children}</main>
       </div>
     </div>
   );

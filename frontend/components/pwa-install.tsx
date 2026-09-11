@@ -65,6 +65,14 @@ export function PWAInstall() {
     };
   }, []);
 
+  // Karta hech qachon ishga xalaqit bermasin: 15 soniyadan so'ng o'zi yopiladi
+  // (modal/panel tugmalarini uzoq vaqt to'sib turmasligi uchun).
+  useEffect(() => {
+    if (!show) return;
+    const t = setTimeout(() => setShow(false), 15000);
+    return () => clearTimeout(t);
+  }, [show]);
+
   const dismiss = () => {
     setShow(false);
     try {
@@ -85,7 +93,8 @@ export function PWAInstall() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] max-w-[calc(100vw-2rem)] animate-[fadeIn_.2s_ease] sm:max-w-sm">
+    // z-30: modal (z-50) va mobil menyu (z-40) ALWAYS ustida bo'lsin — karta ularni to'smaydi
+    <div className="fixed bottom-[calc(1rem_+_env(safe-area-inset-bottom))] right-4 z-30 max-w-[calc(100vw_-_2rem)] sm:max-w-sm">
       <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl ring-1 ring-black/5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
           <Download size={20} />

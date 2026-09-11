@@ -30,6 +30,8 @@ export const viewport: Viewport = {
   themeColor: '#D51A20',
   width: 'device-width',
   initialScale: 1,
+  // PWA: ekranni to'liq egallaydi va iOS'da safe-area (notch/home indicator) ishlaydi
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

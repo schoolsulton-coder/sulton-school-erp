@@ -86,7 +86,7 @@ export function Sidebar({
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4">
+      <div className="flex items-center justify-between px-4 py-4 pt-[calc(1rem_+_env(safe-area-inset-top))]">
         <div className="flex min-w-0 items-center gap-2">
           <Logo className="h-8 w-8 shrink-0 text-white" />
           {!collapsed && <span className="truncate text-lg font-bold">Sulton School ERP</span>}
@@ -178,7 +178,7 @@ export function Sidebar({
       </nav>
 
       {/* User block */}
-      <div className="border-t border-white/10 px-3 py-3">
+      <div className="border-t border-white/10 px-3 py-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
         {!collapsed && (
           <div className="mb-2 px-1">
             <div className="truncate text-sm font-semibold">{user?.fullName}</div>

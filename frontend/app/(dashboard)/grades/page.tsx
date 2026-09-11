@@ -138,28 +138,30 @@ export default function GradesPage() {
     else if (e.key === 'ArrowUp') { e.preventDefault(); inputs.current[idx - 1]?.focus(); }
   };
 
-  const sel = 'min-w-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand';
+  // Mobilda 16px shrift — iOS input'ga bosganda sahifani "zoom" qilmasin
+  const sel = 'min-w-0 rounded-lg border border-slate-300 px-2.5 py-2.5 text-base outline-none focus:border-brand sm:py-1.5 sm:text-sm';
 
   return (
-    <div className="p-3 sm:p-6">
-      <div className="mb-3 flex items-center justify-between sm:mb-5">
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl">Baholash</h1>
+    <div className="p-4 sm:p-6">
+      <div className="mb-3 flex items-center justify-between gap-3 sm:mb-5">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold sm:text-2xl">Baholash</h1>
           <p className="hidden text-sm text-slate-500 sm:block">Sinf jurnali · 5 balli tizim</p>
         </div>
-        <Link href="/grades/statistics" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2">
-          <BarChart3 size={15} /> Statistika
+        <Link href="/grades/statistics" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2">
+          <BarChart3 size={15} /> <span>Statistika</span>
         </Link>
       </div>
 
       {/* Tanlovlar */}
       <div className="mb-3 space-y-1.5 rounded-xl border border-slate-200 bg-white p-2">
-        <div className="flex items-center gap-1.5">
-          <select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(''); }} className={`${sel} flex-1`}>
+        {/* Mobilda 2 ustunli grid (bitta qatorga sig'maydi), sm dan boshlab — avvalgi flex qator */}
+        <div className="grid grid-cols-2 items-center gap-1.5 sm:flex">
+          <select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(''); }} className={`${sel} w-full sm:flex-1`}>
             <option value="">Sinf</option>
             {my?.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={`${sel} flex-[2]`} disabled={!classId && !my?.canGradeAll}>
+          <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={`${sel} w-full sm:flex-[2]`} disabled={!classId && !my?.canGradeAll}>
             <option value="">Fan</option>
             {subjectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -169,22 +171,22 @@ export default function GradesPage() {
             onChange={(e) => setDate(e.target.value)}
             disabled={my ? !my.canGradeAll : true}
             title={my && !my.canGradeAll ? 'Ustoz faqat bugungi kunga baho qo\'yadi' : ''}
-            className={`${sel} flex-1 disabled:bg-slate-50 disabled:text-slate-500`}
+            className={`${sel} w-full disabled:bg-slate-50 disabled:text-slate-500 sm:flex-1 ${isPeriodType ? '' : 'col-span-2'}`}
           />
           {(type === 'QUARTER' || type === 'YEAR') && (
-            <select value={period} onChange={(e) => setPeriod(e.target.value)} className={`${sel} flex-1`}>
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} className={`${sel} w-full sm:flex-1`}>
               <option value="">Chorak</option>
               {CHORAK_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
         </div>
-        {/* Baho turi — pill tugmalar (mobilda gorizontal aylanadi) */}
-        <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5">
+        {/* Baho turi — pill tugmalar (mobilda 5 tasi bir qatorga sig'maydi, shuning uchun o'raladi) */}
+        <div className="-mx-0.5 flex flex-wrap gap-1 px-0.5 pb-0.5 sm:flex-nowrap sm:overflow-x-auto">
           {GRADE_TYPES.map((t) => (
             <button
               key={t.key}
               onClick={() => setType(t.key)}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13px] font-medium ${type === t.key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2.5 text-[13px] font-medium sm:px-2.5 sm:py-1.5 ${type === t.key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
               {t.label}
             </button>
@@ -195,12 +197,12 @@ export default function GradesPage() {
       {errMsg && (
         <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           <span>{errMsg}</span>
-          <button onClick={() => setErrMsg('')} className="shrink-0 text-red-400 hover:text-red-600">✕</button>
+          <button onClick={() => setErrMsg('')} aria-label="Yopish" className="-my-1.5 -mr-1.5 shrink-0 rounded p-2 leading-none text-red-400 hover:text-red-600">✕</button>
         </div>
       )}
 
       {!classId || !subjectId ? (
-        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 text-slate-400">
+        <div className="flex min-h-[10rem] items-center justify-center rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400 sm:text-base">
           {my && !my.classes.length ? "Sizga sinf biriktirilmagan — Ma'lumotlar → Sinflar bo'limida kurator qilib biriktirilishi yoki dars jadvaliga qo'yilishi kerak" : 'Sinf va fanni tanlang'}
         </div>
       ) : (
@@ -213,30 +215,34 @@ export default function GradesPage() {
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 placeholder={`O'quvchi qidirish (${rows.length} ta)`}
-                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
+                className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-base outline-none focus:border-brand sm:py-2 sm:text-sm"
               />
             </div>
           )}
 
-          {/* Hammaga tez qo'yish */}
+          {/* Hammaga tez qo'yish — mobilda sig'masa "Tozalash" keyingi qatorga o'tadi */}
           {canCreate && (
-            <div className="mb-3 flex items-center gap-2 text-sm">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
               <span className="text-slate-500">Hammaga:</span>
               {['5', '4', '3', '2', '1'].map((v) => (
-                <button key={v} onClick={() => fillAll(v)} className={`h-10 w-10 rounded-lg font-bold sm:h-8 sm:w-8 ${gradeBg(Number(v))} hover:ring-2 hover:ring-brand/30`}>{v}</button>
+                <button key={v} onClick={() => fillAll(v)} className={`h-10 w-10 shrink-0 rounded-lg font-bold sm:h-8 sm:w-8 ${gradeBg(Number(v))} hover:ring-2 hover:ring-brand/30`}>{v}</button>
               ))}
-              <button onClick={() => setValues({})} className="ml-1 rounded-lg border border-slate-200 px-3 py-1.5 text-slate-500 hover:bg-slate-50">Tozalash</button>
+              <button onClick={() => setValues({})} className="ml-auto shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-slate-500 hover:bg-slate-50 sm:ml-1 sm:py-1.5">Tozalash</button>
             </div>
           )}
 
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {/* overflow-x-auto: tor ekranda jadvalning o'zi aylanadi — sahifa gorizontal scroll bo'lmaydi */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
+              <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500 sm:text-sm">
                 <tr>
                   <th className="hidden w-8 px-3 py-2.5 sm:table-cell">#</th>
-                  <th className="px-3 py-2.5">O&apos;quvchi</th>
+                  <th className="sticky left-0 z-20 bg-slate-50 px-3 py-2.5 md:static">O&apos;quvchi</th>
                   <th className="hidden px-3 py-2.5 md:table-cell">So&apos;nggi baholar ({GRADE_TYPES.find((t) => t.key === type)?.label})</th>
-                  <th className="w-16 px-2 py-2.5 text-center sm:w-20">O&apos;rtacha</th>
+                  <th className="w-16 px-2 py-2.5 text-center sm:w-20">
+                    <span className="sm:hidden">O&apos;rt.</span>
+                    <span className="hidden sm:inline">O&apos;rtacha</span>
+                  </th>
                   <th className="w-20 px-2 py-2.5 text-center sm:w-28">Baho ({fmtDay(date)})</th>
                 </tr>
               </thead>
@@ -244,10 +250,26 @@ export default function GradesPage() {
                 {filteredRows.map((s, idx) => (
                   <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
                     <td className="hidden px-3 py-2 text-slate-400 sm:table-cell">{idx + 1}</td>
-                    <td className="px-3 py-2">
-                      <button onClick={() => setDetail({ id: s.id, name: `${s.lastName} ${s.firstName}` })} className="text-left font-medium text-slate-800 hover:text-brand hover:underline">
+                    <td className="sticky left-0 z-10 border-t border-slate-100 bg-white px-3 py-2 align-top md:static md:border-t-0 md:bg-transparent md:align-middle">
+                      <button onClick={() => setDetail({ id: s.id, name: `${s.lastName} ${s.firstName}` })} className="break-words text-left font-medium leading-tight text-slate-800 hover:text-brand hover:underline">
                         {s.lastName} {s.firstName}
                       </button>
+                      {/* Mobilda alohida ustun yo'q — so'nggi baholar ism ostida ko'rinadi */}
+                      {!!s.grades.length && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5 md:hidden">
+                          {s.grades.slice(0, 8).map((g) => (
+                            <button
+                              key={g.id}
+                              onClick={() => canUpdate && setEdit(g)}
+                              disabled={!canUpdate}
+                              title={`${fmtDay(g.date)}${g.teacherName ? ' · ' + g.teacherName : ''}`}
+                              className={`h-9 min-w-9 rounded-md px-1.5 text-sm font-bold ${gradeBg(g.value)} ${canUpdate ? '' : 'cursor-default'}`}
+                            >
+                              {g.value}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="hidden px-3 py-2 md:table-cell">
                       <div className="flex flex-wrap gap-1">
@@ -265,8 +287,8 @@ export default function GradesPage() {
                         {!s.grades.length && <span className="text-xs text-slate-400">—</span>}
                       </div>
                     </td>
-                    <td className={`px-2 py-2 text-center text-base font-bold ${gradeColor(s.average)}`}>{s.average || '—'}</td>
-                    <td className="px-2 py-2 text-center">
+                    <td className={`px-2 py-2 text-center align-top text-base font-bold md:align-middle ${gradeColor(s.average)}`}>{s.average || '—'}</td>
+                    <td className="px-2 py-2 text-center align-top md:align-middle">
                       <input
                         ref={(el) => { inputs.current[idx] = el; }}
                         type="text"
@@ -288,16 +310,17 @@ export default function GradesPage() {
           </div>
 
           {canCreate && (
-            <div className="mt-4 flex items-center gap-3">
+            /* Mobilda pastda "yopishib" turadi — uzun ro'yxatda saqlashni qidirmaslik uchun */
+            <div className="sticky bottom-0 z-30 -mx-4 mt-4 flex items-center gap-3 border-t border-slate-200 bg-slate-50/95 px-4 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pb-0 sm:backdrop-blur-none">
               <button
                 onClick={() => save.mutate()}
                 disabled={!enteredCount || save.isPending}
-                className="rounded-lg bg-brand px-6 py-2.5 font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+                className="flex-1 rounded-lg bg-brand px-6 py-3 font-semibold text-white hover:bg-brand-dark disabled:opacity-50 sm:flex-none sm:py-2.5"
               >
                 {save.isPending ? 'Saqlanmoqda…' : `Saqlash (${enteredCount})`}
               </button>
-              {save.isSuccess && !save.isPending && <span className="text-sm font-medium text-green-600">✓ Saqlandi</span>}
-              <span className="text-xs text-slate-400">Enter — keyingi o&apos;quvchi · bir kunga bitta baho (qayta saqlansa yangilanadi)</span>
+              {save.isSuccess && !save.isPending && <span className="shrink-0 text-sm font-medium text-green-600">✓ Saqlandi</span>}
+              <span className="hidden text-xs text-slate-400 sm:inline">Enter — keyingi o&apos;quvchi · bir kunga bitta baho (qayta saqlansa yangilanadi)</span>
             </div>
           )}
         </>
@@ -313,8 +336,8 @@ export default function GradesPage() {
 function EditGradeModal({ grade, canDelete, onClose, onSave, onDelete, busy }: { grade: GradeCell; canDelete: boolean; onClose: () => void; onSave: (v: number) => void; onDelete: () => void; busy: boolean }) {
   const [v, setV] = useState(String(grade.value));
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xs space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[90dvh] w-full space-y-4 overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-xl sm:max-w-xs sm:rounded-2xl sm:pb-5">
         <h2 className="text-lg font-bold">Bahoni tahrirlash</h2>
         <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
           <div>Sana: <b className="text-slate-700">{fmtDay(grade.date)}</b></div>
@@ -323,12 +346,12 @@ function EditGradeModal({ grade, canDelete, onClose, onSave, onDelete, busy }: {
         </div>
         <div className="flex justify-center gap-2">
           {['5', '4', '3', '2', '1'].map((n) => (
-            <button key={n} onClick={() => setV(n)} className={`h-11 w-11 rounded-lg text-lg font-bold ${v === n ? gradeBg(Number(n)) + ' ring-2 ring-brand' : 'bg-slate-100 text-slate-500'}`}>{n}</button>
+            <button key={n} onClick={() => setV(n)} className={`h-12 min-w-0 flex-1 rounded-lg text-lg font-bold sm:h-11 sm:w-11 sm:flex-none ${v === n ? gradeBg(Number(n)) + ' ring-2 ring-brand' : 'bg-slate-100 text-slate-500'}`}>{n}</button>
           ))}
         </div>
         <div className="flex gap-2 pt-1">
-          {canDelete && <button onClick={onDelete} disabled={busy} className="flex-1 rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">O&apos;chirish</button>}
-          <button onClick={() => onSave(Number(v))} disabled={busy} className="flex-1 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">Saqlash</button>
+          {canDelete && <button onClick={onDelete} disabled={busy} className="flex-1 rounded-lg border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 sm:py-2">O&apos;chirish</button>}
+          <button onClick={() => onSave(Number(v))} disabled={busy} className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50 sm:py-2">Saqlash</button>
         </div>
       </div>
     </div>

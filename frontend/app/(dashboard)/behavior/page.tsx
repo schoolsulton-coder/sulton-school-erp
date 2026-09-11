@@ -9,7 +9,8 @@ import { studentsApi } from '@/lib/students';
 import { useMyClasses } from '@/lib/use-my-classes';
 import { useAuthStore } from '@/store/auth';
 
-const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand';
+// Mobilda py-2.5 (>=40px teginish nishoni) va 16px shrift — iOS'da fokusda zoom bo'lmasligi uchun
+const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-brand sm:py-2';
 const errText = (e: any) => { const m = e?.response?.data?.message; return Array.isArray(m) ? m[0] : (m ?? 'Xatolik yuz berdi'); };
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -34,37 +35,37 @@ export default function BehaviorPage() {
   });
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Ahloqiy baholash</h1>
+    <div className="p-4 sm:p-6">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold sm:text-2xl">Ahloqiy baholash</h1>
           <p className="text-sm text-slate-500">Xulq ballari, intizom va rag&apos;batlantirish</p>
         </div>
-        <Link href="/behavior/statistics" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        <Link href="/behavior/statistics" className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto sm:py-2">
           <BarChart3 size={15} /> Statistika
         </Link>
       </div>
 
       {err && (
         <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          <span>{err}</span>
-          <button onClick={() => setErr('')} className="shrink-0 text-red-400 hover:text-red-600">✕</button>
+          <span className="min-w-0 break-words">{err}</span>
+          <button onClick={() => setErr('')} aria-label="Yopish" className="-m-2 shrink-0 rounded p-2 text-red-400 hover:text-red-600">✕</button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+        <div className="space-y-4 sm:space-y-6 lg:col-span-2">
           <AddRecord onAdded={refresh} onError={setErr} />
 
           <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <h2 className="text-lg font-semibold">So&apos;nggi yozuvlar</h2>
-              <div className="flex gap-2">
-                <select value={fClass} onChange={(e) => setFClass(e.target.value)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand">
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <select value={fClass} onChange={(e) => setFClass(e.target.value)} className="w-full min-w-0 rounded-lg border border-slate-300 px-2.5 py-2.5 text-sm outline-none focus:border-brand sm:w-auto sm:py-1.5">
                   <option value="">Barcha sinflar</option>
                   {classes?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <select value={fType} onChange={(e) => setFType(e.target.value)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand">
+                <select value={fType} onChange={(e) => setFType(e.target.value)} className="w-full min-w-0 rounded-lg border border-slate-300 px-2.5 py-2.5 text-sm outline-none focus:border-brand sm:w-auto sm:py-1.5">
                   <option value="">Barchasi</option>
                   <option value="POSITIVE">Ijobiy</option>
                   <option value="NEGATIVE">Salbiy</option>
@@ -73,24 +74,24 @@ export default function BehaviorPage() {
             </div>
             <div className="space-y-2">
               {records?.map((r: BehaviorRecord) => (
-                <div key={r.id} className="group flex items-start justify-between rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="min-w-0">
-                    <div className="font-medium">
+                <div key={r.id} className="group flex items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="break-words font-medium">
                       {r.student.lastName} {r.student.firstName}
                       {r.student.class && <span className="ml-2 text-xs text-slate-400">{r.student.class.name}</span>}
                     </div>
-                    <div className="text-sm text-slate-600">{r.description}</div>
-                    <div className="text-xs text-slate-400">
+                    <div className="break-words text-sm text-slate-600">{r.description}</div>
+                    <div className="break-words text-xs text-slate-400">
                       {fmtDateTime(r.createdAt ?? r.date)}
                       {r.author && ` · ${r.author.fullName}`}
                     </div>
                   </div>
-                  <div className="ml-2 flex shrink-0 items-center gap-2">
-                    <span className={`rounded-full px-3 py-1 text-sm font-bold ${r.type === 'POSITIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-sm font-bold sm:px-3 ${r.type === 'POSITIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {r.type === 'POSITIVE' ? '+' : '−'}{r.points}
                     </span>
                     {canDelete && (
-                      <button onClick={() => { if (confirm("Yozuvni o'chirasizmi?")) del.mutate(r.id); }} className="text-slate-300 opacity-0 transition group-hover:opacity-100 hover:text-red-500" title="O'chirish">
+                      <button onClick={() => { if (confirm("Yozuvni o'chirasizmi?")) del.mutate(r.id); }} className="rounded-lg p-2 text-slate-300 transition hover:text-red-500 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100" title="O'chirish">
                         <Trash2 size={15} />
                       </button>
                     )}
@@ -136,23 +137,23 @@ function AddRecord({ onAdded, onError }: { onAdded: () => void; onError: (m: str
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (!form.studentId) { onError("O'quvchini tanlang"); return; } add.mutate(); }} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
       <h2 className="font-semibold">Yangi yozuv</h2>
-      <div className="flex gap-2">
-        <select value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value, studentId: '' })} className={inputCls}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <select value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value, studentId: '' })} className={`${inputCls} min-w-0`}>
           <option value="">Barcha sinflar</option>
           {classes?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select value={form.studentId} onChange={(e) => setForm({ ...form, studentId: e.target.value })} className={inputCls} required>
+        <select value={form.studentId} onChange={(e) => setForm({ ...form, studentId: e.target.value })} className={`${inputCls} min-w-0`} required>
           <option value="">O&apos;quvchi ({sorted.length})</option>
           {sorted.map((s: any) => <option key={s.id} value={s.id}>{s.lastName} {s.firstName}</option>)}
         </select>
       </div>
       <div className="flex gap-2">
-        <button type="button" onClick={() => setForm({ ...form, type: 'POSITIVE' })} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${form.type === 'POSITIVE' ? 'bg-green-600 text-white' : 'border border-slate-300'}`}>👍 Ijobiy</button>
-        <button type="button" onClick={() => setForm({ ...form, type: 'NEGATIVE' })} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${form.type === 'NEGATIVE' ? 'bg-red-600 text-white' : 'border border-slate-300'}`}>👎 Salbiy</button>
+        <button type="button" onClick={() => setForm({ ...form, type: 'POSITIVE' })} className={`flex-1 rounded-lg py-2.5 text-sm font-semibold sm:py-2 ${form.type === 'POSITIVE' ? 'bg-green-600 text-white' : 'border border-slate-300'}`}>👍 Ijobiy</button>
+        <button type="button" onClick={() => setForm({ ...form, type: 'NEGATIVE' })} className={`flex-1 rounded-lg py-2.5 text-sm font-semibold sm:py-2 ${form.type === 'NEGATIVE' ? 'bg-red-600 text-white' : 'border border-slate-300'}`}>👎 Salbiy</button>
       </div>
       <input type="number" min={1} max={100} placeholder="Ball" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} className={inputCls} required />
       <textarea placeholder="Hodisa / izoh" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inputCls} h-20 resize-none`} required />
-      <button type="submit" disabled={add.isPending} className="w-full rounded-lg bg-brand py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+      <button type="submit" disabled={add.isPending} className="w-full rounded-lg bg-brand py-2.5 font-semibold text-white hover:bg-brand-dark disabled:opacity-60 sm:py-2">
         {add.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
       </button>
     </form>
@@ -183,9 +184,9 @@ function ClassRanking() {
       ) : (
         <div className="space-y-1">
           {ranking?.map((s: RankingItem, i: number) => (
-            <div key={s.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm odd:bg-slate-50">
-              <span><span className="mr-2 w-6 text-slate-400">{medal(i)}</span>{s.lastName} {s.firstName}</span>
-              <span className={`font-bold ${s.score >= 0 ? 'text-green-600' : 'text-red-600'}`}>{s.score > 0 ? '+' : ''}{s.score}</span>
+            <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm odd:bg-slate-50">
+              <span className="flex min-w-0 items-center"><span className="mr-2 w-6 shrink-0 text-slate-400">{medal(i)}</span><span className="truncate">{s.lastName} {s.firstName}</span></span>
+              <span className={`shrink-0 font-bold ${s.score >= 0 ? 'text-green-600' : 'text-red-600'}`}>{s.score > 0 ? '+' : ''}{s.score}</span>
             </div>
           ))}
           {!ranking?.length && <p className="text-sm text-slate-400">{isLoading ? 'Yuklanmoqda…' : "O'quvchi yo'q"}</p>}
