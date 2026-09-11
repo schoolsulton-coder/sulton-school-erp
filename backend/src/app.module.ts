@@ -16,6 +16,7 @@ import { HrModule } from './modules/hr/hr.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { HomeworkModule } from './modules/homework/homework.module';
 import { BehaviorModule } from './modules/behavior/behavior.module';
+import { CoinsModule } from './modules/coins/coins.module';
 import { GradesModule } from './modules/grades/grades.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PortalModule } from './modules/portal/portal.module';
@@ -56,6 +57,7 @@ import { InternalTransfersModule } from './modules/internal-transfers/internal-t
     PayrollModule,
     HomeworkModule,
     BehaviorModule,
+    CoinsModule,
     NotificationsModule,
     WebhooksModule,
     GradesModule,
