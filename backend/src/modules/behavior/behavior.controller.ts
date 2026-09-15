@@ -36,10 +36,11 @@ export class BehaviorController {
     return this.service.list(user, { studentId, type, classId, from, to });
   }
 
+  /** O'quvchi oylik bali (month=YYYY-MM, berilmasa joriy oy) + so'nggi 6 oy */
   @Get('student/:studentId')
   @Permissions('behavior.view')
-  studentSummary(@Param('studentId') studentId: string) {
-    return this.service.studentSummary(studentId);
+  studentSummary(@Param('studentId') studentId: string, @Query('month') month?: string) {
+    return this.service.studentSummary(studentId, month);
   }
 
   @Get('class/:classId/ranking')
@@ -48,14 +49,11 @@ export class BehaviorController {
     return this.service.classRanking(classId);
   }
 
+  /** Sinf ahloqiy statistikasi — oy bo'yicha (month=YYYY-MM, berilmasa joriy oy) */
   @Get('class/:classId/stats')
   @Permissions('behavior.view')
-  classStats(
-    @Param('classId') classId: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.service.classStats(classId, from, to);
+  classStats(@Param('classId') classId: string, @Query('month') month?: string) {
+    return this.service.classStats(classId, month);
   }
 
   @Post()

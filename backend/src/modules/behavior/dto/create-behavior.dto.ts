@@ -14,8 +14,10 @@ export class CreateBehaviorDto {
   @IsNotEmpty()
   studentId: string;
 
+  /** Faqat NEGATIVE — oylik 100 balldan ayirish. Berilmasa — NEGATIVE. */
+  @IsOptional()
   @IsEnum(['POSITIVE', 'NEGATIVE'])
-  type: 'POSITIVE' | 'NEGATIVE';
+  type?: 'POSITIVE' | 'NEGATIVE';
 
   @IsInt()
   @Min(1)

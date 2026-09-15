@@ -93,7 +93,7 @@ export default function PortalStudentPage() {
       </Section>
 
       {/* Xulq */}
-      <Section title={`Xulq balli — ${d.behavior.score}`}>
+      <Section title={`Xulq balli (${d.behavior.monthLabel}) — ${d.behavior.remaining}/${d.behavior.limit}`}>
         {d.behavior.records.length ? (
           d.behavior.records.slice(0, 8).map((r) => (
             <div key={r.id} className="flex items-center justify-between py-1.5 text-sm">
@@ -101,7 +101,7 @@ export default function PortalStudentPage() {
                 <div>{r.description}</div>
                 <div className="text-xs text-slate-400">{new Date(r.date).toLocaleDateString('uz-UZ')}</div>
               </div>
-              <span className={`font-bold ${r.type === 'POSITIVE' ? 'text-green-600' : 'text-red-600'}`}>
+              <span className={`font-bold ${r.type === 'POSITIVE' ? 'text-slate-400' : 'text-red-600'}`}>
                 {r.type === 'POSITIVE' ? '+' : '−'}{r.points}
               </span>
             </div>

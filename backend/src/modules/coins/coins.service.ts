@@ -165,25 +165,54 @@ export class CoinsService {
       },
     });
 
-    // Vasiyga Telegram xabari (faqat Telegram — SMS emas)
-    const label = dto.amount > 0 ? 'qo‘shildi' : 'ayirildi';
+    // Vasiyga Telegram xabari (faqat Telegram — SMS emas): kim, nechta, sabab va jami balans
+    const balance = await this.balanceOf(dto.studentId);
+    const added = dto.amount > 0;
     void this.notifications.notifyGuardians(
       dto.studentId,
-      '🪙 Coin',
-      `${Math.abs(dto.amount)} coin ${label}: ${dto.reason}`,
+      added ? "🪙 Coin qo'shildi" : '🪙 Coin ayirildi',
+      [
+        `👦 ${rec.student.lastName} ${rec.student.firstName}`,
+        `${added ? '➕' : '➖'} ${Math.abs(dto.amount)} coin — ${dto.reason}`,
+        `💰 Jami: ${balance} coin`,
+      ].join('\n'),
       { telegramOnly: true },
     );
-    return rec;
+    return { ...rec, balance };
   }
 
-  /** Yozuvni o'chirish — o'zi yozgan yoki to'liq kirish roli */
+  /** O'quvchining joriy coin balansi */
+  private async balanceOf(studentId: string) {
+    const agg = await this.prisma.coinRecord.aggregate({
+      where: { studentId },
+      _sum: { amount: true },
+    });
+    return agg._sum.amount ?? 0;
+  }
+
+  /** Yozuvni o'chirish — o'zi yozgan yoki to'liq kirish roli. Vasiyga bekor qilingani haqida xabar boradi */
   async remove(user: JwtUser, id: string) {
-    const rec = await this.prisma.coinRecord.findUnique({ where: { id } });
+    const rec = await this.prisma.coinRecord.findUnique({
+      where: { id },
+      include: { student: { select: { firstName: true, lastName: true } } },
+    });
     if (!rec) throw new NotFoundException('Yozuv topilmadi');
     if (rec.authorId !== user.id && !canSeeAllClasses(user.role)) {
       throw new ForbiddenException("Faqat o'zingiz yozgan coinni o'chira olasiz");
     }
     await this.prisma.coinRecord.delete({ where: { id } });
+
+    const balance = await this.balanceOf(rec.studentId);
+    void this.notifications.notifyGuardians(
+      rec.studentId,
+      '↩️ Coin yozuvi bekor qilindi',
+      [
+        `👦 ${rec.student.lastName} ${rec.student.firstName}`,
+        `${rec.amount > 0 ? '➖' : '➕'} ${Math.abs(rec.amount)} coin (bekor qilindi: ${rec.reason})`,
+        `💰 Jami: ${balance} coin`,
+      ].join('\n'),
+      { telegramOnly: true },
+    );
     return { ok: true };
   }
 }

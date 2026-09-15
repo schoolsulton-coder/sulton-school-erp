@@ -46,7 +46,7 @@ export default function PortalHome() {
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Metric label="O'rtacha baho" value={c.gradeAvg || '—'} />
                 <Metric label="Davomat" value={`${c.attendanceRate}%`} />
-                <Metric label="Xulq balli" value={c.behaviorScore} />
+                <Metric label="Xulq balli" value={`${c.behaviorScore}/100`} />
                 <Metric label="Vazifa (kutilmoqda)" value={c.homeworkPending} />
               </div>
 

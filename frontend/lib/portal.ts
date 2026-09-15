@@ -18,10 +18,17 @@ export interface PortalDetail {
   grades: StudentGradeReport;
   attendance: AttReport;
   behavior: {
+    /** Joriy oy qoldig'i (0..limit) */
     score: number;
+    month: string;
+    monthLabel: string;
+    limit: number;
+    deducted: number;
+    remaining: number;
     positive: number;
     negative: number;
     count: number;
+    history: { month: string; monthLabel: string; limit: number; deducted: number; remaining: number }[];
     records: { id: string; type: string; points: number; description: string; date: string }[];
   };
   submissions: {

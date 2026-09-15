@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { X, ChevronRight } from 'lucide-react';
 import { gradesApi, gradeColor, gradeBg } from '@/lib/grades';
 import { attendanceApi, ATT_STATUS, type AttStatus } from '@/lib/attendance';
-import { behaviorApi } from '@/lib/behavior';
+import { behaviorApi, scoreBar, scoreTone } from '@/lib/behavior';
 import { homeworkApi } from '@/lib/homework';
 
 const TABS = [
@@ -123,24 +123,55 @@ function GradeTab({ studentId, onDetail }: { studentId: string; onDetail: (d: De
 
 function BehaviorTab({ studentId, onDetail }: { studentId: string; onDetail: (d: Detail) => void }) {
   const { data, isLoading } = useQuery({ queryKey: ['sr-behavior', studentId], queryFn: () => behaviorApi.list({ studentId }) });
+  const { data: sum } = useQuery({ queryKey: ['behavior-summary', studentId], queryFn: () => behaviorApi.studentSummary(studentId) });
   if (isLoading) return <Loading />;
-  if (!data || !data.length) return <Empty text="Ahloqiy baho yo'q" />;
   return (
-    <ul className="space-y-2">
-      {data.map((b) => (
-        <li key={b.id}>
-          <button onClick={() => onDetail({ title: 'Ahloqiy baho', rows: [['Turi', b.type === 'POSITIVE' ? 'Ijobiy' : 'Salbiy'], ['Ball', String(b.points)], ['Tavsif', b.description], ['Sana', fmt(b.date)], ['Kim', b.author?.fullName || '—']] })}
-            className="flex w-full items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left hover:bg-slate-50">
-            <span className={`rounded px-2 py-0.5 text-xs font-semibold ${b.type === 'POSITIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {b.type === 'POSITIVE' ? `+${b.points}` : b.points}
+    <div className="space-y-3">
+      {sum && (
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-500">{sum.monthLabel} bali</span>
+            <span>
+              <b className={scoreTone(sum.remaining)}>{sum.remaining}</b>
+              <span className="text-xs text-slate-400">/{sum.limit}</span>
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{b.description}</span>
-            <span className="shrink-0 text-xs text-slate-400">{fmt(b.date)}</span>
-            <ChevronRight size={15} className="shrink-0 text-slate-300" />
-          </button>
-        </li>
-      ))}
-    </ul>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
+            <div className={`h-full rounded-full ${scoreBar(sum.remaining)}`} style={{ width: `${(sum.remaining / sum.limit) * 100}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {sum.history.slice(1).reverse().map((h) => (
+              <span key={h.month} className="rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-500 ring-1 ring-slate-200" title={h.monthLabel}>
+                {h.monthLabel.slice(0, 3)}: <b className={scoreTone(h.remaining)}>{h.remaining}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {!data || !data.length ? (
+        <Empty text="Ahloqiy baho yo'q" />
+      ) : (
+        <ul className="space-y-2">
+          {data.map((b) => {
+            const legacy = b.type === 'POSITIVE';
+            const pts = legacy ? `+${b.points}` : `−${b.points}`;
+            return (
+              <li key={b.id}>
+                <button onClick={() => onDetail({ title: 'Ahloqiy baho', rows: [['Turi', legacy ? "Ijobiy (eski, ballga ta'sir qilmaydi)" : 'Ball ayirildi'], ['Ball', pts], ['Sabab', b.description], ['Sana', fmt(b.date)], ['Kim', b.author?.fullName || '—']] })}
+                  className="flex w-full items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left hover:bg-slate-50">
+                  <span className={`rounded px-2 py-0.5 text-xs font-semibold ${legacy ? 'bg-slate-100 text-slate-400' : 'bg-red-100 text-red-700'}`}>
+                    {pts}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{b.description}</span>
+                  <span className="shrink-0 text-xs text-slate-400">{fmt(b.date)}</span>
+                  <ChevronRight size={15} className="shrink-0 text-slate-300" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
