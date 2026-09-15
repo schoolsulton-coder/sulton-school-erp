@@ -1,14 +1,31 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateNormDto } from './dto/create-norm.dto';
 import { BulkScheduleDto } from './dto/bulk-schedule.dto';
+import {
+  CopyScheduleWeekDto,
+  CreateScheduleWeekDto,
+  UpdateScheduleWeekDto,
+} from './dto/schedule-week.dto';
+import {
+  activeWeek,
+  addDays,
+  dayFromStr,
+  fmtDay,
+  mondayOf,
+  schoolToday,
+  weekDayCount,
+  ymd,
+} from '../../common/schedule-weeks';
 
 const WEEKDAYS = [
   '',
@@ -29,6 +46,9 @@ function normTime(t?: string | null): string {
   const mm = String(parseInt(m ?? '0', 10) || 0).padStart(2, '0');
   return `${hh}:${mm}`;
 }
+
+type WeekRange = { id: string; startDate: Date; endDate: Date };
+type Db = Prisma.TransactionClient;
 
 @Injectable()
 export class ScheduleService {
@@ -73,11 +93,242 @@ export class ScheduleService {
     return this.prisma.subject.delete({ where: { id } });
   }
 
+  // ---- Jadval haftalari ----
+
+  /** Barcha haftalar (yangisi tepada) — darslar soni va joriy hafta bilan */
+  async listWeeks() {
+    const today = schoolToday();
+    const [weeks, active] = await Promise.all([
+      this.prisma.scheduleWeek.findMany({
+        orderBy: { startDate: 'desc' },
+        include: { _count: { select: { lessons: true } } },
+      }),
+      activeWeek(this.prisma, today),
+    ]);
+    return {
+      today: ymd(today),
+      activeWeekId: active?.id ?? null,
+      weeks: weeks.map((w) => ({
+        id: w.id,
+        startDate: ymd(w.startDate),
+        endDate: ymd(w.endDate),
+        note: w.note,
+        lessons: w._count.lessons,
+        isCurrent: w.startDate <= today && w.endDate >= today,
+      })),
+    };
+  }
+
+  /** Hafta oralig'i: boshi Dushanbaga keltiriladi, oxiri berilmasa — Shanba */
+  private parseRange(startStr: string, endStr?: string) {
+    const raw = dayFromStr(startStr);
+    if (Number.isNaN(raw.getTime())) throw new BadRequestException("Boshlanish sanasi noto'g'ri");
+    const start = mondayOf(raw);
+    const end = endStr ? dayFromStr(endStr) : addDays(start, 5);
+    if (Number.isNaN(end.getTime())) throw new BadRequestException("Tugash sanasi noto'g'ri");
+    if (end < start) {
+      throw new BadRequestException("Hafta oxiri boshlanishidan oldin bo'lishi mumkin emas");
+    }
+    if (end > addDays(start, 6)) {
+      throw new BadRequestException("Hafta 7 kundan uzun bo'lishi mumkin emas");
+    }
+    return { start, end };
+  }
+
+  /** Boshqa hafta bilan sanalar ustma-ust kelmasin */
+  private async assertNoOverlap(db: Db, start: Date, end: Date, exceptId?: string) {
+    const clash = await db.scheduleWeek.findFirst({
+      where: {
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+        startDate: { lte: end },
+        endDate: { gte: start },
+      },
+    });
+    if (clash) {
+      throw new BadRequestException(
+        `Bu hafta allaqachon mavjud: ${fmtDay(clash.startDate)} – ${fmtDay(clash.endDate)}`,
+      );
+    }
+  }
+
+  /** Darslarni boshqa haftaga nusxalash (faqat maqsad hafta oralig'idagi kunlar) */
+  private async copyLessons(db: Db, fromWeekId: string, to: WeekRange, classId?: string) {
+    const rows = await db.schedule.findMany({
+      where: {
+        weekId: fromWeekId,
+        weekday: { lte: weekDayCount(to) },
+        ...(classId ? { classId } : {}),
+      },
+      select: {
+        classId: true,
+        subjectId: true,
+        teacherId: true,
+        weekday: true,
+        startTime: true,
+        endTime: true,
+        room: true,
+      },
+    });
+    if (!rows.length) return 0;
+    const res = await db.schedule.createMany({
+      data: rows.map((r) => ({ ...r, weekId: to.id })),
+    });
+    return res.count;
+  }
+
+  async createWeek(dto: CreateScheduleWeekDto, userId?: string) {
+    const { start, end } = this.parseRange(dto.startDate, dto.endDate);
+    if (dto.copyFromWeekId) {
+      const src = await this.prisma.scheduleWeek.findUnique({
+        where: { id: dto.copyFromWeekId },
+        select: { id: true },
+      });
+      if (!src) throw new NotFoundException("Ko'chiriladigan hafta topilmadi");
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertNoOverlap(tx, start, end);
+      const week = await tx.scheduleWeek.create({
+        data: {
+          startDate: start,
+          endDate: end,
+          note: dto.note?.trim() || null,
+          createdById: userId ?? null,
+        },
+      });
+      const copied = dto.copyFromWeekId
+        ? await this.copyLessons(tx, dto.copyFromWeekId, week)
+        : 0;
+      return { id: week.id, startDate: ymd(week.startDate), endDate: ymd(week.endDate), copied };
+    });
+  }
+
+  /** Hafta oxiri va izohini tahrirlash (boshlanish sanasi — haftaning o'zi, o'zgarmaydi) */
+  async updateWeek(id: string, dto: UpdateScheduleWeekDto) {
+    const w = await this.prisma.scheduleWeek.findUnique({ where: { id } });
+    if (!w) throw new NotFoundException('Hafta topilmadi');
+    const { end } = this.parseRange(ymd(w.startDate), dto.endDate ?? ymd(w.endDate));
+    const updated = await this.prisma.scheduleWeek.update({
+      where: { id },
+      data: {
+        endDate: end,
+        ...(dto.note !== undefined ? { note: dto.note.trim() || null } : {}),
+      },
+    });
+    return {
+      id: updated.id,
+      startDate: ymd(updated.startDate),
+      endDate: ymd(updated.endDate),
+      note: updated.note,
+    };
+  }
+
+  /** Haftani o'chirish — undagi darslar ham o'chadi */
+  async removeWeek(id: string) {
+    const w = await this.prisma.scheduleWeek.findUnique({
+      where: { id },
+      include: { _count: { select: { lessons: true } } },
+    });
+    if (!w) throw new NotFoundException('Hafta topilmadi');
+    await this.prisma.scheduleWeek.delete({ where: { id } });
+    return { ok: true, removedLessons: w._count.lessons };
+  }
+
+  /** Ko'chirish uchun maqsad hafta: mavjud id, yoki sana bo'yicha topiladi/yaratiladi */
+  private async resolveCopyTarget(
+    tx: Db,
+    source: WeekRange,
+    dto: CopyScheduleWeekDto,
+    userId?: string,
+  ): Promise<WeekRange> {
+    if (dto.targetWeekId) {
+      const t = await tx.scheduleWeek.findUnique({ where: { id: dto.targetWeekId } });
+      if (!t) throw new NotFoundException('Maqsad hafta topilmadi');
+      return t;
+    }
+    const { start, end } = this.parseRange(
+      dto.targetStartDate ?? ymd(addDays(source.startDate, 7)),
+      dto.targetEndDate,
+    );
+    const existing = await tx.scheduleWeek.findUnique({ where: { startDate: start } });
+    if (existing) return existing;
+    await this.assertNoOverlap(tx, start, end);
+    return tx.scheduleWeek.create({
+      data: { startDate: start, endDate: end, createdById: userId ?? null },
+    });
+  }
+
+  /**
+   * Haftani bir tugma bilan ko'chirish. Maqsad berilmasa — keyingi hafta (yo'q bo'lsa yaratiladi).
+   * Maqsad haftada darslar bo'lsa, faqat replace=true bilan almashtiriladi.
+   */
+  async copyWeek(sourceId: string, dto: CopyScheduleWeekDto, userId?: string) {
+    const source = await this.prisma.scheduleWeek.findUnique({ where: { id: sourceId } });
+    if (!source) throw new NotFoundException('Hafta topilmadi');
+
+    return this.prisma.$transaction(async (tx) => {
+      const target = await this.resolveCopyTarget(tx, source, dto, userId);
+      if (target.id === source.id) {
+        throw new BadRequestException("Haftani o'zining ustiga ko'chirib bo'lmaydi");
+      }
+
+      const scope: Prisma.ScheduleWhereInput = {
+        weekId: target.id,
+        ...(dto.classId ? { classId: dto.classId } : {}),
+      };
+      const existing = await tx.schedule.count({ where: scope });
+      if (existing > 0 && !dto.replace) {
+        throw new ConflictException(
+          `${fmtDay(target.startDate)} haftasida ${existing} ta dars bor — almashtirish uchun tasdiqlang`,
+        );
+      }
+      const removed = existing > 0 ? (await tx.schedule.deleteMany({ where: scope })).count : 0;
+      const copied = await this.copyLessons(tx, source.id, target, dto.classId);
+      return {
+        targetWeekId: target.id,
+        startDate: ymd(target.startDate),
+        endDate: ymd(target.endDate),
+        copied,
+        removed,
+      };
+    });
+  }
+
+  /** O'qish uchun hafta: berilgan id (tekshiriladi) yoki joriy hafta (bo'lmasa null) */
+  private async resolveWeek(weekId?: string | null): Promise<WeekRange | null> {
+    if (weekId) {
+      const w = await this.prisma.scheduleWeek.findUnique({ where: { id: weekId } });
+      if (!w) throw new NotFoundException('Hafta topilmadi');
+      return w;
+    }
+    return activeWeek(this.prisma);
+  }
+
+  /** Yozish uchun hafta: hafta umuman bo'lmasa — joriy hafta avtomatik yaratiladi */
+  private async resolveWeekForWrite(weekId?: string | null): Promise<WeekRange> {
+    const w = await this.resolveWeek(weekId);
+    if (w) return w;
+    const start = mondayOf(schoolToday());
+    return this.prisma.scheduleWeek.upsert({
+      where: { startDate: start },
+      update: {},
+      create: { startDate: start, endDate: addDays(start, 5) },
+    });
+  }
+
+  private assertInWeek(week: WeekRange, weekday: number) {
+    if (weekday > weekDayCount(week)) {
+      throw new BadRequestException(
+        `${WEEKDAYS[weekday]} bu hafta oralig'iga kirmaydi (${fmtDay(week.startDate)} – ${fmtDay(week.endDate)})`,
+      );
+    }
+  }
+
   // ---- Jadval ----
-  /** Sinf jadvali — hafta kunlari bo'yicha guruhlangan grid */
-  async byClass(classId: string) {
+  /** Sinf jadvali — tanlangan (yoki joriy) hafta bo'yicha, kunlarga guruhlangan grid */
+  async byClass(classId: string, weekId?: string) {
+    const week = await this.resolveWeek(weekId);
     const rows = await this.prisma.schedule.findMany({
-      where: { classId },
+      where: { classId, weekId: week?.id ?? null },
       include: { subject: true },
       orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
     });
@@ -99,13 +350,16 @@ export class ScheduleService {
   async create(dto: CreateScheduleDto) {
     if (dto.startTime >= dto.endTime) {
       throw new BadRequestException(
-        'Boshlanish vaqti tugash vaqtidan oldin bo‘lishi kerak',
+        "Boshlanish vaqti tugash vaqtidan oldin bo'lishi kerak",
       );
     }
+    const week = await this.resolveWeekForWrite(dto.weekId);
+    this.assertInWeek(week, dto.weekday);
 
-    // Bir sinfda, bir kunda vaqt ustma-ust kelmasligi kerak
+    // Bir sinfda, bir kunda (shu haftada) vaqt ustma-ust kelmasligi kerak
     const overlap = await this.prisma.schedule.findFirst({
       where: {
+        weekId: week.id,
         classId: dto.classId,
         weekday: dto.weekday,
         startTime: { lt: dto.endTime },
@@ -118,10 +372,11 @@ export class ScheduleService {
       );
     }
 
-    // Ustoz shu vaqtda boshqa sinfda band bo'lmasligi kerak
+    // Ustoz shu vaqtda (shu haftada) boshqa sinfda band bo'lmasligi kerak
     if (dto.teacherId) {
       const teacherBusy = await this.prisma.schedule.findFirst({
         where: {
+          weekId: week.id,
           teacherId: dto.teacherId,
           weekday: dto.weekday,
           startTime: { lt: dto.endTime },
@@ -137,18 +392,21 @@ export class ScheduleService {
     }
 
     return this.prisma.schedule.create({
-      data: dto,
+      data: { ...dto, weekId: week.id },
       include: { subject: true },
     });
   }
 
   /**
-   * Sinf va (ixtiyoriy) ustoz bo'yicha band paralar — jadvalga bittada joylashda
-   * bo'sh slotlarni hisoblash uchun.
+   * Sinf va (ixtiyoriy) ustoz bo'yicha band paralar (tanlangan hafta) — jadvalga
+   * bittada joylashda bo'sh slotlarni hisoblash uchun.
    */
-  async availability(classId: string, teacherId?: string) {
+  async availability(classId: string, teacherId?: string, weekId?: string) {
+    const week = await this.resolveWeek(weekId);
+    const weekWhere = { weekId: week?.id ?? null };
+
     const classRows = await this.prisma.schedule.findMany({
-      where: { classId },
+      where: { classId, ...weekWhere },
       include: { subject: { select: { name: true } } },
     });
     // Sinf band slotlarida qaysi ustoz ekanini ko'rsatish uchun ismlarni yechamiz
@@ -178,7 +436,7 @@ export class ScheduleService {
     let teacherBusy: { weekday: number; start: string; label: string }[] = [];
     if (teacherId) {
       const tRows = await this.prisma.schedule.findMany({
-        where: { teacherId },
+        where: { teacherId, ...weekWhere },
         include: {
           subject: { select: { name: true } },
           class: { select: { name: true } },
@@ -194,10 +452,12 @@ export class ScheduleService {
   }
 
   /**
-   * Bir fanni bir nechta bo'sh slotga bittada joylash. Har bir slot uchun sinf va
-   * ustoz bandligi qayta tekshiriladi; to'qnashganlari o'tkazib yuboriladi.
+   * Bir fanni bir nechta bo'sh slotga bittada joylash (tanlangan haftaga). Har bir slot
+   * uchun sinf va ustoz bandligi qayta tekshiriladi; to'qnashganlari o'tkazib yuboriladi.
    */
   async bulkCreate(dto: BulkScheduleDto) {
+    const week = await this.resolveWeekForWrite(dto.weekId);
+    const maxDay = weekDayCount(week);
     let created = 0;
     const skipped: { weekday: number; startTime: string; reason: string }[] = [];
 
@@ -206,9 +466,14 @@ export class ScheduleService {
         skipped.push({ ...slot, reason: 'vaqt xato' });
         continue;
       }
+      if (slot.weekday > maxDay) {
+        skipped.push({ ...slot, reason: "hafta oralig'idan tashqari" });
+        continue;
+      }
 
       const classOverlap = await this.prisma.schedule.findFirst({
         where: {
+          weekId: week.id,
           classId: dto.classId,
           weekday: slot.weekday,
           startTime: { lt: slot.endTime },
@@ -223,6 +488,7 @@ export class ScheduleService {
       if (dto.teacherId) {
         const teacherOverlap = await this.prisma.schedule.findFirst({
           where: {
+            weekId: week.id,
             teacherId: dto.teacherId,
             weekday: slot.weekday,
             startTime: { lt: slot.endTime },
@@ -237,6 +503,7 @@ export class ScheduleService {
 
       await this.prisma.schedule.create({
         data: {
+          weekId: week.id,
           classId: dto.classId,
           subjectId: dto.subjectId,
           teacherId: dto.teacherId || null,
@@ -252,24 +519,36 @@ export class ScheduleService {
     return { created, skipped };
   }
 
-  /** Darsni tahrirlash — vaqt ustma-ustligini o'zidan tashqari tekshiradi */
+  /** Darsni tahrirlash — vaqt ustma-ustligini o'z haftasi ichida, o'zidan tashqari tekshiradi */
   async update(id: string, dto: UpdateScheduleDto) {
     const existing = await this.prisma.schedule.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Dars topilmadi');
 
-    const startTime = dto.startTime ?? existing.startTime;
-    const endTime = dto.endTime ?? existing.endTime;
+    // Darsni boshqa haftaga bu yerda ko'chirib bo'lmaydi
+    const data: UpdateScheduleDto = { ...dto };
+    delete data.weekId;
+
+    const startTime = data.startTime ?? existing.startTime;
+    const endTime = data.endTime ?? existing.endTime;
     if (startTime >= endTime) {
       throw new BadRequestException(
-        'Boshlanish vaqti tugash vaqtidan oldin bo‘lishi kerak',
+        "Boshlanish vaqti tugash vaqtidan oldin bo'lishi kerak",
       );
+    }
+
+    const weekday = data.weekday ?? existing.weekday;
+    // Kun o'zgartirilsa — yangi kun hafta oralig'ida bo'lishi kerak
+    if (existing.weekId && data.weekday !== undefined && data.weekday !== existing.weekday) {
+      const week = await this.prisma.scheduleWeek.findUnique({ where: { id: existing.weekId } });
+      if (week) this.assertInWeek(week, weekday);
     }
 
     const overlap = await this.prisma.schedule.findFirst({
       where: {
         id: { not: id },
-        classId: dto.classId ?? existing.classId,
-        weekday: dto.weekday ?? existing.weekday,
+        weekId: existing.weekId,
+        classId: data.classId ?? existing.classId,
+        weekday,
         startTime: { lt: endTime },
         endTime: { gt: startTime },
       },
@@ -282,7 +561,7 @@ export class ScheduleService {
 
     return this.prisma.schedule.update({
       where: { id },
-      data: dto,
+      data,
       include: { subject: true },
     });
   }
@@ -294,8 +573,9 @@ export class ScheduleService {
   }
 
   // ---- Fan normasi (haftalik soat reja) ----
-  /** Sinf bo'yicha fan normalari — reja va qo'yilgan (placed) soat bilan */
-  async norms(classId: string) {
+  /** Sinf bo'yicha fan normalari — reja va tanlangan haftada qo'yilgan (placed) soat bilan */
+  async norms(classId: string, weekId?: string) {
+    const week = await this.resolveWeek(weekId);
     const [norms, placedGroups] = await Promise.all([
       this.prisma.subjectNorm.findMany({
         where: { classId },
@@ -304,7 +584,7 @@ export class ScheduleService {
       }),
       this.prisma.schedule.groupBy({
         by: ['subjectId'],
-        where: { classId },
+        where: { classId, weekId: week?.id ?? null },
         _count: { _all: true },
       }),
     ]);

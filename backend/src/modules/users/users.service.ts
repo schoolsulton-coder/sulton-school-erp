@@ -8,6 +8,7 @@ import {
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PORTAL_ROLES } from '../../common/rbac-open';
+import { activeWeek } from '../../common/schedule-weeks';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -83,7 +84,11 @@ export class UsersService {
     if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
 
     // Dars jadvalidagi darslar (Schedule'da User bilan bevosita bog'liqlik yo'q)
-    const lessons = await this.prisma.schedule.count({ where: { teacherId: id } });
+    // Joriy haftadagi darslari (haftalar nusxalari ikki marta sanalmasin)
+    const week = await activeWeek(this.prisma);
+    const lessons = await this.prisma.schedule.count({
+      where: { teacherId: id, weekId: week?.id ?? null },
+    });
 
     return {
       ...user,

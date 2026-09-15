@@ -16,6 +16,12 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateNormDto } from './dto/create-norm.dto';
 import { BulkScheduleDto } from './dto/bulk-schedule.dto';
+import {
+  CopyScheduleWeekDto,
+  CreateScheduleWeekDto,
+  UpdateScheduleWeekDto,
+} from './dto/schedule-week.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -52,11 +58,47 @@ export class ScheduleController {
     return this.service.removeSubject(id);
   }
 
+  // ---- Jadval haftalari ----
+  @Get('schedule/weeks')
+  @Permissions('classes.view')
+  listWeeks() {
+    return this.service.listWeeks();
+  }
+
+  @Post('schedule/weeks')
+  @Permissions('classes.update')
+  createWeek(@Body() dto: CreateScheduleWeekDto, @CurrentUser() user: { id: string }) {
+    return this.service.createWeek(dto, user?.id);
+  }
+
+  @Patch('schedule/weeks/:id')
+  @Permissions('classes.update')
+  updateWeek(@Param('id') id: string, @Body() dto: UpdateScheduleWeekDto) {
+    return this.service.updateWeek(id, dto);
+  }
+
+  @Delete('schedule/weeks/:id')
+  @Permissions('classes.update')
+  removeWeek(@Param('id') id: string) {
+    return this.service.removeWeek(id);
+  }
+
+  /** Haftani boshqa haftaga ko'chirish (maqsad berilmasa — keyingi haftaga) */
+  @Post('schedule/weeks/:id/copy')
+  @Permissions('classes.update')
+  copyWeek(
+    @Param('id') id: string,
+    @Body() dto: CopyScheduleWeekDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.copyWeek(id, dto, user?.id);
+  }
+
   // ---- Jadval ----
   @Get('classes/:classId/schedule')
   @Permissions('classes.view')
-  byClass(@Param('classId') classId: string) {
-    return this.service.byClass(classId);
+  byClass(@Param('classId') classId: string, @Query('weekId') weekId?: string) {
+    return this.service.byClass(classId, weekId);
   }
 
   @Post('schedule')
@@ -70,8 +112,9 @@ export class ScheduleController {
   availability(
     @Query('classId') classId: string,
     @Query('teacherId') teacherId?: string,
+    @Query('weekId') weekId?: string,
   ) {
-    return this.service.availability(classId, teacherId);
+    return this.service.availability(classId, teacherId, weekId);
   }
 
   @Post('schedule/bulk')
@@ -95,8 +138,8 @@ export class ScheduleController {
   // ---- Fan normasi (haftalik soat) ----
   @Get('classes/:classId/norms')
   @Permissions('classes.view')
-  norms(@Param('classId') classId: string) {
-    return this.service.norms(classId);
+  norms(@Param('classId') classId: string, @Query('weekId') weekId?: string) {
+    return this.service.norms(classId, weekId);
   }
 
   @Post('classes/:classId/norms')

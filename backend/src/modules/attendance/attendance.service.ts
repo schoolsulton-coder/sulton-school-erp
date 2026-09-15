@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
+import { scheduleAccessWhere } from '../../common/schedule-weeks';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 
@@ -50,7 +51,7 @@ export class AttendanceService {
     });
     if (ct) return;
     const sch = await this.prisma.schedule.findFirst({
-      where: { classId, teacherId: user.id },
+      where: { classId, teacherId: user.id, ...(await scheduleAccessWhere(this.prisma)) },
       select: { id: true },
     });
     if (sch) return;
@@ -67,13 +68,14 @@ export class AttendanceService {
       });
       return { canMarkAll: true, classes };
     }
+    const weekScope = await scheduleAccessWhere(this.prisma);
     const [cts, schs] = await Promise.all([
       this.prisma.classTeacher.findMany({
         where: { teacherId: user.id },
         select: { class: { select: { id: true, name: true } } },
       }),
       this.prisma.schedule.findMany({
-        where: { teacherId: user.id },
+        where: { teacherId: user.id, ...weekScope },
         select: { class: { select: { id: true, name: true } } },
       }),
     ]);

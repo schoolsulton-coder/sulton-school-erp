@@ -8,18 +8,21 @@ import { classesApi, type Subject, type SubjectNormRow } from '@/lib/classes';
 /** Sinf bo'yicha haftalik fan normasi (reja soati). Schedule va sinf detali sahifalarida ishlatiladi. */
 export function NormPanel({
   classId,
+  weekId,
   subjects,
   onDistribute,
 }: {
   classId: string;
+  /** Qaysi hafta bo'yicha "qo'yilgan" soat sanalsin (berilmasa — joriy hafta) */
+  weekId?: string;
   subjects: Subject[];
   /** berilsa — har normaga "Jadvalga joylash" tugmasi chiqadi (subjectId, qolgan soat) */
   onDistribute?: (subjectId: string, hours: number) => void;
 }) {
   const qc = useQueryClient();
   const { data: norms } = useQuery({
-    queryKey: ['norms', classId],
-    queryFn: () => classesApi.norms(classId),
+    queryKey: ['norms', classId, weekId ?? ''],
+    queryFn: () => classesApi.norms(classId, weekId),
     enabled: !!classId,
   });
   const [addSubject, setAddSubject] = useState('');

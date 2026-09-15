@@ -37,4 +37,9 @@ export class CreateScheduleDto {
   @IsOptional()
   @IsString()
   room?: string;
+
+  /** Qaysi hafta (ScheduleWeek id). Berilmasa — joriy hafta. */
+  @IsOptional()
+  @IsString()
+  weekId?: string;
 }

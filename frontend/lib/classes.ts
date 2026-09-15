@@ -53,6 +53,30 @@ export interface ScheduleDay {
   lessons: Lesson[];
 }
 
+/** Dars jadvali haftasi (butun maktab uchun) */
+export interface ScheduleWeek {
+  id: string;
+  startDate: string; // "2026-09-14" (Dushanba)
+  endDate: string; // "2026-09-19"
+  note?: string | null;
+  lessons: number; // shu haftadagi darslar soni
+  isCurrent: boolean;
+}
+
+export interface ScheduleWeeksResp {
+  today: string;
+  activeWeekId: string | null;
+  weeks: ScheduleWeek[];
+}
+
+export interface CopyWeekResult {
+  targetWeekId: string;
+  startDate: string;
+  endDate: string;
+  copied: number;
+  removed: number;
+}
+
 export interface SubjectNormRow {
   id: string;
   subjectId: string;
@@ -96,8 +120,31 @@ export const classesApi = {
     api.delete(`/classes/${classId}/teachers/${teacherId}`).then((r) => r.data),
 
   // jadval
-  schedule: (classId: string) =>
-    api.get<ScheduleDay[]>(`/classes/${classId}/schedule`).then((r) => r.data),
+  // jadval haftalari
+  weeks: () => api.get<ScheduleWeeksResp>('/schedule/weeks').then((r) => r.data),
+  createWeek: (data: { startDate: string; endDate?: string; note?: string; copyFromWeekId?: string }) =>
+    api
+      .post<{ id: string; startDate: string; endDate: string; copied: number }>('/schedule/weeks', data)
+      .then((r) => r.data),
+  updateWeek: (id: string, data: { endDate?: string; note?: string }) =>
+    api.patch(`/schedule/weeks/${id}`, data).then((r) => r.data),
+  removeWeek: (id: string) =>
+    api.delete<{ ok: boolean; removedLessons: number }>(`/schedule/weeks/${id}`).then((r) => r.data),
+  copyWeek: (
+    id: string,
+    data: {
+      targetWeekId?: string;
+      targetStartDate?: string;
+      targetEndDate?: string;
+      classId?: string;
+      replace?: boolean;
+    },
+  ) => api.post<CopyWeekResult>(`/schedule/weeks/${id}/copy`, data).then((r) => r.data),
+
+  schedule: (classId: string, weekId?: string) =>
+    api
+      .get<ScheduleDay[]>(`/classes/${classId}/schedule`, { params: { weekId: weekId || undefined } })
+      .then((r) => r.data),
   addLesson: (data: {
     classId: string;
     subjectId: string;
@@ -106,6 +153,7 @@ export const classesApi = {
     endTime: string;
     room?: string;
     teacherId?: string;
+    weekId?: string;
   }) => api.post<Lesson>('/schedule', data).then((r) => r.data),
   updateLesson: (
     id: string,
@@ -122,11 +170,11 @@ export const classesApi = {
     api.delete(`/schedule/${id}`).then((r) => r.data),
 
   // bo'sh slotlar (sinf + ustoz) va bittada joylash
-  availability: (classId: string, teacherId?: string) =>
+  availability: (classId: string, teacherId?: string, weekId?: string) =>
     api
       .get<{ classBusy: BusySlot[]; teacherBusy: BusySlot[] }>(
         '/schedule/availability',
-        { params: { classId, teacherId: teacherId || undefined } },
+        { params: { classId, teacherId: teacherId || undefined, weekId: weekId || undefined } },
       )
       .then((r) => r.data),
   bulkAddLessons: (data: {
@@ -134,6 +182,7 @@ export const classesApi = {
     subjectId: string;
     teacherId?: string;
     room?: string;
+    weekId?: string;
     slots: { weekday: number; startTime: string; endTime: string }[];
   }) => api.post<BulkResult>('/schedule/bulk', data).then((r) => r.data),
 
@@ -147,8 +196,10 @@ export const classesApi = {
     api.delete(`/subjects/${id}`).then((r) => r.data),
 
   // fan normasi (haftalik soat reja)
-  norms: (classId: string) =>
-    api.get<SubjectNormRow[]>(`/classes/${classId}/norms`).then((r) => r.data),
+  norms: (classId: string, weekId?: string) =>
+    api
+      .get<SubjectNormRow[]>(`/classes/${classId}/norms`, { params: { weekId: weekId || undefined } })
+      .then((r) => r.data),
   setNorm: (classId: string, data: { subjectId: string; weeklyHours: number }) =>
     api.post(`/classes/${classId}/norms`, data).then((r) => r.data),
   removeNorm: (id: string) =>

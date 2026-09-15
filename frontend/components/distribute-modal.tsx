@@ -43,6 +43,8 @@ export function DistributeModal({
   teachers,
   initialSubjectId,
   initialHours,
+  weekId,
+  days,
   onClose,
   onSaved,
 }: {
@@ -52,6 +54,10 @@ export function DistributeModal({
   teachers: ManagedUser[];
   initialSubjectId?: string;
   initialHours?: number;
+  /** Qaysi hafta jadvaliga joylanadi (berilmasa — joriy hafta) */
+  weekId?: string;
+  /** Haftadagi kunlar soni (qisqa hafta) — undan keyingi kunlar ko'rsatilmaydi */
+  days?: number;
   onClose: () => void;
   onSaved: (created: number, skipped: number, deleted?: number) => void;
 }) {
@@ -63,9 +69,12 @@ export function DistributeModal({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
 
+  // Hafta oralig'idagi kunlar
+  const wdays = useMemo(() => WEEKDAYS.filter((w) => w.n <= (days ?? 7)), [days]);
+
   const { data: avail } = useQuery({
-    queryKey: ['availability', classId, teacherId],
-    queryFn: () => classesApi.availability(classId, teacherId || undefined),
+    queryKey: ['availability', classId, teacherId, weekId ?? ''],
+    queryFn: () => classesApi.availability(classId, teacherId || undefined, weekId),
     enabled: !!classId,
   });
 
@@ -96,14 +105,14 @@ export function DistributeModal({
 
   const freeSlots = useMemo(() => {
     const list: { weekday: number; start: string }[] = [];
-    for (const wd of WEEKDAYS) {
+    for (const wd of wdays) {
       for (const p of PERIODS) {
         const k = key(wd.n, p.start);
         if (!classBusy.has(k) && !teacherBusy.has(k)) list.push({ weekday: wd.n, start: p.start });
       }
     }
     return list;
-  }, [classBusy, teacherBusy]);
+  }, [classBusy, teacherBusy, wdays]);
 
   const n = Math.max(0, Number(hours) || 0);
   // Avtomatik tanlash: mavjud darslar doim tanlangan, qolgani bo'sh slotlardan to'ldiriladi
@@ -170,6 +179,7 @@ export function DistributeModal({
           subjectId,
           teacherId: teacherId || undefined,
           room: room || undefined,
+          weekId,
           slots,
         });
         created = res.created;
@@ -302,7 +312,7 @@ export function DistributeModal({
             <thead>
               <tr>
                 <th className="w-14"></th>
-                {WEEKDAYS.map((wd) => <th key={wd.n} className="pb-1 font-semibold text-slate-500">{wd.label}</th>)}
+                {wdays.map((wd) => <th key={wd.n} className="pb-1 font-semibold text-slate-500">{wd.label}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -312,7 +322,7 @@ export function DistributeModal({
                     <div className="font-semibold text-slate-500">{i + 1}-dars</div>
                     {p.start}
                   </td>
-                  {WEEKDAYS.map((wd) => {
+                  {wdays.map((wd) => {
                     const k = key(wd.n, p.start);
                     const cBusy = classBusy.get(k);
                     const tBusy = teacherBusy.get(k);

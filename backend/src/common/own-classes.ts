@@ -1,4 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { scheduleAccessWhere } from './schedule-weeks';
 
 /**
  * Foydalanuvchiga tegishli sinflar: sinfga biriktirilgan (kurator/fan o'qituvchisi)
@@ -8,13 +9,15 @@ export async function ownClassIds(
   prisma: PrismaService,
   userId: string,
 ): Promise<string[]> {
+  // Jadval — faqat dolzarb haftalar bo'yicha (qarang: scheduleAccessWhere)
+  const weekScope = await scheduleAccessWhere(prisma);
   const [assigned, scheduled] = await Promise.all([
     prisma.classTeacher.findMany({
       where: { teacherId: userId },
       select: { classId: true },
     }),
     prisma.schedule.findMany({
-      where: { teacherId: userId },
+      where: { teacherId: userId, ...weekScope },
       select: { classId: true },
     }),
   ]);

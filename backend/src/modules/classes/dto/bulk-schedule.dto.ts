@@ -44,6 +44,11 @@ export class BulkScheduleDto {
   @IsString()
   room?: string;
 
+  /** Qaysi hafta (ScheduleWeek id). Berilmasa — joriy hafta. */
+  @IsOptional()
+  @IsString()
+  weekId?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

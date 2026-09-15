@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Telegraf } from 'telegraf';
 import { PrismaService } from '../../prisma/prisma.service';
+import { activeWeek, addDays, fmtDay } from '../../common/schedule-weeks';
 
 const WEEKDAYS_UZ = [
   '',
@@ -500,13 +501,16 @@ export class TelegramService implements OnModuleInit {
 
   /** Sinf bo'yicha haftalik jadvalni matn ko'rinishida tayyorlaydi */
   private async buildScheduleText(classId: string, className: string, studentName: string) {
+    // Joriy hafta jadvali (hafta umuman yo'q bo'lsa — eski, haftasiz yozuvlar)
+    const week = await activeWeek(this.prisma);
     const rows = await this.prisma.schedule.findMany({
-      where: { classId },
+      where: { classId, weekId: week?.id ?? null },
       include: { subject: { select: { name: true } } },
       orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
     });
 
-    let text = `👦 ${studentName}\n🏫 ${className} — haftalik dars jadvali`;
+    const range = week ? ` (${fmtDay(week.startDate, true)} – ${fmtDay(week.endDate)})` : '';
+    let text = `👦 ${studentName}\n🏫 ${className} — haftalik dars jadvali${range}`;
     if (rows.length === 0) {
       return text + '\n\nHozircha dars jadvali kiritilmagan.';
     }
@@ -529,7 +533,9 @@ export class TelegramService implements OnModuleInit {
         .sort((a, b) => normTime(a.startTime).localeCompare(normTime(b.startTime)));
       if (day.length === 0) continue;
       printedDays += 1;
-      text += `\n\n🗓 ${WEEKDAYS_UZ[wd]}`;
+      text +=
+        `\n\n🗓 ${WEEKDAYS_UZ[wd]}` +
+        (week ? ` · ${fmtDay(addDays(week.startDate, wd - 1), true)}` : '');
       day.forEach((r, i) => {
         const teacher = r.teacherId ? tName.get(r.teacherId) : null;
         text +=

@@ -37,3 +37,50 @@ export function periodIndex(start: string): number {
   const i = PERIODS.findIndex((p) => p.start === s);
   return i === -1 ? 0 : i + 1;
 }
+
+// ===== Haftalar (sanalar "YYYY-MM-DD" satri — vaqt zonasiga bog'liq emas, UTC) =====
+
+const DAY_MS = 86_400_000;
+const toUTC = (s: string) => new Date(`${s.slice(0, 10)}T00:00:00.000Z`);
+const fromUTC = (d: Date) => d.toISOString().slice(0, 10);
+
+/** "2026-09-14" + 7 → "2026-09-21" */
+export function addDaysStr(s: string, n: number): string {
+  return fromUTC(new Date(toUTC(s).getTime() + n * DAY_MS));
+}
+
+/** Sana joylashgan haftaning Dushanbasi */
+export function mondayOfStr(s: string): string {
+  const wd = toUTC(s).getUTCDay(); // 0=Yakshanba
+  return addDaysStr(s, wd === 0 ? -6 : 1 - wd);
+}
+
+/** Bugun (Toshkent vaqti) — "YYYY-MM-DD" */
+export function todayStr(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+}
+
+/** "2026-09-14" → "14.09.2026" */
+export function fmtDate(s?: string | null): string {
+  if (!s) return '';
+  const [y, m, d] = s.slice(0, 10).split('-');
+  return `${d}.${m}.${y}`;
+}
+
+/** "2026-09-14" → "14.09" */
+export function fmtShort(s?: string | null): string {
+  if (!s) return '';
+  const [, m, d] = s.slice(0, 10).split('-');
+  return `${d}.${m}`;
+}
+
+/** Hafta yorlig'i: "14.09 – 19.09.2026" */
+export function weekLabel(w: { startDate: string; endDate: string }): string {
+  return `${fmtShort(w.startDate)} – ${fmtDate(w.endDate)}`;
+}
+
+/** Haftadagi kunlar soni (Dushanbadan boshlab), 1..7 */
+export function weekDays(w: { startDate: string; endDate: string }): number {
+  const diff = Math.round((toUTC(w.endDate).getTime() - toUTC(w.startDate).getTime()) / DAY_MS);
+  return Math.min(7, Math.max(1, diff + 1));
+}

@@ -568,12 +568,31 @@ model Schedule {
   startTime String  // "08:30"
   endTime   String  // "09:15"
   room      String?
+  // Qaysi haftaning jadvali (ScheduleWeek). null — eski, haftaga bog'lanmagan yozuv.
+  weekId    String?
   class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject   Subject @relation(fields: [subjectId], references: [id])
+  week      ScheduleWeek? @relation(fields: [weekId], references: [id], onDelete: Cascade)
 
   @@index([classId])
   @@index([teacherId])
+  @@index([weekId, classId])
+  @@index([weekId, teacherId])
   @@map("schedules")
+}
+
+/// Dars jadvali haftasi (butun maktab uchun), masalan 14.09–19.09.2026.
+/// Har hafta o'z darslariga ega; oldingi haftadan bir tugma bilan ko'chiriladi.
+model ScheduleWeek {
+  id          String     @id @default(uuid())
+  startDate   DateTime   @unique // hafta boshi — Dushanba (UTC 00:00)
+  endDate     DateTime // hafta oxiri — odatda Shanba (UTC 00:00)
+  note        String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  lessons     Schedule[]
+
+  @@map("schedule_weeks")
 }
 
 // ============================================================================

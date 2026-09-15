@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { activeWeek } from '../../common/schedule-weeks';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignStudentsDto } from './dto/assign-students.dto';
@@ -41,6 +42,8 @@ export class ClassesService {
   }
 
   async findOne(id: string) {
+    // Sinf ichidagi jadval — joriy hafta bo'yicha (haftalar nusxasi takrorlanmasin)
+    const week = await activeWeek(this.prisma);
     const cls = await this.prisma.class.findUnique({
       where: { id },
       include: {
@@ -59,6 +62,7 @@ export class ClassesService {
           include: { teacher: { select: { id: true, fullName: true } } },
         },
         schedules: {
+          where: { weekId: week?.id ?? null },
           include: {
             subject: true,
             // teacher relation Schedule modelida bevosita yo'q — teacherId orqali

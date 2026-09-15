@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
+import { scheduleAccessWhere } from '../../common/schedule-weeks';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { BulkGradeDto } from './dto/bulk-grade.dto';
@@ -70,7 +71,12 @@ export class GradesService {
   private async assertCanGrade(user: JwtUser, subjectId: string, classId?: string) {
     if (this.canGradeAll(user.role)) return;
     const sched = await this.prisma.schedule.findFirst({
-      where: { subjectId, teacherId: user.id, ...(classId ? { classId } : {}) },
+      where: {
+        subjectId,
+        teacherId: user.id,
+        ...(classId ? { classId } : {}),
+        ...(await scheduleAccessWhere(this.prisma)),
+      },
       select: { id: true },
     });
     if (sched) return;
@@ -102,9 +108,10 @@ export class GradesService {
 
     // Ustozning sinflari: dars jadvali + sinfga biriktirilganlar (kurator/fan o'qituvchisi).
     // Fani: Foydalanuvchilar oynasida biriktirilgan fan (User.subjectId) + jadvaldagilar.
+    const weekScope = await scheduleAccessWhere(this.prisma);
     const [sched, assigned, u] = await Promise.all([
       this.prisma.schedule.findMany({
-        where: { teacherId: user.id },
+        where: { teacherId: user.id, ...weekScope },
         select: {
           classId: true,
           subjectId: true,
