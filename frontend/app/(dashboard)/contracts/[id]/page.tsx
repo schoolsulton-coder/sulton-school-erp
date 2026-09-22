@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronDown, FileText, Pencil, Trash2, Plus, X } from 'lucide-react';
-import { contractsApi } from '@/lib/contracts';
+import { CONTRACT_CATEGORIES, contractsApi } from '@/lib/contracts';
 import { contractTemplatesApi } from '@/lib/contract-templates';
 import { crmApi, type ClassForm } from '@/lib/crm';
 import { flowAccountsApi, flowAccountLabel } from '@/lib/flow-accounts';
@@ -32,6 +32,8 @@ const C_STATUS: Record<string, { label: string; cls: string }> = {
   DRAFT: { label: 'Qoralama', cls: 'border-slate-200 text-slate-600' },
   COMPLETED: { label: 'Yakunlangan', cls: 'border-slate-200 text-slate-600' },
   CANCELLED: { label: 'Bekor qilingan', cls: 'border-red-200 text-red-600' },
+  INACTIVE: { label: 'Nofaol', cls: 'border-rose-200 text-rose-700' },
+  OVERDUE: { label: "Muddati o'tgan", cls: 'border-orange-200 text-orange-700' },
   OTHER: { label: 'Boshqa', cls: 'border-slate-200 text-slate-600' },
 };
 const INST_STATUS: Record<string, { label: string; cls: string }> = {
@@ -95,6 +97,7 @@ export default function ContractDetailPage() {
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <span className={`rounded-full border px-2 py-0.5 ${st.cls}`}>{st.label}</span>
               <span className="rounded-full border border-green-200 px-2 py-0.5 text-green-700">{c.type === 'YEARLY' ? 'Yillik' : 'Oylik'}</span>
+              {c.category && <span className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-600">{c.category}</span>}
               {cls && <span className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-600">{cls.name}{cls.language ? ` (${cls.language})` : ''}</span>}
               {c.student.branch && <span className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-600">{c.student.branch.name}</span>}
               {cls?.academicYear && <span className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-600">{cls.academicYear}</span>}
@@ -354,8 +357,10 @@ function PaymentModal({ contractId, onClose, onPaid }: { contractId: string; onC
 
 const CONTRACT_STATUS_OPTS = [
   { v: 'ACTIVE', l: 'Faol' },
+  { v: 'INACTIVE', l: "Nofaol (to'lov qilmagani uchun)" },
   { v: 'SUSPENDED', l: 'Band' },
   { v: 'TEMP_SUSPENDED', l: 'Vaqtincha band' },
+  { v: 'OVERDUE', l: "Muddati o'tgan (to'lov kutilmoqda)" },
   { v: 'LEFT', l: 'Ketdi-aniqlashga' },
   { v: 'DRAFT', l: 'Qoralama' },
   { v: 'COMPLETED', l: 'Yakunlangan' },
@@ -368,6 +373,7 @@ function EditContractModal({ contract, onClose, onSaved }: { contract: any; onCl
   const [f, setF] = useState({
     status: contract.status ?? 'ACTIVE',
     type: (contract.type ?? 'MONTHLY') as 'MONTHLY' | 'YEARLY',
+    category: (contract.category ?? '') as string,
     branchId: s?.branchId ?? '',
     academicYear: s?.class?.academicYear ?? '',
     classId: s?.classId ?? '',
@@ -389,6 +395,7 @@ function EditContractModal({ contract, onClose, onSaved }: { contract: any; onCl
       contractsApi.update(contract.id, {
         status: f.status,
         type: f.type,
+        category: f.category, // bo'sh — oddiy Oylik/Yillik
         branchId: f.branchId || undefined,
         classId: f.classId || undefined,
         startDate: f.startDate || undefined,
@@ -421,6 +428,15 @@ function EditContractModal({ contract, onClose, onSaved }: { contract: any; onCl
             <select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value as 'MONTHLY' | 'YEARLY' })} className={inp}>
               <option value="MONTHLY">Oylik</option>
               <option value="YEARLY">Yillik</option>
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={lbl}>Toifa (Boshqa tur)</label>
+            <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className={inp}>
+              <option value="">— Oddiy (Oylik / Yillik)</option>
+              {[...CONTRACT_CATEGORIES, ...(f.category && !CONTRACT_CATEGORIES.includes(f.category) ? [f.category] : [])].map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
             </select>
           </div>
           <div>

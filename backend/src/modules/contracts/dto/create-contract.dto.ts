@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -45,4 +46,9 @@ export class CreateContractDto {
   @IsOptional()
   @IsIn(['MONTHLY', 'YEARLY'])
   type?: 'MONTHLY' | 'YEARLY'; // Oylik / Yillik
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  category?: string; // "Boshqa" tur: Grand, Xodim farzandi, ... (bo'sh = oddiy Oylik/Yillik)
 }

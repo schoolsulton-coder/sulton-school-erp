@@ -189,6 +189,8 @@ function NewContractInner() {
         monthlyAmount: Number(f.narx) || 0,
         discountAmount: f.chegirma !== '' ? Number(f.chegirma) : undefined,
         type: (f.contractType === 'Yillik' ? 'YEARLY' : 'MONTHLY') as 'MONTHLY' | 'YEARLY',
+        // Grand, Xodim farzandi, ... — "Boshqa" tur sifatida saqlanadi (ro'yxatdagi kartalar uchun)
+        category: ['Oylik', 'Yillik'].includes(f.contractType) ? undefined : f.contractType,
       };
       // Qabuldan kelgan bo'lsa — ATOMIK endpoint: o'quvchi (kerak bo'lsa) + shartnoma
       // + lead'ni "Shartnoma tuzdi"ga o'tkazish, hammasi bitta tranzaksiyada.

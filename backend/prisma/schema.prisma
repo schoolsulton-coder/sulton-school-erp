@@ -58,6 +58,8 @@ enum ContractStatus {
   TEMP_SUSPENDED // Vaqtincha band
   LEFT // Ketdi-aniqlashga
   OTHER // Boshqa
+  INACTIVE // Nofaol — to'lov qilmagani uchun
+  OVERDUE // Muddati o'tgan — to'lov kutilmoqda
 }
 
 enum ContractType {
@@ -618,6 +620,7 @@ model Contract {
   endDate       DateTime?
   monthlyAmount Float
   type          ContractType   @default(MONTHLY)
+  category      String? // "Boshqa" turlar: Grand, Xodim farzandi, Yarim yillik, 6-oylik (bo'sh = oddiy Oylik/Yillik)
   discountId    String?
   discount      Discount?      @relation(fields: [discountId], references: [id])
   status        ContractStatus @default(DRAFT)

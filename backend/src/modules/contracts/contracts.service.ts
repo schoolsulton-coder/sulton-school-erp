@@ -100,6 +100,7 @@ export class ContractsService {
             endDate,
             monthlyAmount: dto.monthlyAmount,
             type: dto.type ?? 'MONTHLY',
+            category: dto.category?.trim() || null,
             discountId: dto.discountId,
             status: 'ACTIVE',
             installments: { create: installments },
@@ -253,6 +254,7 @@ export class ContractsService {
             endDate,
             monthlyAmount: dto.monthlyAmount,
             type: dto.type ?? 'MONTHLY',
+            category: dto.category?.trim() || null,
             status: 'ACTIVE',
             installments: { create: installments },
           },
@@ -328,6 +330,8 @@ export class ContractsService {
             id: true,
             firstName: true,
             lastName: true,
+            branchId: true,
+            classId: true,
             branch: { select: { name: true } },
             class: { select: { name: true, language: true, academicYear: true } },
           },
@@ -350,6 +354,9 @@ export class ContractsService {
         id: c.id,
         number: c.number,
         createdAt: c.createdAt,
+        studentId: c.student.id,
+        branchId: c.student.branchId,
+        classId: c.student.classId,
         student: {
           firstName: c.student.firstName,
           lastName: c.student.lastName,
@@ -360,6 +367,7 @@ export class ContractsService {
         branch: c.student.branch?.name ?? null,
         academicYear: c.student.class?.academicYear ?? null,
         type: c.type,
+        category: c.category,
         status: c.status,
         overdue,
         original,
@@ -373,13 +381,19 @@ export class ContractsService {
     const cnt = (fn: (r: (typeof rows)[number]) => boolean) => rows.filter(fn).length;
     const stats = {
       total: rows.length,
-      monthly: cnt((r) => r.type === 'MONTHLY'),
-      yearly: cnt((r) => r.type === 'YEARLY'),
+      // Tur: toifasi bor (Grand, Xodim farzandi, ...) — "Boshqa"; qolganlari Oylik/Yillik
+      monthly: cnt((r) => !r.category && r.type === 'MONTHLY'),
+      yearly: cnt((r) => !r.category && r.type === 'YEARLY'),
+      categorized: cnt((r) => !!r.category),
+      active: cnt((r) => ['ACTIVE', 'COMPLETED'].includes(r.status)),
+      inactive: cnt((r) => r.status === 'INACTIVE'),
+      cancelled: cnt((r) => r.status === 'CANCELLED'),
       suspended: cnt((r) => r.status === 'SUSPENDED'),
       tempSuspended: cnt((r) => r.status === 'TEMP_SUSPENDED'),
+      overdueStatus: cnt((r) => r.status === 'OVERDUE'),
       overdue: cnt((r) => r.overdue),
       left: cnt((r) => r.status === 'LEFT'),
-      other: cnt((r) => ['OTHER', 'DRAFT', 'COMPLETED', 'CANCELLED'].includes(r.status)),
+      other: cnt((r) => ['OTHER', 'DRAFT'].includes(r.status)),
       payableSum: rows.reduce((s, r) => s + r.payable, 0),
       paymentsSum: rows.reduce((s, r) => s + r.paymentsSum, 0),
     };
@@ -538,6 +552,7 @@ export class ContractsService {
     const data: any = {};
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.type !== undefined) data.type = dto.type;
+    if (dto.category !== undefined) data.category = dto.category.trim() || null;
     if (dto.monthlyAmount !== undefined) data.monthlyAmount = dto.monthlyAmount;
     if (dto.startDate !== undefined) data.startDate = new Date(dto.startDate);
     if (dto.endDate !== undefined)

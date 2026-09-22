@@ -11,7 +11,7 @@ type JwtUser = { id: string; role: string };
 const MARK_ALL_ROLES = ['superadmin', 'akademik', 'admin'];
 // "O'qiyotgan" o'quvchi — shartnomasi shu holatlardan birida (ketgan/bekor/lead emas)
 const ENROLLED_CONTRACT: any = {
-  some: { status: { in: ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'] } },
+  some: { status: { in: ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED', 'OVERDUE'] } },
 };
 
 // Sana stringidan (YYYY-MM-DD) barqaror UTC kun boshi — server zonasiga bog'liq emas

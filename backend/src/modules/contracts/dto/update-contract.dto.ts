@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -18,12 +19,19 @@ export class UpdateContractDto {
     'TEMP_SUSPENDED',
     'LEFT',
     'OTHER',
+    'INACTIVE',
+    'OVERDUE',
   ])
   status?: string;
 
   @IsOptional()
   @IsIn(['MONTHLY', 'YEARLY'])
   type?: 'MONTHLY' | 'YEARLY';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  category?: string; // bo'sh satr — toifani olib tashlash (oddiy Oylik/Yillik)
 
   @IsOptional()
   @IsString()

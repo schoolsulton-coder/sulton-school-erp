@@ -42,6 +42,9 @@ export interface ContractOverviewRow {
   id: string;
   number: string;
   createdAt: string;
+  studentId: string;
+  branchId?: string | null;
+  classId?: string | null;
   student: {
     firstName: string;
     lastName: string;
@@ -50,6 +53,7 @@ export interface ContractOverviewRow {
   branch?: string | null;
   academicYear?: string | null;
   type: 'MONTHLY' | 'YEARLY';
+  category?: string | null; // "Boshqa" turlar: Grand, Xodim farzandi, ...
   status: string;
   overdue: boolean;
   original: number;
@@ -64,8 +68,13 @@ export interface ContractsOverview {
     total: number;
     monthly: number;
     yearly: number;
+    categorized: number;
+    active: number;
+    inactive: number;
+    cancelled: number;
     suspended: number;
     tempSuspended: number;
+    overdueStatus: number;
     overdue: number;
     left: number;
     other: number;
@@ -74,6 +83,9 @@ export interface ContractsOverview {
   };
   rows: ContractOverviewRow[];
 }
+
+/** "Boshqa" shartnoma turlari — Oylik/Yillik'dan tashqari (Contract.category) */
+export const CONTRACT_CATEGORIES = ['Grand', 'Xodim farzandi', 'Yarim yillik', '6-oylik'];
 
 export const contractsApi = {
   overview: () => api.get<ContractsOverview>('/contracts/overview').then((r) => r.data),
@@ -91,6 +103,7 @@ export const contractsApi = {
     discountAmount?: number;
     dueDay?: number;
     type?: 'MONTHLY' | 'YEARLY';
+    category?: string;
   }) => api.post('/contracts', data).then((r) => r.data),
   createFromLead: (
     leadId: string,
@@ -101,6 +114,7 @@ export const contractsApi = {
       discountAmount?: number;
       dueDay?: number;
       type?: 'MONTHLY' | 'YEARLY';
+      category?: string;
       classId?: string;
       branchId?: string;
     },
@@ -117,6 +131,7 @@ export const contractsApi = {
     data: {
       status?: string;
       type?: 'MONTHLY' | 'YEARLY';
+      category?: string;
       classId?: string;
       branchId?: string;
       startDate?: string;

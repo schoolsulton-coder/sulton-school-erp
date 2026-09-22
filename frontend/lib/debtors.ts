@@ -65,6 +65,9 @@ export const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   SUSPENDED: { label: 'Band', cls: 'bg-amber-100 text-amber-700' },
   TEMP_SUSPENDED: { label: 'Vaqtincha band', cls: 'bg-amber-100 text-amber-700' },
   LEFT: { label: 'Ketgan', cls: 'bg-red-100 text-red-700' },
+  INACTIVE: { label: 'Nofaol', cls: 'bg-rose-100 text-rose-700' },
+  OVERDUE: { label: "Muddati o'tgan", cls: 'bg-orange-100 text-orange-700' },
+  CANCELLED: { label: 'Bekor qilingan', cls: 'bg-slate-100 text-slate-600' },
   OTHER: { label: 'Boshqa', cls: 'bg-slate-100 text-slate-600' },
 };
 

@@ -24,7 +24,7 @@ const PERIOD_TYPES = ['QUARTER', 'YEAR'];
 // "O'qiyotgan" o'quvchi — shartnomasi shu holatlardan birida (ketgan/bekor/lead emas).
 // To'liq to'langan shartnoma avtomat COMPLETED bo'ladi — u ham baholanadi.
 const ENROLLED_CONTRACT: any = {
-  some: { status: { in: ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'] } },
+  some: { status: { in: ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED', 'OVERDUE'] } },
 };
 
 const GRADE_TYPE_LABEL: Record<string, string> = {

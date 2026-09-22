@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -40,6 +41,11 @@ export class CreateFromLeadDto {
   @IsOptional()
   @IsIn(['MONTHLY', 'YEARLY'])
   type?: 'MONTHLY' | 'YEARLY';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  category?: string; // "Boshqa" tur: Grand, Xodim farzandi, ... (bo'sh = oddiy Oylik/Yillik)
 
   @IsOptional()
   @IsString()
