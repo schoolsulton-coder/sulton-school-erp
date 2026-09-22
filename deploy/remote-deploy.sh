@@ -67,7 +67,10 @@ echo "==> Backend"
 cd "$APP_DIR/backend"
 npm ci --no-audit --prefer-offline
 npx prisma migrate deploy
-npm run build
+# 1 GB RAM: Node standart heap chegarasi (~480 MB) tsc uchun yetmaydi (build ~520 MB) —
+# kattaroq heap beriladi, ortig'ini swap ko'taradi (DEPLOY-1GB.md: swap majburiy)
+free -m 2>/dev/null | sed -n '1,3p' || true
+NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 echo "==> Frontend"
 cd "$APP_DIR/frontend"
