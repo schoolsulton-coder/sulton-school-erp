@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -19,9 +20,16 @@ export class CreateScheduleDto {
   @IsNotEmpty()
   subjectId: string;
 
+  /** Asosiy ustoz (eski maydon). teacherIds berilsa — uning birinchisi yoziladi. */
   @IsOptional()
   @IsString()
   teacherId?: string;
+
+  /** Bir dars soatiga bir nechta ustoz */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  teacherIds?: string[];
 
   @IsInt()
   @Min(1)

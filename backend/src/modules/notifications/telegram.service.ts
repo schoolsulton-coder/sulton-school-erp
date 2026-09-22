@@ -505,7 +505,10 @@ export class TelegramService implements OnModuleInit {
     const week = await activeWeek(this.prisma);
     const rows = await this.prisma.schedule.findMany({
       where: { classId, weekId: week?.id ?? null },
-      include: { subject: { select: { name: true } } },
+      include: {
+        subject: { select: { name: true } },
+        teachers: { select: { teacherId: true } },
+      },
       orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
     });
 
@@ -516,7 +519,9 @@ export class TelegramService implements OnModuleInit {
     }
 
     // Ustoz ismlari
-    const teacherIds = [...new Set(rows.map((r) => r.teacherId).filter(Boolean))] as string[];
+    const teacherIds = [
+      ...new Set(rows.flatMap((r) => [r.teacherId, ...r.teachers.map((t) => t.teacherId)]).filter(Boolean)),
+    ] as string[];
     const tUsers = teacherIds.length
       ? await this.prisma.user.findMany({
           where: { id: { in: teacherIds } },
@@ -537,7 +542,12 @@ export class TelegramService implements OnModuleInit {
         `\n\n🗓 ${WEEKDAYS_UZ[wd]}` +
         (week ? ` · ${fmtDay(addDays(week.startDate, wd - 1), true)}` : '');
       day.forEach((r, i) => {
-        const teacher = r.teacherId ? tName.get(r.teacherId) : null;
+        // Bir darsda bir nechta ustoz bo'lsa — hammasi ko'rsatiladi
+        const teacher =
+          [...new Set([r.teacherId, ...r.teachers.map((t) => t.teacherId)].filter(Boolean) as string[])]
+            .map((tid) => tName.get(tid))
+            .filter(Boolean)
+            .join(', ') || null;
         text +=
           `\n${i + 1}. ${normTime(r.startTime)}–${normTime(r.endTime)} · ${r.subject.name}` +
           (teacher ? ` · ${teacher}` : '');

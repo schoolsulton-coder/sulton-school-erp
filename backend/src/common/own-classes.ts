@@ -17,7 +17,8 @@ export async function ownClassIds(
       select: { classId: true },
     }),
     prisma.schedule.findMany({
-      where: { teacherId: userId, ...weekScope },
+      // Bir darsda bir nechta ustoz bo'lishi mumkin — ro'yxatdagilar ham o'z sinfini ko'radi
+      where: { OR: [{ teacherId: userId }, { teachers: { some: { teacherId: userId } } }], ...weekScope },
       select: { classId: true },
     }),
   ]);

@@ -50,6 +50,31 @@ function normTime(t?: string | null): string {
 type WeekRange = { id: string; startDate: Date; endDate: Date };
 type Db = Prisma.TransactionClient;
 
+/**
+ * Ustoz shu vaqtda boshqa sinfda band bo'lsa — darsni qo'shishni to'sish.
+ * Maktab so'roviga ko'ra VAQTINCHA o'chirilgan: band ustozni ham tanlash mumkin,
+ * jadvalda faqat ogohlantirish ko'rinadi. Qayta yoqish uchun — true.
+ */
+const BLOCK_TEACHER_CONFLICT = false;
+
+/** Dars yozuvi bilan birga fan va ustozlar ro'yxati */
+const LESSON_INCLUDE = {
+  subject: true,
+  teachers: { include: { teacher: { select: { id: true, fullName: true } } } },
+} as const;
+
+/** Darsning ustozlari — asosiysi (teacherId) birinchi, qolganlari alifbo bo'yicha */
+const lessonTeachers = (r: {
+  teacherId?: string | null;
+  teachers?: { teacher: { id: string; fullName: string } }[];
+}) =>
+  (r.teachers ?? [])
+    .map((t) => ({ id: t.teacher.id, fullName: t.teacher.fullName }))
+    .sort(
+      (a, b) =>
+        Number(b.id === r.teacherId) - Number(a.id === r.teacherId) || a.fullName.localeCompare(b.fullName),
+    );
+
 @Injectable()
 export class ScheduleService {
   constructor(private prisma: PrismaService) {}
@@ -167,12 +192,26 @@ export class ScheduleService {
         startTime: true,
         endTime: true,
         room: true,
+        teachers: { select: { teacherId: true } },
       },
     });
     if (!rows.length) return 0;
     const res = await db.schedule.createMany({
-      data: rows.map((r) => ({ ...r, weekId: to.id })),
+      data: rows.map(({ teachers, ...r }) => ({ ...r, weekId: to.id })),
     });
+    // Ustozlar ro'yxati (bir darsda bir nechta) — yangi darslarga bog'lanadi
+    const fresh = await db.schedule.findMany({
+      where: { weekId: to.id, ...(classId ? { classId } : {}) },
+      select: { id: true, classId: true, subjectId: true, weekday: true, startTime: true },
+    });
+    const key = (r: { classId: string; subjectId: string; weekday: number; startTime: string }) =>
+      `${r.classId}|${r.subjectId}|${r.weekday}|${r.startTime}`;
+    const idOf = new Map(fresh.map((f) => [key(f), f.id]));
+    const links = rows.flatMap((r) => {
+      const id = idOf.get(key(r));
+      return id ? r.teachers.map((t) => ({ scheduleId: id, teacherId: t.teacherId })) : [];
+    });
+    if (links.length) await db.scheduleTeacher.createMany({ data: links, skipDuplicates: true });
     return res.count;
   }
 
@@ -329,7 +368,7 @@ export class ScheduleService {
     const week = await this.resolveWeek(weekId);
     const rows = await this.prisma.schedule.findMany({
       where: { classId, weekId: week?.id ?? null },
-      include: { subject: true },
+      include: LESSON_INCLUDE,
       orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
     });
 
@@ -340,11 +379,23 @@ export class ScheduleService {
         .filter((r) => r.weekday === i + 1)
         .map((r) => ({
           ...r,
+          teachers: lessonTeachers(r),
           startTime: normTime(r.startTime),
           endTime: normTime(r.endTime),
         })),
     }));
     return grid;
+  }
+
+  /** Dars ustozlari ro'yxati (takrorlarsiz); eski bitta maydon ham qo'llab-quvvatlanadi */
+  private teacherList(dto: { teacherIds?: string[]; teacherId?: string }): string[] {
+    const raw = dto.teacherIds?.length ? dto.teacherIds : dto.teacherId ? [dto.teacherId] : [];
+    return [...new Set(raw.map((x) => (x ?? '').trim()).filter(Boolean))];
+  }
+
+  /** Darsga ustozlarni biriktirish (asosiysi — birinchisi) */
+  private teacherData(ids: string[]) {
+    return { teacherId: ids[0] ?? null, teachers: { create: ids.map((teacherId) => ({ teacherId })) } };
   }
 
   async create(dto: CreateScheduleDto) {
@@ -372,28 +423,28 @@ export class ScheduleService {
       );
     }
 
-    // Ustoz shu vaqtda (shu haftada) boshqa sinfda band bo'lmasligi kerak
-    if (dto.teacherId) {
-      const teacherBusy = await this.prisma.schedule.findFirst({
+    const teacherIds = this.teacherList(dto);
+    // Ustoz bandligi — BLOCK_TEACHER_CONFLICT yoqilgandagina to'sadi (hozir o'chirilgan)
+    if (BLOCK_TEACHER_CONFLICT && teacherIds.length) {
+      const busy = await this.prisma.schedule.findFirst({
         where: {
           weekId: week.id,
-          teacherId: dto.teacherId,
           weekday: dto.weekday,
           startTime: { lt: dto.endTime },
           endTime: { gt: dto.startTime },
+          OR: [{ teacherId: { in: teacherIds } }, { teachers: { some: { teacherId: { in: teacherIds } } } }],
         },
         include: { class: { select: { name: true } } },
       });
-      if (teacherBusy) {
-        throw new BadRequestException(
-          `Ustoz bu vaqtda band (${teacherBusy.class.name} sinfida)`,
-        );
+      if (busy) {
+        throw new BadRequestException(`Ustoz bu vaqtda band (${busy.class.name} sinfida)`);
       }
     }
 
+    const { teacherIds: _ids, teacherId: _tid, ...rest } = dto;
     return this.prisma.schedule.create({
-      data: { ...dto, weekId: week.id },
-      include: { subject: true },
+      data: { ...rest, weekId: week.id, ...this.teacherData(teacherIds) },
+      include: LESSON_INCLUDE,
     });
   }
 
@@ -407,11 +458,11 @@ export class ScheduleService {
 
     const classRows = await this.prisma.schedule.findMany({
       where: { classId, ...weekWhere },
-      include: { subject: { select: { name: true } } },
+      include: { subject: { select: { name: true } }, teachers: { select: { teacherId: true } } },
     });
     // Sinf band slotlarida qaysi ustoz ekanini ko'rsatish uchun ismlarni yechamiz
     const teacherIds = [
-      ...new Set(classRows.map((r) => r.teacherId).filter(Boolean)),
+      ...new Set(classRows.flatMap((r) => [r.teacherId, ...r.teachers.map((t) => t.teacherId)]).filter(Boolean)),
     ] as string[];
     const tUsers = teacherIds.length
       ? await this.prisma.user.findMany({
@@ -427,16 +478,24 @@ export class ScheduleService {
       id: r.id,
       subjectId: r.subjectId,
       teacherId: r.teacherId ?? null,
+      teacherIds: [...new Set([r.teacherId, ...r.teachers.map((t) => t.teacherId)].filter(Boolean) as string[])],
       weekday: r.weekday,
       start: normTime(r.startTime),
       label: r.subject.name,
-      teacher: r.teacherId ? tName.get(r.teacherId) ?? null : null,
+      teacher:
+        [...new Set([r.teacherId, ...r.teachers.map((t) => t.teacherId)].filter(Boolean) as string[])]
+          .map((id) => tName.get(id))
+          .filter(Boolean)
+          .join(', ') || null,
     }));
 
     let teacherBusy: { weekday: number; start: string; label: string }[] = [];
     if (teacherId) {
       const tRows = await this.prisma.schedule.findMany({
-        where: { teacherId, ...weekWhere },
+        where: {
+          OR: [{ teacherId }, { teachers: { some: { teacherId } } }],
+          ...weekWhere,
+        },
         include: {
           subject: { select: { name: true } },
           class: { select: { name: true } },
@@ -457,6 +516,7 @@ export class ScheduleService {
    */
   async bulkCreate(dto: BulkScheduleDto) {
     const week = await this.resolveWeekForWrite(dto.weekId);
+    const teacherIds = this.teacherList(dto);
     const maxDay = weekDayCount(week);
     let created = 0;
     const skipped: { weekday: number; startTime: string; reason: string }[] = [];
@@ -485,14 +545,14 @@ export class ScheduleService {
         continue;
       }
 
-      if (dto.teacherId) {
+      if (BLOCK_TEACHER_CONFLICT && teacherIds.length) {
         const teacherOverlap = await this.prisma.schedule.findFirst({
           where: {
             weekId: week.id,
-            teacherId: dto.teacherId,
             weekday: slot.weekday,
             startTime: { lt: slot.endTime },
             endTime: { gt: slot.startTime },
+            OR: [{ teacherId: { in: teacherIds } }, { teachers: { some: { teacherId: { in: teacherIds } } } }],
           },
         });
         if (teacherOverlap) {
@@ -506,7 +566,7 @@ export class ScheduleService {
           weekId: week.id,
           classId: dto.classId,
           subjectId: dto.subjectId,
-          teacherId: dto.teacherId || null,
+          ...this.teacherData(teacherIds),
           weekday: slot.weekday,
           startTime: slot.startTime,
           endTime: slot.endTime,
@@ -559,10 +619,24 @@ export class ScheduleService {
       );
     }
 
-    return this.prisma.schedule.update({
-      where: { id },
-      data,
-      include: { subject: true },
+    // Ustozlar ro'yxati berilgan bo'lsa — to'liq almashtiriladi
+    const teacherIds =
+      dto.teacherIds !== undefined || dto.teacherId !== undefined ? this.teacherList(dto) : null;
+    const updateData: Record<string, unknown> = { ...data };
+    delete updateData.teacherIds;
+    if (teacherIds) updateData.teacherId = teacherIds[0] ?? null;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (teacherIds) {
+        await tx.scheduleTeacher.deleteMany({ where: { scheduleId: id } });
+        if (teacherIds.length) {
+          await tx.scheduleTeacher.createMany({
+            data: teacherIds.map((teacherId) => ({ scheduleId: id, teacherId })),
+            skipDuplicates: true,
+          });
+        }
+      }
+      return tx.schedule.update({ where: { id }, data: updateData, include: LESSON_INCLUDE });
     });
   }
 

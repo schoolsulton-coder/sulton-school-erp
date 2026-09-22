@@ -43,7 +43,10 @@ export interface Lesson {
   startTime: string;
   endTime: string;
   room?: string | null;
+  /** asosiy (birinchi) ustoz — eski maydon */
   teacherId?: string | null;
+  /** darsning barcha ustozlari */
+  teachers?: { id: string; fullName: string }[];
   subject: Subject;
 }
 
@@ -90,6 +93,7 @@ export interface BusySlot {
   id?: string; // dars id — sudrab ko'chirish/o'chirish uchun (faqat shu sinf darslarida)
   subjectId?: string; // qaysi fan — mavjud joylashuvni tahrirlash uchun
   teacherId?: string | null;
+  teacherIds?: string[];
   weekday: number;
   start: string; // "08:30"
   label: string; // band sabab: fan nomi yoki "Sinf · Fan"
@@ -153,6 +157,7 @@ export const classesApi = {
     endTime: string;
     room?: string;
     teacherId?: string;
+    teacherIds?: string[];
     weekId?: string;
   }) => api.post<Lesson>('/schedule', data).then((r) => r.data),
   updateLesson: (
@@ -164,6 +169,7 @@ export const classesApi = {
       endTime?: string;
       room?: string;
       teacherId?: string;
+      teacherIds?: string[];
     },
   ) => api.patch<Lesson>(`/schedule/${id}`, data).then((r) => r.data),
   removeLesson: (id: string) =>
@@ -181,6 +187,7 @@ export const classesApi = {
     classId: string;
     subjectId: string;
     teacherId?: string;
+    teacherIds?: string[];
     room?: string;
     weekId?: string;
     slots: { weekday: number; startTime: string; endTime: string }[];

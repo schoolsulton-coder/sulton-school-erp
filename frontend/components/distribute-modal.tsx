@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Wand2, Target, Check, AlertTriangle, User, Info, Trash2, Move } from 'lucide-react';
 import { classesApi, type Subject, type BusySlot } from '@/lib/classes';
-import { teacherLabel, type ManagedUser } from '@/lib/users';
+import { type ManagedUser } from '@/lib/users';
+import { TeacherPicker } from './teacher-picker';
 import { PERIODS, WEEKDAYS } from '@/lib/schedule';
 
 const key = (weekday: number, start: string) => `${weekday}-${start}`;
@@ -63,7 +64,9 @@ export function DistributeModal({
 }) {
   const qc = useQueryClient();
   const [subjectId, setSubjectId] = useState(initialSubjectId ?? '');
-  const [teacherId, setTeacherId] = useState('');
+  const [teacherIds, setTeacherIds] = useState<string[]>([]);
+  // Bandlik ko'rsatkichi birinchi ustoz bo'yicha ko'rsatiladi (faqat ogohlantirish)
+  const teacherId = teacherIds[0] ?? '';
   const [hours, setHours] = useState(String(initialHours ?? 2));
   const [room, setRoom] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -108,7 +111,8 @@ export function DistributeModal({
     for (const wd of wdays) {
       for (const p of PERIODS) {
         const k = key(wd.n, p.start);
-        if (!classBusy.has(k) && !teacherBusy.has(k)) list.push({ weekday: wd.n, start: p.start });
+        // Ustoz band bo'lsa ham katak tanlanadi — cheklov olib tashlangan, faqat belgi qoladi
+        if (!classBusy.has(k)) list.push({ weekday: wd.n, start: p.start });
       }
     }
     return list;
@@ -126,10 +130,16 @@ export function DistributeModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freeSig, ownSig, n]);
 
-  // Mavjud darsning ustozini formaga olib qo'yamiz (bir xil bo'lsa)
+  // Mavjud darslarning ustozlarini formaga olib qo'yamiz (hammasida bir xil bo'lsa)
   useEffect(() => {
-    const ids = [...new Set(ownLessons.map((l) => l.teacherId ?? ''))];
-    if (ids.length === 1 && ids[0]) setTeacherId(ids[0]);
+    const sets = [
+      ...new Set(
+        ownLessons.map((l) =>
+          (l.teacherIds?.length ? l.teacherIds : l.teacherId ? [l.teacherId] : []).slice().sort().join(','),
+        ),
+      ),
+    ];
+    if (sets.length === 1 && sets[0]) setTeacherIds(sets[0].split(','));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownSig]);
 
@@ -160,9 +170,9 @@ export function DistributeModal({
       for (const id of toDelete) await classesApi.removeLesson(id);
 
       // Ustoz almashtirilgan bo'lsa — qoladigan darslarga ham qo'llanadi
-      if (teacherId) {
+      if (teacherIds.length) {
         for (const l of keep) {
-          if (l.id && l.teacherId !== teacherId) await classesApi.updateLesson(l.id, { teacherId });
+          if (l.id) await classesApi.updateLesson(l.id, { teacherIds });
         }
       }
 
@@ -177,7 +187,7 @@ export function DistributeModal({
         const res = await classesApi.bulkAddLessons({
           classId,
           subjectId,
-          teacherId: teacherId || undefined,
+          teacherIds,
           room: room || undefined,
           weekId,
           slots,
@@ -270,13 +280,10 @@ export function DistributeModal({
               {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
-          <label className="col-span-2 block sm:col-span-1">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Ustoz</span>
-            <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className={selCls}>
-              <option value="">Biriktirilmagan</option>
-              {teachers.map((t) => <option key={t.id} value={t.id}>{teacherLabel(t)}</option>)}
-            </select>
-          </label>
+          <div className="col-span-2 block sm:col-span-1">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Ustoz(lar)</span>
+            <TeacherPicker teachers={teachers} value={teacherIds} onChange={setTeacherIds} />
+          </div>
           <label className="block">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Soat/hafta</span>
             <input type="number" min={1} max={40} value={hours} onChange={(e) => setHours(e.target.value)} className={selCls} />
@@ -293,7 +300,7 @@ export function DistributeModal({
             <Lg cls="bg-brand" t="tanlangan" />
             <Lg cls="bg-emerald-100 ring-1 ring-emerald-200" t="bo'sh" />
             <Lg cls="bg-slate-100 ring-1 ring-slate-200" t="sinf band" />
-            <Lg cls="bg-amber-100 ring-1 ring-amber-200" t="ustoz band" />
+            <Lg cls="bg-amber-100 ring-1 ring-amber-200" t="ustoz band (tanlash mumkin)" />
             <span className="inline-flex items-center gap-1 text-slate-400">
               <Move size={12} /> darsni sudrab ko&apos;chiring · <Trash2 size={12} /> o&apos;chirish
             </span>

@@ -87,7 +87,10 @@ export class UsersService {
     // Joriy haftadagi darslari (haftalar nusxalari ikki marta sanalmasin)
     const week = await activeWeek(this.prisma);
     const lessons = await this.prisma.schedule.count({
-      where: { teacherId: id, weekId: week?.id ?? null },
+      where: {
+        OR: [{ teacherId: id }, { teachers: { some: { teacherId: id } } }],
+        weekId: week?.id ?? null,
+      },
     });
 
     return {

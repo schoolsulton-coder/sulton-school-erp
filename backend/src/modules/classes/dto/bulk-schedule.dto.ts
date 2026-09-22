@@ -40,6 +40,12 @@ export class BulkScheduleDto {
   @IsString()
   teacherId?: string;
 
+  /** Bir dars soatiga bir nechta ustoz */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  teacherIds?: string[];
+
   @IsOptional()
   @IsString()
   room?: string;

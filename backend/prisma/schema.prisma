@@ -190,6 +190,7 @@ model User {
   itCreated          InternalTransfer[] @relation("ITCreatedBy")
   itUpdated          InternalTransfer[] @relation("ITUpdatedBy")
   itConfirmed        InternalTransfer[] @relation("ITConfirmedBy")
+  scheduleLessons    ScheduleTeacher[]  @relation("ScheduleTeachers")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -575,12 +576,27 @@ model Schedule {
   class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject   Subject @relation(fields: [subjectId], references: [id])
   week      ScheduleWeek? @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  // Bir dars soatiga bir nechta ustoz. teacherId — asosiy (birinchi) ustoz: eski
+  // hisoblar (o'z sinflari, dars soati, Telegram jadvali) shu maydonga tayanadi.
+  teachers  ScheduleTeacher[]
 
   @@index([classId])
   @@index([teacherId])
   @@index([weekId, classId])
   @@index([weekId, teacherId])
   @@map("schedules")
+}
+
+/// Dars soati ↔ ustoz (bir darsga bir nechta ustoz biriktirish uchun)
+model ScheduleTeacher {
+  scheduleId String
+  teacherId  String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  teacher    User     @relation("ScheduleTeachers", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@id([scheduleId, teacherId])
+  @@index([teacherId])
+  @@map("schedule_teachers")
 }
 
 /// Dars jadvali haftasi (butun maktab uchun), masalan 14.09–19.09.2026.

@@ -25,7 +25,8 @@ import {
   type Lesson,
   type Subject,
 } from '@/lib/classes';
-import { usersApi, teacherLabel, type ManagedUser } from '@/lib/users';
+import { usersApi, type ManagedUser } from '@/lib/users';
+import { TeacherPicker } from '@/components/teacher-picker';
 import {
   PERIODS,
   WEEKDAYS,
@@ -58,6 +59,12 @@ const btnOutline = `${btnBase} border border-slate-200 bg-white text-slate-600 h
 const btnDanger = `${btnBase} border border-rose-200 bg-white text-rose-500 hover:bg-rose-50`;
 const iconBtn =
   'grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-500';
+
+/** Darsning ustozlari — nomlar ro'yxati (bir darsda bir nechta bo'lishi mumkin) */
+const lessonTeacherNames = (l: Lesson, names: Map<string, string>) =>
+  (l.teachers?.length ? l.teachers.map((t) => t.fullName) : l.teacherId ? [names.get(l.teacherId) ?? ''] : [])
+    .filter(Boolean)
+    .join(', ');
 
 export default function SchedulePage() {
   return (
@@ -462,9 +469,9 @@ function ScheduleManager() {
                             {normTime(l.startTime)}–{normTime(l.endTime)}
                             {l.room ? ` · ${l.room}` : ''}
                           </div>
-                          {l.teacherId && teacherMap.get(l.teacherId) && (
+                          {lessonTeacherNames(l, teacherMap) && (
                             <div className="truncate text-xs font-medium text-brand/80">
-                              👤 {teacherMap.get(l.teacherId)}
+                              👤 {lessonTeacherNames(l, teacherMap)}
                             </div>
                           )}
                         </div>
@@ -749,7 +756,9 @@ function LessonModal({
   const dayOptions = WEEKDAYS.filter((wd) => wd.n <= dayCount || wd.n === editing?.weekday);
   const [weekday, setWeekday] = useState(initWeekday);
   const [subjectId, setSubjectId] = useState(editing?.subject.id ?? '');
-  const [teacherId, setTeacherId] = useState(editing?.teacherId ?? '');
+  const [teacherIds, setTeacherIds] = useState<string[]>(
+    editing?.teachers?.length ? editing.teachers.map((t) => t.id) : editing?.teacherId ? [editing.teacherId] : [],
+  );
   const [slot, setSlot] = useState(editing ? normTime(editing.startTime) : '');
   const [room, setRoom] = useState(editing?.room ?? '');
   const [error, setError] = useState('');
@@ -781,7 +790,7 @@ function LessonModal({
         startTime: period.start,
         endTime: period.end,
         room: room || undefined,
-        teacherId: teacherId || undefined,
+        teacherIds,
       };
       return editing
         ? classesApi.updateLesson(editing.id, payload)
@@ -869,26 +878,20 @@ function LessonModal({
             </select>
           </label>
 
-          <label className="block">
-            <span className={labelCls}>Ustoz</span>
-            <select
-              value={teacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
-              className={`${inputCls} cursor-pointer`}
-            >
-              <option value="">Biriktirilmagan</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {teacherLabel(t)}
-                </option>
-              ))}
-            </select>
-            {teachers.length === 0 && (
-              <span className="mt-1 block text-xs text-slate-400">
-                Ustoz yo&apos;q — Sozlamalar → Foydalanuvchilar&apos;dan &quot;Ustoz&quot; roli bilan qo&apos;shing
+          <div className="block">
+            <span className={labelCls}>
+              Ustoz(lar){' '}
+              <span className="font-normal normal-case tracking-normal text-slate-400">
+                — bir nechtasini tanlash mumkin
               </span>
-            )}
-          </label>
+            </span>
+            <TeacherPicker
+              teachers={teachers}
+              value={teacherIds}
+              onChange={setTeacherIds}
+              emptyHint="Ustoz yo'q — Sozlamalar → Foydalanuvchilar'dan &quot;Ustoz&quot; roli bilan qo'shing"
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <label className="block">
