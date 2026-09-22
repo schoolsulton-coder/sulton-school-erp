@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, RefreshCw } from 'lucide-react';
 import {
@@ -14,6 +15,7 @@ import {
   fmtShort,
   fmtSigned,
   todayStr,
+  type AcademicData,
   type CeoDashboard,
   type DashParams,
   type DetailReq,
@@ -93,7 +95,7 @@ function Delta({ value, goodUp = true, suffix = '%' }: { value: number | null; g
 function Section({ title, note, children, right }: { title: string; note?: string; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="mt-8">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-lg font-semibold text-slate-900">
           {title}
           {note && <span className="ml-2 text-sm font-normal text-slate-500">— {note}</span>}
@@ -127,6 +129,7 @@ export function CeoDashboard() {
   const [preset, setPreset] = useState<Preset>('30');
   const [range, setRange] = useState(() => rangeOf('30'));
   const [branchId, setBranchId] = useState('');
+  const [classId, setClassId] = useState(''); // O'quv jarayoni bo'limi uchun
   const [detail, setDetail] = useState<DetailReq | null>(null);
   const [split, setSplit] = useState(false);
   const [asTable, setAsTable] = useState(false);
@@ -141,6 +144,7 @@ export function CeoDashboard() {
         setPreset(s.preset ?? '30');
         setRange(s.preset && s.preset !== 'custom' ? rangeOf(s.preset) : { from: s.from, to: s.to });
         setBranchId(s.branchId ?? '');
+        setClassId(s.classId ?? '');
       }
     } catch { /* standart filtrlar */ }
     setRestored(true);
@@ -148,9 +152,9 @@ export function CeoDashboard() {
   useEffect(() => {
     if (!restored) return;
     try {
-      sessionStorage.setItem(SKEY, JSON.stringify({ preset, ...range, branchId }));
+      sessionStorage.setItem(SKEY, JSON.stringify({ preset, ...range, branchId, classId }));
     } catch { /* private rejim */ }
-  }, [restored, preset, range, branchId]);
+  }, [restored, preset, range, branchId, classId]);
 
   const params: DashParams = { from: range.from, to: range.to, branchId: branchId || undefined };
   const { data, isLoading, isError, isFetching, refetch, error } = useQuery({
@@ -159,6 +163,18 @@ export function CeoDashboard() {
     placeholderData: keepPreviousData,
     enabled: restored,
   });
+  // Sinf tanlanganda faqat o'quv jarayoni qayta hisoblanadi (moliya qismi tegilmaydi)
+  const academicQuery = useQuery({
+    queryKey: ['dash-academic', params, classId],
+    queryFn: () => dashboardApi.academic({ ...params, classId }),
+    placeholderData: keepPreviousData,
+    enabled: restored && !!classId,
+  });
+  // Filial almashsa, tanlangan sinf o'sha filialda bo'lmasa — tozalanadi
+  useEffect(() => {
+    if (classId && data && !data.classes.some((c) => c.id === classId)) setClassId('');
+  }, [data, classId]);
+
   const open = useCallback((req: DetailReq) => setDetail(req), []);
   const close = useCallback(() => setDetail(null), []);
 
@@ -259,7 +275,21 @@ export function CeoDashboard() {
         </div>
       )}
 
-      {data && <Body d={data} open={open} split={split} setSplit={setSplit} asTable={asTable} setAsTable={setAsTable} stale={isFetching} />}
+      {data && (
+        <Body
+          d={data}
+          open={open}
+          split={split}
+          setSplit={setSplit}
+          asTable={asTable}
+          setAsTable={setAsTable}
+          stale={isFetching}
+          classId={classId}
+          setClassId={setClassId}
+          academic={classId ? academicQuery.data ?? null : data.academic}
+          academicStale={academicQuery.isFetching}
+        />
+      )}
 
       <DetailDrawer req={detail} params={params} onClose={close} />
     </div>
@@ -274,6 +304,10 @@ function Body({
   asTable,
   setAsTable,
   stale,
+  classId,
+  setClassId,
+  academic,
+  academicStale,
 }: {
   d: CeoDashboard;
   open: (r: DetailReq) => void;
@@ -282,10 +316,18 @@ function Body({
   asTable: boolean;
   setAsTable: (v: boolean) => void;
   stale: boolean;
+  classId: string;
+  setClassId: (v: string) => void;
+  academic: CeoDashboard['academic'] | AcademicData | null;
+  academicStale: boolean;
 }) {
+  const router = useRouter();
   const t = d.today;
   const r = d.result;
-  const a = d.academic;
+  const a = academic;
+  const cls = !!classId;
+  // Detal oynasi ham tanlangan sinf doirasida ochiladi
+  const openA = (r: DetailReq) => open({ ...r, classId: classId || undefined });
   const branchName = d.branches.find((b) => b.id === d.branchId)?.name ?? 'barcha filiallar';
   const asOf = fmtDate(d.generatedAt.slice(0, 10));
   const runwayTone: Tone = t.runway.months === null ? 'white' : t.runway.months < 1 ? 'rose' : t.runway.months < 2 ? 'amber' : 'emerald';
@@ -614,12 +656,31 @@ function Body({
       </div>
 
       {/* ===== O'quv jarayoni ===== */}
-      <Section title="O'quv jarayoni" note="tanlangan davr va filial bo'yicha">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <Section
+        title="O'quv jarayoni"
+        note={`tanlangan davr, filial${cls ? ' va sinf' : ''} bo'yicha`}
+        right={
+          <label className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="shrink-0 text-sm text-slate-500">Sinf:</span>
+            <select value={classId} onChange={(e) => setClassId(e.target.value)} className={`${sel} sm:w-60`}>
+              <option value="">Barcha sinflar</option>
+              {d.classes.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+        }
+      >
+        {!a ? (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {Array.from({ length: 4 }, (_, i) => <div key={i} className="h-72 animate-pulse rounded-2xl bg-slate-100" />)}
+          </div>
+        ) : (
+        <div className={`grid grid-cols-1 gap-4 transition-opacity xl:grid-cols-2 ${academicStale ? 'opacity-70' : ''}`}>
           {/* Davomat */}
           <Panel
             title="Davomat"
-            right={<button type="button" onClick={() => open({ kind: 'attendance-classes' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">Barcha sinflar</button>}
+            right={<button type="button" onClick={() => openA({ kind: 'attendance-classes' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">{cls ? "Barcha o'quvchilar" : 'Barcha sinflar'}</button>}
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
@@ -639,17 +700,17 @@ function Body({
                       { key: 'absent', label: 'Sababsiz', value: a.attendance.absent, stroke: 'stroke-rose-500', dot: 'bg-rose-500' },
                       { key: 'excused', label: 'Sababli', value: a.attendance.excused, stroke: 'stroke-sky-400', dot: 'bg-sky-400' },
                     ]}
-                    onSelect={(s) => open({ kind: s.key === 'present' ? 'attendance-classes' : 'attendance-day' })}
+                    onSelect={(s) => openA({ kind: s.key === 'present' ? 'attendance-classes' : 'attendance-day' })}
                   />
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="mb-1 text-sm font-medium text-slate-600">Eng past davomatli sinflar</div>
+                <div className="mb-1 text-sm font-medium text-slate-600">Eng past davomatli {cls ? "o'quvchilar" : 'sinflar'}</div>
                 <BarList
                   limit={6}
                   max={100}
-                  rows={a.attendance.classes.map((c) => ({ id: c.id, label: c.name, value: c.rate, display: fmtPct(c.rate), sub: `${c.absent} yo'q`, bar: rateBar(c.rate) }))}
-                  onSelect={(c) => open({ kind: 'attendance-class', key: c.id })}
+                  rows={(cls ? a.attendance.students : a.attendance.classes).map((c) => ({ id: c.id, label: c.name, value: c.rate, display: fmtPct(c.rate), sub: `${c.absent} yo'q`, bar: rateBar(c.rate) }))}
+                  onSelect={(c) => (cls ? router.push(`/students/${c.id}`) : openA({ kind: 'attendance-class', key: c.id }))}
                   empty="Bu davrda davomat belgilanmagan"
                 />
               </div>
@@ -665,7 +726,7 @@ function Body({
                 extra={(it) => [{ label: "Yo'q", value: String(it.values.absent ?? 0), cls: 'text-rose-300' }]}
                 onSelect={(it) => {
                   const x = a.attendance.trend.find((y) => y.from === it.id)!;
-                  open({ kind: 'attendance-day', from: x.from, to: x.to });
+                  openA({ kind: 'attendance-day', from: x.from, to: x.to });
                 }}
                 empty="Bu davrda davomat belgilanmagan"
               />
@@ -675,7 +736,7 @@ function Body({
           {/* Baho */}
           <Panel
             title="Baholar"
-            right={<button type="button" onClick={() => open({ kind: 'grades-classes' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">Barcha sinflar</button>}
+            right={<button type="button" onClick={() => openA({ kind: 'grades-classes' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">{cls ? "Barcha o'quvchilar" : 'Barcha sinflar'}</button>}
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
@@ -696,7 +757,7 @@ function Body({
                     sub: a.grades.count ? fmtPct(Math.round((a.grades.distribution[k] / a.grades.count) * 1000) / 10) : '0%',
                     bar: k === '5' ? 'bg-emerald-500' : k === '4' ? 'bg-sky-500' : k === '3' ? 'bg-amber-400' : 'bg-rose-500',
                   }))}
-                  onSelect={(x) => open({ kind: 'grades-value', key: x.id })}
+                  onSelect={(x) => openA({ kind: 'grades-value', key: x.id })}
                 />
               </div>
               <div className="min-w-0 space-y-4">
@@ -706,17 +767,17 @@ function Body({
                     limit={5}
                     max={5}
                     rows={a.grades.subjects.map((s) => ({ id: s.id, label: s.name, value: s.average, display: String(s.average).replace('.', ','), sub: `${s.count}`, bar: gradeBar(s.average) }))}
-                    onSelect={(s) => open({ kind: 'grades-subject', key: s.id })}
+                    onSelect={(s) => openA({ kind: 'grades-subject', key: s.id })}
                     empty="Bu davrda baho qo'yilmagan"
                   />
                 </div>
                 <div>
-                  <div className="mb-1 text-sm font-medium text-slate-600">Eng past o&apos;rtachali sinflar</div>
+                  <div className="mb-1 text-sm font-medium text-slate-600">Eng past o&apos;rtachali {cls ? "o'quvchilar" : 'sinflar'}</div>
                   <BarList
                     limit={4}
                     max={5}
-                    rows={a.grades.classes.map((c) => ({ id: c.id, label: c.name, value: c.average, display: String(c.average).replace('.', ','), sub: `${c.count}`, bar: gradeBar(c.average) }))}
-                    onSelect={(c) => open({ kind: 'grades-class', key: c.id })}
+                    rows={(cls ? a.grades.students : a.grades.classes).map((c) => ({ id: c.id, label: c.name, value: c.average, display: String(c.average).replace('.', ','), sub: `${c.count}`, bar: gradeBar(c.average) }))}
+                    onSelect={(c) => (cls ? router.push(`/students/${c.id}`) : openA({ kind: 'grades-class', key: c.id }))}
                     empty="—"
                   />
                 </div>
@@ -727,7 +788,7 @@ function Body({
           {/* Coin */}
           <Panel
             title="Coin (rag'bat ballari)"
-            right={<button type="button" onClick={() => open({ kind: 'coins' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">Barcha o&apos;quvchilar</button>}
+            right={<button type="button" onClick={() => openA({ kind: 'coins' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">Barcha o&apos;quvchilar</button>}
           >
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -735,7 +796,7 @@ function Body({
                 { l: 'Ayirildi', v: `−${fmt(a.coins.spent)}`, c: 'text-rose-600' },
                 { l: 'Natija', v: fmtSigned(a.coins.net), c: 'text-slate-900' },
               ].map((k) => (
-                <button key={k.l} type="button" onClick={() => open({ kind: 'coins' })} className="rounded-xl bg-slate-50 px-3 py-2 text-left hover:bg-slate-100">
+                <button key={k.l} type="button" onClick={() => openA({ kind: 'coins' })} className="rounded-xl bg-slate-50 px-3 py-2 text-left hover:bg-slate-100">
                   <div className="text-xs uppercase tracking-wide text-slate-500">{k.l}</div>
                   <div className={`text-xl font-bold ${k.c}`}>{k.v}</div>
                 </button>
@@ -754,7 +815,7 @@ function Body({
                 axis={(n) => fmt(n)}
                 onSelect={(it) => {
                   const x = a.coins.trend.find((y) => y.from === it.id)!;
-                  open({ kind: 'coins', from: x.from, to: x.to });
+                  openA({ kind: 'coins', from: x.from, to: x.to });
                 }}
                 empty="Bu davrda coin berilmagan"
               />
@@ -779,11 +840,15 @@ function Body({
                 )}
               </div>
               <div className="min-w-0">
-                <div className="mb-1 text-sm font-medium text-slate-600">Sinflar (natija)</div>
+                <div className="mb-1 text-sm font-medium text-slate-600">{cls ? "O'quvchilar (natija)" : 'Sinflar (natija)'}</div>
                 <BarList
                   limit={5}
-                  rows={a.coins.classes.map((c) => ({ id: c.id, label: c.name, value: Math.max(0, c.net), display: fmtSigned(c.net), sub: `${c.students} o'q.`, bar: 'bg-amber-400' }))}
-                  onSelect={(c) => open({ kind: 'coins-class', key: c.id })}
+                  rows={
+                    cls
+                      ? a.coins.studentList.map((s) => ({ id: s.id, label: s.name, value: Math.max(0, s.net), display: fmtSigned(s.net), sub: `+${s.earned}`, bar: 'bg-amber-400' }))
+                      : a.coins.classes.map((c) => ({ id: c.id, label: c.name, value: Math.max(0, c.net), display: fmtSigned(c.net), sub: `${c.students} o'q.`, bar: 'bg-amber-400' }))
+                  }
+                  onSelect={(c) => (cls ? router.push(`/students/${c.id}`) : openA({ kind: 'coins-class', key: c.id }))}
                   empty="—"
                 />
               </div>
@@ -793,7 +858,7 @@ function Body({
           {/* Ahloq */}
           <Panel
             title={<>Ahloqiy baholar <span className="text-sm font-normal text-slate-500">· {a.behavior.monthLabel}</span></>}
-            right={<button type="button" onClick={() => open({ kind: 'behavior', key: 'all' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">Barcha o&apos;quvchilar</button>}
+            right={<button type="button" onClick={() => openA({ kind: 'behavior', key: 'all' })} className="text-sm font-medium text-blue-700 underline underline-offset-2">Barcha o&apos;quvchilar</button>}
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
@@ -812,7 +877,7 @@ function Body({
                       { key: 'mid', label: '50–79', value: a.behavior.buckets.mid, stroke: 'stroke-amber-400', dot: 'bg-amber-400' },
                       { key: 'low', label: '0–49', value: a.behavior.buckets.low, stroke: 'stroke-rose-500', dot: 'bg-rose-500' },
                     ]}
-                    onSelect={(s) => open({ kind: 'behavior', key: s.key })}
+                    onSelect={(s) => openA({ kind: 'behavior', key: s.key })}
                   />
                 </div>
               </div>
@@ -828,17 +893,21 @@ function Body({
                     onSelect={(it) => {
                       const [y, m] = it.id.split('-').map(Number);
                       const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-                      open({ kind: 'behavior', key: 'all', from: `${it.id}-01`, to: last });
+                      openA({ kind: 'behavior', key: 'all', from: `${it.id}-01`, to: last });
                     }}
                   />
                 </div>
                 <div>
-                  <div className="mb-1 text-sm font-medium text-slate-600">Eng past ballli sinflar</div>
+                  <div className="mb-1 text-sm font-medium text-slate-600">Eng past ballli {cls ? "o'quvchilar" : 'sinflar'}</div>
                   <BarList
                     limit={4}
                     max={a.behavior.limit}
-                    rows={a.behavior.classes.map((c) => ({ id: c.id, label: c.name, value: c.average, display: String(c.average).replace('.', ','), sub: `−${c.deducted}`, bar: scoreBar(c.average) }))}
-                    onSelect={(c) => open({ kind: 'behavior-class', key: c.id })}
+                    rows={
+                      cls
+                        ? a.behavior.studentList.map((s) => ({ id: s.id, label: s.name, value: s.remaining, display: String(s.remaining), sub: s.deducted ? `−${s.deducted}` : '', bar: scoreBar(s.remaining) }))
+                        : a.behavior.classes.map((c) => ({ id: c.id, label: c.name, value: c.average, display: String(c.average).replace('.', ','), sub: `−${c.deducted}`, bar: scoreBar(c.average) }))
+                    }
+                    onSelect={(c) => (cls ? router.push(`/students/${c.id}`) : openA({ kind: 'behavior-class', key: c.id }))}
                     empty="—"
                   />
                 </div>
@@ -846,6 +915,7 @@ function Body({
             </div>
           </Panel>
         </div>
+        )}
       </Section>
     </div>
   );

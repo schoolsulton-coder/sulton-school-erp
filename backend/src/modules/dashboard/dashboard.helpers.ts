@@ -33,6 +33,9 @@ export const ENROLLED_STATUSES: ContractStatus[] = ['ACTIVE', 'COMPLETED', 'SUSP
 export const LEFT_STATUSES: ContractStatus[] = ['CANCELLED', 'LEFT', 'INACTIVE'];
 /** Davr o'rtachasi uchun kundalik baholar (chorak/yillik yakuniy baholar ikki marta sanalmasin) */
 export const GRADE_TYPES: GradeType[] = ['DAILY', 'HOMEWORK', 'EXAM'];
+/** Baho shkalasi 1–5 — undan tashqaridagi qiymatlar (import xatolari) o'rtachani buzmasin */
+export const GRADE_MIN = 1;
+export const GRADE_MAX = 5;
 
 export const dayStart = (s: string) => dayFromStr(s);
 export const dayEnd = (s: string) => new Date(`${s.slice(0, 10)}T23:59:59.999Z`);

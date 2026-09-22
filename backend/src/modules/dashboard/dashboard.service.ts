@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -9,6 +9,8 @@ import { DashboardQueries } from './dashboard.queries';
 import {
   AGE_BUCKETS,
   Ctx,
+  GRADE_MAX,
+  GRADE_MIN,
   GRADE_TYPES,
   Range,
   academicYearOf,
@@ -76,7 +78,7 @@ export class DashboardService {
       this.prisma.student.count({ where: this.q.enrolledWhere(nextYear, b) }),
       this.prisma.class.findMany({
         where: { academicYear: year, status: { not: 'Arxiv' }, ...(b ? { branchId: b } : {}) },
-        select: { capacity: true },
+        select: { id: true, name: true, language: true, capacity: true },
       }),
       this.prisma.contract.findMany({ where: this.q.leftWhere(c, b), select: { studentId: true }, distinct: ['studentId'] }),
       this.prisma.contract.findMany({ where: this.q.leftWhere(c.prev, b), select: { studentId: true }, distinct: ['studentId'] }),
@@ -238,6 +240,10 @@ export class DashboardService {
       period: { from: c.from, to: c.to, days: c.days, prevFrom: c.prev.from, prevTo: c.prev.to, bucketDays: c.bucketDays },
       branchId: b ?? null,
       branches,
+      // O'quv jarayoni sinf filtri uchun — joriy o'quv yili sinflari
+      classes: classes
+        .map((x) => ({ id: x.id, name: x.language ? `${x.name} (${x.language})` : x.name }))
+        .sort((x, y) => x.name.localeCompare(y.name, 'uz', { numeric: true })),
       alerts: this.alerts({ today, result, supOver30, academic }),
       today,
       aging: {
@@ -362,22 +368,46 @@ export class DashboardService {
 
   // ======================= O'QUV JARAYONI =======================
 
-  private async academic(c: Ctx, b?: string) {
+  /** O'quv jarayoni bo'limi — filial va (ixtiyoriy) bitta sinf bo'yicha; moliya qismi qayta hisoblanmaydi */
+  async academicScoped(query: { from?: string; to?: string; branchId?: string; classId?: string }) {
+    const c = resolveCtx(query);
+    const classId = query.classId || undefined;
+    const cls = classId
+      ? await this.prisma.class.findUnique({ where: { id: classId }, select: { id: true, name: true, language: true } })
+      : null;
+    if (classId && !cls) throw new BadRequestException('Sinf topilmadi');
+    const academic = await this.academic(c, c.branchId, classId);
+    return {
+      ...academic,
+      scope: cls ? { classId: cls.id, className: cls.language ? `${cls.name} (${cls.language})` : cls.name } : null,
+    };
+  }
+
+  private async academic(c: Ctx, b?: string, classId?: string) {
     const [attendance, grades, coins, behavior] = await Promise.all([
-      this.attendance(c, b),
-      this.grades(c, b),
-      this.coins(c, b),
-      this.behavior(c, b),
+      this.attendance(c, b, classId),
+      this.grades(c, b, classId),
+      this.coins(c, b, classId),
+      this.behavior(c, b, classId),
     ]);
     return { attendance, grades, coins, behavior };
   }
 
-  private async attendance(c: Ctx, b?: string) {
-    const w = this.q.attendanceWhere(c, b);
-    const [byDay, byClass, prevRows] = await Promise.all([
+  private async studentNames(ids: string[]) {
+    if (!ids.length) return new Map<string, string>();
+    const list = await this.prisma.student.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true } });
+    return new Map(list.map((s) => [s.id, fullName(s)]));
+  }
+
+  private async attendance(c: Ctx, b?: string, classId?: string) {
+    const w = this.q.attendanceWhere(c, b, classId);
+    const [byDay, byGroup, prevRows] = await Promise.all([
       this.prisma.attendance.groupBy({ by: ['date', 'status'], where: w, _count: { _all: true } }),
-      this.prisma.attendance.groupBy({ by: ['classId', 'status'], where: w, _count: { _all: true } }),
-      this.prisma.attendance.groupBy({ by: ['status'], where: this.q.attendanceWhere(c.prev, b), _count: { _all: true } }),
+      // Sinf tanlangan bo'lsa — o'quvchilar kesimi, aks holda sinflar kesimi
+      classId
+        ? this.prisma.attendance.groupBy({ by: ['studentId', 'status'], where: w, _count: { _all: true } })
+        : this.prisma.attendance.groupBy({ by: ['classId', 'status'], where: w, _count: { _all: true } }),
+      this.prisma.attendance.groupBy({ by: ['status'], where: this.q.attendanceWhere(c.prev, b, classId), _count: { _all: true } }),
     ]);
     const total = attBlank();
     const prev = attBlank();
@@ -392,15 +422,22 @@ export class DashboardService {
       attAdd(buckets[bucketIndex(r.date, c.from, size, buckets.length)], r.status, r._count._all);
     }
 
-    const cls = new Map<string, ReturnType<typeof attBlank>>();
-    for (const r of byClass) {
-      if (!r.classId) continue;
-      const a = cls.get(r.classId) ?? attBlank();
+    const groups = new Map<string, ReturnType<typeof attBlank>>();
+    for (const r of byGroup as { studentId?: string; classId?: string | null; status: string; _count: { _all: number } }[]) {
+      const id = classId ? r.studentId : r.classId;
+      if (!id) continue;
+      const a = groups.get(id) ?? attBlank();
       attAdd(a, r.status, r._count._all);
-      cls.set(r.classId, a);
+      groups.set(id, a);
     }
-    const names = await this.prisma.class.findMany({ where: { id: { in: [...cls.keys()] } }, select: { id: true, name: true } });
-    const nameOf = new Map(names.map((n) => [n.id, n.name]));
+    const nameOf = classId
+      ? await this.studentNames([...groups.keys()])
+      : new Map(
+          (await this.prisma.class.findMany({ where: { id: { in: [...groups.keys()] } }, select: { id: true, name: true } })).map((n) => [n.id, n.name]),
+        );
+    const rows = [...groups.entries()]
+      .map(([id, a]) => ({ id, name: nameOf.get(id) ?? '—', rate: attRate(a), total: a.total, absent: a.absent, late: a.late }))
+      .sort((x, y) => x.rate - y.rate || y.absent - x.absent);
 
     const rate = attRate(total, 1);
     const prevRate = attRate(prev, 1);
@@ -413,28 +450,30 @@ export class DashboardService {
       trend: buckets
         .filter((x) => x.total > 0)
         .map((x) => ({ from: x.from, to: x.to, rate: attRate(x, 1), total: x.total, absent: x.absent, late: x.late, excused: x.excused })),
-      classes: [...cls.entries()]
-        .map(([id, a]) => ({ id, name: nameOf.get(id) ?? '—', rate: attRate(a), total: a.total, absent: a.absent, late: a.late }))
-        .sort((x, y) => x.rate - y.rate || y.absent - x.absent),
+      classes: classId ? [] : rows,
+      students: classId ? rows : [],
     };
   }
 
-  private async grades(c: Ctx, b?: string) {
-    const w = this.q.gradeWhere(c, b);
-    const [agg, prevAgg, dist, bySubject, byClass] = await Promise.all([
+  private async grades(c: Ctx, b?: string, classId?: string) {
+    const w = this.q.gradeWhere(c, b, classId);
+    const [agg, prevAgg, dist, bySubject, byGroup] = await Promise.all([
       this.prisma.grade.aggregate({ where: w, _avg: { value: true }, _count: { _all: true } }),
-      this.prisma.grade.aggregate({ where: this.q.gradeWhere(c.prev, b), _avg: { value: true } }),
+      this.prisma.grade.aggregate({ where: this.q.gradeWhere(c.prev, b, classId), _avg: { value: true } }),
       this.prisma.grade.groupBy({ by: ['value'], where: w, _count: { _all: true } }),
       this.prisma.grade.groupBy({ by: ['subjectId'], where: w, _avg: { value: true }, _count: { _all: true } }),
-      this.prisma.$queryRaw<{ id: string; name: string; average: number; count: number }[]>`
-        SELECT s."classId" AS id, cl.name, AVG(g.value)::float8 AS average, COUNT(*)::int AS count
-        FROM grades g
-        JOIN students s ON s.id = g."studentId"
-        JOIN classes cl ON cl.id = s."classId"
-        WHERE g.date >= ${dayStart(c.from)} AND g.date <= ${dayEnd(c.to)}
-          AND g.type::text IN (${Prisma.join(GRADE_TYPES)})
-          ${b ? Prisma.sql`AND s."branchId" = ${b}` : Prisma.empty}
-        GROUP BY s."classId", cl.name`,
+      classId
+        ? this.prisma.grade.groupBy({ by: ['studentId'], where: w, _avg: { value: true }, _count: { _all: true } })
+        : this.prisma.$queryRaw<{ id: string; name: string; average: number; count: number }[]>`
+            SELECT s."classId" AS id, cl.name, AVG(g.value)::float8 AS average, COUNT(*)::int AS count
+            FROM grades g
+            JOIN students s ON s.id = g."studentId"
+            JOIN classes cl ON cl.id = s."classId"
+            WHERE g.date >= ${dayStart(c.from)} AND g.date <= ${dayEnd(c.to)}
+              AND g.type::text IN (${Prisma.join(GRADE_TYPES)})
+              AND g.value BETWEEN ${GRADE_MIN} AND ${GRADE_MAX}
+              ${b ? Prisma.sql`AND s."branchId" = ${b}` : Prisma.empty}
+            GROUP BY s."classId", cl.name`,
     ]);
     const subjects = await this.prisma.subject.findMany({
       where: { id: { in: bySubject.map((x) => x.subjectId) } },
@@ -446,6 +485,15 @@ export class DashboardService {
       const k = String(Math.min(5, Math.max(1, Math.round(r.value)))) as keyof typeof distribution;
       distribution[k] += r._count._all;
     }
+    let rows: { id: string; name: string; average: number; count: number }[];
+    if (classId) {
+      const g = byGroup as { studentId: string; _avg: { value: number | null }; _count: { _all: number } }[];
+      const names = await this.studentNames(g.map((x) => x.studentId));
+      rows = g.map((x) => ({ id: x.studentId, name: names.get(x.studentId) ?? '—', average: round(x._avg.value ?? 0, 2), count: x._count._all }));
+    } else {
+      rows = (byGroup as { id: string; name: string; average: number; count: number }[]).map((x) => ({ ...x, average: round(x.average, 2) }));
+    }
+    rows.sort((x, y) => x.average - y.average);
     const average = round(agg._avg.value ?? 0, 2);
     const prev = round(prevAgg._avg.value ?? 0, 2);
     return {
@@ -459,13 +507,14 @@ export class DashboardService {
       subjects: bySubject
         .map((s) => ({ id: s.subjectId, name: subjectName.get(s.subjectId) ?? '—', average: round(s._avg.value ?? 0, 2), count: s._count._all }))
         .sort((x, y) => y.average - x.average),
-      classes: byClass.map((x) => ({ ...x, average: round(x.average, 2) })).sort((x, y) => x.average - y.average),
+      classes: classId ? [] : rows,
+      students: classId ? rows : [],
     };
   }
 
-  private async coins(c: Ctx, b?: string) {
+  private async coins(c: Ctx, b?: string, classId?: string) {
     const rows = await this.prisma.coinRecord.findMany({
-      where: this.q.coinWhere(c, b),
+      where: this.q.coinWhere(c, b, classId),
       select: { studentId: true, amount: true, date: true },
     });
     const ranges = makeBuckets(c.from, c.to, c.bucketDays);
@@ -494,7 +543,7 @@ export class DashboardService {
         })
       : [];
     const cls = new Map<string, { id: string; name: string; earned: number; spent: number; students: number }>();
-    const top = students.map((s) => {
+    const list = students.map((s) => {
       const m = per.get(s.id)!;
       if (s.classId) {
         const x = cls.get(s.classId) ?? { id: s.classId, name: s.class?.name ?? '—', earned: 0, spent: 0, students: 0 };
@@ -512,18 +561,19 @@ export class DashboardService {
       records: rows.length,
       students: per.size,
       trend,
-      topStudents: top.sort((x, y) => y.earned - x.earned).slice(0, 5),
-      classes: [...cls.values()].map((x) => ({ ...x, net: x.earned - x.spent })).sort((x, y) => y.net - x.net),
+      topStudents: [...list].sort((x, y) => y.earned - x.earned).slice(0, 5),
+      classes: classId ? [] : [...cls.values()].map((x) => ({ ...x, net: x.earned - x.spent })).sort((x, y) => y.net - x.net),
+      studentList: classId ? list.sort((x, y) => y.net - x.net) : [],
     };
   }
 
   /** Ahloq — tanlangan davr oxiridagi oy (har o'quvchiga 100 ball, faqat ayirish) + oxirgi 6 oy */
-  private async behavior(c: Ctx, b?: string) {
+  private async behavior(c: Ctx, b?: string, classId?: string) {
     const month = c.to.slice(0, 7);
     const months = Array.from({ length: 6 }, (_, i) => shiftMonth(month, i - 5));
     const students = await this.prisma.student.findMany({
-      where: { status: 'ACTIVE', classId: { not: null }, ...(b ? { branchId: b } : {}) },
-      select: { id: true, classId: true, class: { select: { name: true } } },
+      where: { status: 'ACTIVE', classId: classId ?? { not: null }, ...(b ? { branchId: b } : {}) },
+      select: { id: true, firstName: true, lastName: true, classId: true, class: { select: { name: true } } },
     });
     const ids = students.map((s) => s.id);
     const records = ids.length
@@ -546,13 +596,14 @@ export class DashboardService {
     const cur = byMonth.get(month)!;
     const buckets = { full: 0, good: 0, mid: 0, low: 0 };
     const cls = new Map<string, { id: string; name: string; sum: number; students: number; deducted: number }>();
+    const list: { id: string; name: string; remaining: number; deducted: number }[] = [];
     let sum = 0;
     let totalDeducted = 0;
     for (const s of students) {
-      const ded = cur.get(s.id) ?? 0;
+      const ded = Math.min(L, cur.get(s.id) ?? 0);
       const rem = remainingOf(ded);
       sum += rem;
-      totalDeducted += Math.min(L, ded);
+      totalDeducted += ded;
       if (rem >= L) buckets.full++;
       else if (rem >= 80) buckets.good++;
       else if (rem >= 50) buckets.mid++;
@@ -560,8 +611,9 @@ export class DashboardService {
       const x = cls.get(s.classId!) ?? { id: s.classId!, name: s.class?.name ?? '—', sum: 0, students: 0, deducted: 0 };
       x.sum += rem;
       x.students++;
-      x.deducted += Math.min(L, ded);
+      x.deducted += ded;
       cls.set(s.classId!, x);
+      if (classId) list.push({ id: s.id, name: fullName(s), remaining: rem, deducted: ded });
     }
     const n = students.length;
     return {
@@ -573,9 +625,12 @@ export class DashboardService {
       totalDeducted,
       withDeductions: n - buckets.full,
       buckets,
-      classes: [...cls.values()]
-        .map((x) => ({ id: x.id, name: x.name, students: x.students, deducted: x.deducted, average: round(x.sum / x.students, 1) }))
-        .sort((a, z) => a.average - z.average),
+      classes: classId
+        ? []
+        : [...cls.values()]
+            .map((x) => ({ id: x.id, name: x.name, students: x.students, deducted: x.deducted, average: round(x.sum / x.students, 1) }))
+            .sort((a, z) => a.average - z.average),
+      studentList: list.sort((a, z) => a.remaining - z.remaining || a.name.localeCompare(z.name)),
       history: months.map((m) => {
         const mm = byMonth.get(m)!;
         const total = students.reduce((s, st) => s + remainingOf(mm.get(st.id) ?? 0), 0);

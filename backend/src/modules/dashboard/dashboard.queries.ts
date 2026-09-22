@@ -5,6 +5,8 @@ import { schoolToday } from '../../common/schedule-weeks';
 import {
   DAY_MS,
   ENROLLED_STATUSES,
+  GRADE_MAX,
+  GRADE_MIN,
   GRADE_TYPES,
   LEFT_STATUSES,
   Range,
@@ -179,25 +181,34 @@ export class DashboardQueries {
     };
   }
 
-  attendanceWhere(p: Range, branchId?: string): Prisma.AttendanceWhereInput {
+  /** Talaba filtri: filial va (ixtiyoriy) sinf */
+  private studentScope(branchId?: string, classId?: string) {
+    if (!branchId && !classId) return {};
+    return { student: { ...(branchId ? { branchId } : {}), ...(classId ? { classId } : {}) } };
+  }
+
+  /** Davomat: sinf — belgilangan paytdagi sinf (Attendance.classId) */
+  attendanceWhere(p: Range, branchId?: string, classId?: string): Prisma.AttendanceWhereInput {
     return {
       date: { gte: dayStart(p.from), lte: dayEnd(p.to) },
+      ...(classId ? { classId } : {}),
       ...(branchId ? { student: { branchId } } : {}),
     };
   }
 
-  gradeWhere(p: Range, branchId?: string): Prisma.GradeWhereInput {
+  gradeWhere(p: Range, branchId?: string, classId?: string): Prisma.GradeWhereInput {
     return {
       date: { gte: dayStart(p.from), lte: dayEnd(p.to) },
       type: { in: GRADE_TYPES },
-      ...(branchId ? { student: { branchId } } : {}),
+      value: { gte: GRADE_MIN, lte: GRADE_MAX },
+      ...this.studentScope(branchId, classId),
     };
   }
 
-  coinWhere(p: Range, branchId?: string): Prisma.CoinRecordWhereInput {
+  coinWhere(p: Range, branchId?: string, classId?: string): Prisma.CoinRecordWhereInput {
     return {
       date: { gte: dayStart(p.from), lte: dayEnd(p.to) },
-      ...(branchId ? { student: { branchId } } : {}),
+      ...this.studentScope(branchId, classId),
     };
   }
 

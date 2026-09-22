@@ -7,6 +7,8 @@ import { MONTHLY_BEHAVIOR_POINTS, monthLabel, monthRange } from '../behavior/beh
 import { DashboardQueries } from './dashboard.queries';
 import {
   EXPENSE_STATUS_LABEL,
+  GRADE_MAX,
+  GRADE_MIN,
   GRADE_TYPES,
   academicYearOf,
   ageBucket,
@@ -72,10 +74,21 @@ export class DashboardDetailService {
     return { title, columns, rows: rows.slice(0, LIMIT), total: rows.length, truncated: rows.length > LIMIT, ...extra };
   }
 
-  async detail(kind: string, query: { from?: string; to?: string; branchId?: string; key?: string }): Promise<DetailResult> {
+  async detail(
+    kindIn: string,
+    query: { from?: string; to?: string; branchId?: string; key?: string; classId?: string },
+  ): Promise<DetailResult> {
     const c = resolveCtx(query);
     const b = c.branchId;
-    const key = query.key ?? '';
+    let kind = kindIn;
+    let key = query.key ?? '';
+    // O'quv jarayoni sinf filtri: "barcha sinflar" ro'yxatlari shu sinf o'quvchilariga aylanadi
+    const classId = query.classId || undefined;
+    const TO_CLASS: Record<string, string> = { 'attendance-classes': 'attendance-class', 'grades-classes': 'grades-class', coins: 'coins-class' };
+    if (classId && TO_CLASS[kind]) {
+      kind = TO_CLASS[kind];
+      key = classId;
+    }
     const period = span(c.from, c.to);
 
     switch (kind) {
@@ -742,7 +755,7 @@ export class DashboardDetailService {
 
       case 'attendance-day': {
         const list = await this.prisma.attendance.findMany({
-          where: { ...this.q.attendanceWhere(c, b), status: { not: 'PRESENT' } },
+          where: { ...this.q.attendanceWhere(c, b, classId), status: { not: 'PRESENT' } },
           select: {
             date: true,
             status: true,
@@ -778,6 +791,31 @@ export class DashboardDetailService {
       case 'grades-subject': {
         const subject = kind === 'grades-subject' ? await this.prisma.subject.findUnique({ where: { id: key }, select: { name: true } }) : null;
         if (kind === 'grades-subject' && !subject) throw new BadRequestException('Fan topilmadi');
+        if (subject && classId) {
+          // Sinf tanlangan: shu fan bo'yicha sinf o'quvchilari
+          const g = await this.prisma.grade.groupBy({
+            by: ['studentId'],
+            where: { ...this.q.gradeWhere(c, b, classId), subjectId: key },
+            _avg: { value: true },
+            _count: { _all: true },
+          });
+          const st = await this.prisma.student.findMany({ where: { id: { in: g.map((x) => x.studentId) } }, select: { id: true, firstName: true, lastName: true } });
+          const sm = new Map(st.map((x) => [x.id, x]));
+          const rows = g
+            .filter((x) => sm.has(x.studentId))
+            .map((x) => ({ student: fullName(sm.get(x.studentId)!), average: round(x._avg.value ?? 0, 2), count: x._count._all, _href: `/students/${x.studentId}` }))
+            .sort((x, y) => x.average - y.average);
+          return this.out(
+            `Baholar · ${subject.name}`,
+            [
+              { key: 'student', label: "O'quvchi" },
+              { key: 'average', label: "O'rtacha", type: 'num' },
+              { key: 'count', label: 'Baholar', type: 'int' },
+            ],
+            rows,
+            { subtitle: period },
+          );
+        }
         const list = await this.prisma.$queryRaw<{ id: string; name: string; average: number; count: number; fives: number; fails: number }[]>`
           SELECT s."classId" AS id, cl.name, AVG(g.value)::float8 AS average, COUNT(*)::int AS count,
             (COUNT(*) FILTER (WHERE g.value >= 4.5))::int AS fives, (COUNT(*) FILTER (WHERE g.value < 3))::int AS fails
@@ -786,6 +824,7 @@ export class DashboardDetailService {
           JOIN classes cl ON cl.id = s."classId"
           WHERE g.date >= ${dayStart(c.from)} AND g.date <= ${dayEnd(c.to)}
             AND g.type::text IN (${Prisma.join(GRADE_TYPES)})
+            AND g.value BETWEEN ${GRADE_MIN} AND ${GRADE_MAX}
             ${subject ? Prisma.sql`AND g."subjectId" = ${key}` : Prisma.empty}
             ${b ? Prisma.sql`AND s."branchId" = ${b}` : Prisma.empty}
           GROUP BY s."classId", cl.name`;
@@ -822,8 +861,7 @@ export class DashboardDetailService {
         const v = Number(key);
         if (kind === 'grades-value' && !(v >= 1 && v <= 5)) throw new BadRequestException("Baho 1–5 bo'lishi kerak");
         const where: Prisma.GradeWhereInput = {
-          ...this.q.gradeWhere(c, b),
-          ...(cls ? { student: { classId: key, ...(b ? { branchId: b } : {}) } } : {}),
+          ...this.q.gradeWhere(c, b, cls ? key : classId),
           ...(kind === 'grades-value' ? { value: { gte: v - 0.5, lt: v + 0.5 } } : {}),
         };
         const g = await this.prisma.grade.groupBy({ by: ['studentId'], where, _avg: { value: true }, _count: { _all: true } });
@@ -866,8 +904,7 @@ export class DashboardDetailService {
       case 'coins':
       case 'coins-class': {
         const where: Prisma.CoinRecordWhereInput = {
-          ...this.q.coinWhere(c, b),
-          ...(kind === 'coins-class' ? { student: { classId: key, ...(b ? { branchId: b } : {}) } } : {}),
+          ...this.q.coinWhere(c, b, kind === 'coins-class' ? key : undefined),
         };
         const [plus, minus] = await Promise.all([
           this.prisma.coinRecord.groupBy({ by: ['studentId'], where: { ...where, amount: { gt: 0 } }, _sum: { amount: true } }),
@@ -908,7 +945,7 @@ export class DashboardDetailService {
         const students = await this.prisma.student.findMany({
           where: {
             status: 'ACTIVE',
-            classId: kind === 'behavior-class' ? key : { not: null },
+            classId: kind === 'behavior-class' ? key : classId ?? { not: null },
             ...(b ? { branchId: b } : {}),
           },
           select: { id: true, firstName: true, lastName: true, class: { select: { name: true } } },

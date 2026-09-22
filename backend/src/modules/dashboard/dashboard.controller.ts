@@ -26,6 +26,18 @@ export class DashboardController {
     return this.service.ceo({ from, to, branchId });
   }
 
+  /** O'quv jarayoni bo'limi — sinf filtri bilan (moliya qismi qayta hisoblanmaydi) */
+  @Get('ceo/academic')
+  @Permissions('reports.view')
+  academic(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branchId') branchId?: string,
+    @Query('classId') classId?: string,
+  ) {
+    return this.service.academicScoped({ from, to, branchId, classId });
+  }
+
   /** Karta / qator bosilganda — o'sha ko'rsatkichning yozuvlari */
   @Get('ceo/detail')
   @Permissions('reports.view')
@@ -35,8 +47,9 @@ export class DashboardController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('branchId') branchId?: string,
+    @Query('classId') classId?: string,
   ) {
-    return this.details.detail(kind, { key, from, to, branchId });
+    return this.details.detail(kind, { key, from, to, branchId, classId });
   }
 
   @Get('ceo/export')

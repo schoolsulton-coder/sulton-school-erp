@@ -39,6 +39,8 @@ export interface CeoDashboard {
   period: { from: string; to: string; days: number; prevFrom: string; prevTo: string; bucketDays: number };
   branchId: string | null;
   branches: { id: string; name: string }[];
+  /** joriy o'quv yili sinflari (filial bo'yicha) — O'quv jarayoni sinf filtri */
+  classes: { id: string; name: string }[];
   alerts: DashAlert[];
   today: {
     cash: { som: number; usd: number; somPending: number; usdPending: number; somConfirmed: number; usdConfirmed: number; accounts: number };
@@ -81,6 +83,8 @@ export interface CeoDashboard {
       trendSize: number;
       trend: { from: string; to: string; rate: number; total: number; absent: number; late: number; excused: number }[];
       classes: { id: string; name: string; rate: number; total: number; absent: number; late: number }[];
+      /** sinf tanlanganda — o'quvchilar kesimi */
+      students: { id: string; name: string; rate: number; total: number; absent: number; late: number }[];
     };
     grades: {
       average: number;
@@ -92,6 +96,7 @@ export interface CeoDashboard {
       failPct: number;
       subjects: { id: string; name: string; average: number; count: number }[];
       classes: { id: string; name: string; average: number; count: number }[];
+      students: { id: string; name: string; average: number; count: number }[];
     };
     coins: {
       earned: number;
@@ -102,6 +107,7 @@ export interface CeoDashboard {
       trend: { from: string; to: string; earned: number; spent: number }[];
       topStudents: { id: string; name: string; className: string | null; earned: number; spent: number; net: number }[];
       classes: { id: string; name: string; earned: number; spent: number; net: number; students: number }[];
+      studentList: { id: string; name: string; className: string | null; earned: number; spent: number; net: number }[];
     };
     behavior: {
       month: string;
@@ -113,10 +119,13 @@ export interface CeoDashboard {
       withDeductions: number;
       buckets: { full: number; good: number; mid: number; low: number };
       classes: { id: string; name: string; students: number; deducted: number; average: number }[];
+      studentList: { id: string; name: string; remaining: number; deducted: number }[];
       history: { month: string; label: string; average: number }[];
     };
   };
 }
+
+export type AcademicData = CeoDashboard['academic'] & { scope?: { classId: string; className: string } | null };
 
 export type ColType = 'text' | 'money' | 'int' | 'num' | 'pct' | 'date' | 'badge';
 export interface DetailData {
@@ -133,12 +142,16 @@ export interface DetailData {
 export interface DetailReq {
   kind: string;
   key?: string;
+  /** O'quv jarayoni sinf filtri */
+  classId?: string;
   from?: string;
   to?: string;
 }
 
 export const dashboardApi = {
   ceo: (p: DashParams) => api.get<CeoDashboard>('/dashboard/ceo', { params: p }).then((r) => r.data),
+  academic: (p: DashParams & { classId: string }) =>
+    api.get<AcademicData>('/dashboard/ceo/academic', { params: p }).then((r) => r.data),
   detail: (p: DashParams & DetailReq) => api.get<DetailData>('/dashboard/ceo/detail', { params: p }).then((r) => r.data),
   exportXlsx: async (p: DashParams) => {
     const res = await api.get('/dashboard/ceo/export', { params: p, responseType: 'blob' });
