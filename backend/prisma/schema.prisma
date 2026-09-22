@@ -624,6 +624,7 @@ model Contract {
   discountId    String?
   discount      Discount?      @relation(fields: [discountId], references: [id])
   status        ContractStatus @default(DRAFT)
+  statusChangedAt DateTime? // holat qo'lda o'zgargan vaqt (tahrirlash / bekor qilish) — "Ketganlar" hisobi uchun
   pdfPath       String?
 
   installments ContractInstallment[]

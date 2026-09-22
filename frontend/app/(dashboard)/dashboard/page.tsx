@@ -6,8 +6,15 @@ import { useAuthStore } from '@/store/auth';
 import { financeApi, money } from '@/lib/finance';
 import { crmApi } from '@/lib/crm';
 import { classesApi } from '@/lib/classes';
+import { CeoDashboard } from '@/components/dashboard/ceo-dashboard';
 
+/** Rahbariyat (Hisobotlar ruxsati) — CEO Dashboard; qolganlar uchun — qisqa bosh sahifa */
 export default function DashboardHome() {
+  const can = useAuthStore((s) => s.can);
+  return can('reports.view') ? <CeoDashboard /> : <Greeting />;
+}
+
+function Greeting() {
   const user = useAuthStore((s) => s.user);
   const can = useAuthStore((s) => s.can);
 

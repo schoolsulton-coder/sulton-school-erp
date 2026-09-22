@@ -517,7 +517,7 @@ export class ContractsService {
     await this.findOne(id);
     return this.prisma.contract.update({
       where: { id },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', statusChangedAt: new Date() },
     });
   }
 
@@ -551,6 +551,7 @@ export class ContractsService {
     // Shartnoma darajasidagi o'zgarishlar
     const data: any = {};
     if (dto.status !== undefined) data.status = dto.status;
+    if (dto.status !== undefined && dto.status !== contract.status) data.statusChangedAt = new Date();
     if (dto.type !== undefined) data.type = dto.type;
     if (dto.category !== undefined) data.category = dto.category.trim() || null;
     if (dto.monthlyAmount !== undefined) data.monthlyAmount = dto.monthlyAmount;

@@ -29,6 +29,7 @@ import { DebtorsModule } from './modules/debtors/debtors.module';
 import { CounterpartiesModule } from './modules/counterparties/counterparties.module';
 import { FlowAccountsModule } from './modules/flow-accounts/flow-accounts.module';
 import { InternalTransfersModule } from './modules/internal-transfers/internal-transfers.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 /**
  * So'rov yo'lini oladi (global prefiks bilan, masalan "/api/auth/login").
@@ -130,6 +131,7 @@ function clientIp(req: Record<string, any>): string {
     CounterpartiesModule,
     FlowAccountsModule,
     InternalTransfersModule,
+    DashboardModule,
     // Barcha asosiy modullar ulandi 🎉
     // GradesModule, AttendanceModule, HomeworkModule, BehaviorModule,
     // NotificationsModule, TelegramModule, EsmaktabModule, ReportsModule

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './logo';
 import {
+  LayoutDashboard,
   ShieldCheck,
   FileText,
   CircleDollarSign,
@@ -38,6 +39,7 @@ interface Group {
 
 // Asosiy menyu (rasmga mos tartib)
 const MENU: Item[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, perm: 'reports.view' },
   { href: '/crm', label: 'Qabulxona', icon: ShieldCheck, perm: 'crm.view' },
   { href: '/contracts', label: 'Shartnomalar', icon: FileText, perm: 'contracts.view' },
   { href: '/payments', label: "To'lovlar", icon: CircleDollarSign, perm: 'contracts.view' },
