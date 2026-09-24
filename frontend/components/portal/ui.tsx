@@ -179,3 +179,66 @@ export function PageTitle({ title, sub, right }: { title: string; sub?: ReactNod
     </div>
   );
 }
+
+/** Kunlar chizig'i — har kun rangli nuqta (davomat tarixi) */
+export function DotStrip({
+  days,
+  colorOf,
+  titleOf,
+}: {
+  days: { date: string; status: string | null }[];
+  colorOf: (status: string | null) => string;
+  titleOf: (d: { date: string; status: string | null }) => string;
+}) {
+  return (
+    <div className="flex items-end gap-1">
+      {days.map((d) => (
+        <div key={d.date} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={titleOf(d)}>
+          <span className={`h-7 w-full rounded-md ${colorOf(d.status)}`} />
+          <span className="text-[9px] text-slate-400">{Number(d.date.slice(8))}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Ustma-ust ulushlar chizig'i (bor / kechikdi / yo'q / sababli) */
+export function StackBar({ parts }: { parts: { value: number; cls: string; label: string }[] }) {
+  const total = parts.reduce((s, p) => s + p.value, 0) || 1;
+  return (
+    <div>
+      <div className="flex h-3 overflow-hidden rounded-full bg-slate-100">
+        {parts.map((p) =>
+          p.value ? <span key={p.label} className={p.cls} style={{ width: `${(p.value / total) * 100}%` }} /> : null,
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+        {parts.map((p) => (
+          <span key={p.label} className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+            <span className={`h-2.5 w-2.5 rounded-full ${p.cls}`} /> {p.label}: <b className="text-slate-700">{p.value}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Izohli progress: "5 tadan 4 tasi bajarilgan" */
+export function Progress({ value, max, tone = 'emerald', left, right }: { value: number; max: number; tone?: Tone; left?: ReactNode; right?: ReactNode }) {
+  return (
+    <div>
+      {(left || right) && (
+        <div className="mb-1.5 flex items-baseline justify-between gap-2 text-sm">
+          <span className="text-slate-600">{left}</span>
+          <span className="font-semibold text-slate-800">{right}</span>
+        </div>
+      )}
+      <Bar value={value} max={max} tone={tone} />
+    </div>
+  );
+}
+
+/** Oddiy til bilan tushuntirish qatori */
+export function Hint({ children }: { children: ReactNode }) {
+  return <p className="mt-2 text-xs leading-relaxed text-slate-400">{children}</p>;
+}

@@ -49,10 +49,11 @@ export default function DashboardLayout({
   }
 
   return (
-    // h-[100dvh]: mobil brauzerda manzil paneli chiqib-kirganda ham to'g'ri balandlik
-    <div className="flex h-[100dvh] overflow-hidden bg-slate-50">
-      {/* Desktop sidebar */}
-      <div className="hidden md:block">
+    // Sahifaning o'zi aylanadi: telefonda ham, kompyuterda ham oddiy surish ishlaydi
+    // (ilgari ichki "overflow-y-auto" konteyner edi — mobil brauzerlarda surish tutilmasdi)
+    <div className="min-h-dvh bg-slate-50">
+      {/* Kompyuter: chap menyu joyida qotib turadi */}
+      <div className="fixed inset-y-0 left-0 z-30 hidden md:block">
         <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapse} />
       </div>
 
@@ -66,11 +67,14 @@ export default function DashboardLayout({
         </div>
       )}
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onMenu={() => setMobileOpen(true)} />
-        <SectionTabs />
+      <div className={`flex min-h-dvh flex-col ${collapsed ? 'md:pl-16' : 'md:pl-64'}`}>
+        {/* Tepa panel va bo'lim yorliqlari sahifa bilan birga surilmaydi */}
+        <div className="sticky top-0 z-20">
+          <Topbar onMenu={() => setMobileOpen(true)} />
+          <SectionTabs />
+        </div>
         {/* pb-[safe-area]: iPhone'da pastdagi "home indicator" kontentni to'smasin */}
-        <main className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">{children}</main>
+        <main className="flex-1 pb-[env(safe-area-inset-bottom)]">{children}</main>
       </div>
     </div>
   );

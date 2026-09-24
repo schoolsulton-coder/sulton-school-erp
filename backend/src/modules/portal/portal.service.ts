@@ -467,6 +467,21 @@ export class PortalService {
     };
   }
 
+  /** Oxirgi N kun davomati (bosh sahifadagi nuqtalar chizig'i uchun) */
+  private async recentDays(studentId: string, days = 14) {
+    const today = schoolToday();
+    const from = addDays(today, -(days - 1));
+    const rows = await this.prisma.attendance.findMany({
+      where: { studentId, date: { gte: from, lte: today } },
+      select: { date: true, status: true },
+    });
+    const byDay = new Map(rows.map((r) => [ymd(r.date), r.status]));
+    return Array.from({ length: days }, (_, i) => {
+      const d = ymd(addDays(from, i));
+      return { date: d, status: byDay.get(d) ?? null };
+    });
+  }
+
   // ===================== Bosh sahifa =====================
 
   /** Dashboard: barcha bo'limlardan qisqacha */
@@ -475,13 +490,14 @@ export class PortalService {
     const today = ymd(schoolToday());
     const ym = today.slice(0, 7);
 
-    const [grades, attendance, behavior, homework, schedule, payments] = await Promise.all([
+    const [grades, attendance, behavior, homework, schedule, payments, recentDays] = await Promise.all([
       this.gradesOf(studentId),
       this.attendanceOf(studentId, ym),
       this.behaviorOf(studentId),
       this.homeworkOf(studentId),
       this.scheduleOf(s),
       this.paymentsOf(studentId),
+      this.recentDays(studentId),
     ]);
 
     const todayDay = schedule.days.find((d) => d.isToday);
@@ -510,6 +526,8 @@ export class PortalService {
         excused: attendance.excused,
         total: attendance.total,
         todayStatus: attendance.days.find((d) => d.date === today)?.status ?? null,
+        // Oxirgi 2 hafta — nuqtalar chizig'i uchun
+        recentDays,
       },
       behavior: {
         month: behavior.month,
@@ -519,8 +537,12 @@ export class PortalService {
         deducted: behavior.deducted,
         records: behavior.records.length,
         coins: behavior.coins.balance,
+        // Oxirgi ayirilgan ballar — sabablari bilan
+        last: behavior.records.slice(0, 2).map((r) => ({ points: r.points, description: r.description, date: r.date, type: r.type })),
       },
       homework: {
+        total: homework.list.length,
+        done: homework.list.filter((h) => h.done).length,
         pending: homework.counts.pending,
         overdue: homework.counts.overdue,
         next: upcoming[0] ?? null,

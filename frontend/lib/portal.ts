@@ -142,9 +142,19 @@ export interface SummaryData {
     excused: number;
     total: number;
     todayStatus: string | null;
+    recentDays: { date: string; status: string | null }[];
   };
-  behavior: { month: string; monthLabel: string; limit: number; remaining: number; deducted: number; records: number; coins: number };
-  homework: { pending: number; overdue: number; next: HomeworkItem | null };
+  behavior: {
+    month: string;
+    monthLabel: string;
+    limit: number;
+    remaining: number;
+    deducted: number;
+    records: number;
+    coins: number;
+    last: { points: number; description: string; date: string; type: string }[];
+  };
+  homework: { total: number; done: number; pending: number; overdue: number; next: HomeworkItem | null };
   schedule: {
     weekId: string | null;
     today: { label: string; date: string | null; lessons: LessonRow[] } | null;
@@ -193,6 +203,21 @@ export const dueLabel = (date: string, today = todayStr()) => {
   if (d === -1) return 'kecha';
   return d > 0 ? `${d} kun qoldi` : `${-d} kun kechikdi`;
 };
+
+
+// ===== Oddiy til bilan izohlash =====
+/** Bahoga so'z bilan baho: a'lo / yaxshi / qoniqarli / past */
+export const gradeWord = (avg: number, scale: number) => {
+  if (!avg) return '—';
+  const pct = scale === 100 ? avg : (avg / 5) * 100;
+  return pct >= 90 ? "a'lo" : pct >= 75 ? 'yaxshi' : pct >= 60 ? 'qoniqarli' : 'past';
+};
+/** Davomatga so'z bilan baho */
+export const rateWord = (rate: number | null) =>
+  rate === null ? 'belgilanmagan' : rate >= 95 ? "a'lo" : rate >= 90 ? 'yaxshi' : rate >= 80 ? "o'rtacha" : 'past';
+const WEEKDAYS_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+/** "2026-09-25" → "Juma, 25 sentabr" */
+export const fmtLongDay = (s: string) => `${WEEKDAYS_UZ[new Date(`${s}T00:00:00Z`).getUTCDay()]}, ${fmtDay(s)}`;
 
 export type Tone = 'emerald' | 'sky' | 'amber' | 'rose' | 'violet' | 'slate' | 'brand';
 export const TONE: Record<Tone, { text: string; bg: string; soft: string; ring: string; bar: string }> = {
