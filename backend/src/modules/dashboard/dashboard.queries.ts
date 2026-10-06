@@ -152,11 +152,19 @@ export class DashboardQueries {
     };
   }
 
+  /**
+   * Ketgan o'quvchi: shu davrda shartnomasi bekor/to'xtatilgan VA hozirda
+   * o'qiyotgan shartnomasi qolmagan. Qayta shartnoma tuzgan o'quvchi "ketgan"
+   * deb sanalmaydi (aks holda u "Yozilgan"da ham, "Ketgan"da ham ko'rinardi).
+   */
   leftWhere(p: Range, branchId?: string): Prisma.ContractWhereInput {
     return {
       status: { in: LEFT_STATUSES },
       statusChangedAt: { gte: instantStart(p.from), lte: instantEnd(p.to) },
-      ...(branchId ? { student: { branchId } } : {}),
+      student: {
+        ...(branchId ? { branchId } : {}),
+        NOT: { contracts: { some: { status: { in: ENROLLED_STATUSES } } } },
+      },
     };
   }
 
