@@ -7,7 +7,10 @@ import {
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
-import { ownClassIds } from '../../common/own-classes';
+import {
+  assertStudentAccess,
+  ownClassIds,
+} from '../../common/own-classes';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { AddGuardianDto } from './dto/add-guardian.dto';
@@ -88,7 +91,9 @@ export class StudentsService {
     return { data, total, page, limit, pages: Math.ceil(total / limit), stats };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: { id: string; role: string }) {
+    // Ustoz/kurator/koordinator — faqat o'z sinfi o'quvchisi kartasi
+    if (user) await assertStudentAccess(this.prisma, user, id);
     const student = await this.prisma.student.findUnique({
       where: { id },
       include: {

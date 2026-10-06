@@ -2,7 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
-import { ownClassIds } from '../../common/own-classes';
+import {
+  assertClassAccess,
+  assertStudentAccess,
+  ownClassIds,
+} from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateBehaviorDto } from './dto/create-behavior.dto';
 
@@ -73,7 +77,13 @@ export class BehaviorService {
   }
 
   /** Ball ayirish — oylik 100 balldan; qolgandan ko'p ayirib bo'lmaydi (0 dan pastga tushmaydi) */
-  async create(authorId: string | null, dto: CreateBehaviorDto) {
+  async create(
+    author: { id: string; role?: string } | null,
+    dto: CreateBehaviorDto,
+  ) {
+    const authorId = author?.id ?? null;
+    // Ustoz/kurator/koordinator — faqat o'z sinfi o'quvchisiga ball ayiradi
+    if (author) await assertStudentAccess(this.prisma, author, dto.studentId);
     if (dto.type && dto.type !== 'NEGATIVE') {
       throw new BadRequestException(
         "Ahloqiy baho faqat ball ayirish uchun. Rag'batlantirish uchun Coin tizimidan foydalaning",
@@ -169,7 +179,12 @@ export class BehaviorService {
   }
 
   /** Sinf ahloqiy statistikasi — oy bo'yicha: har o'quvchi 100 dan qancha ayirilgani va qolgani */
-  async classStats(classId: string, month?: string) {
+  async classStats(
+    user: { id: string; role?: string },
+    classId: string,
+    month?: string,
+  ) {
+    await assertClassAccess(this.prisma, user, classId);
     const ym = isMonth(month) ? month : monthOf(new Date());
     const { start, end } = monthRange(ym);
     const students = await this.prisma.student.findMany({
@@ -222,7 +237,12 @@ export class BehaviorService {
   }
 
   /** O'quvchi xulq xulosasi: tanlangan (yoki joriy) oy bali + so'nggi 6 oy tarixi */
-  async studentSummary(studentId: string, month?: string) {
+  async studentSummary(
+    user: { id: string; role?: string },
+    studentId: string,
+    month?: string,
+  ) {
+    await assertStudentAccess(this.prisma, user, studentId);
     const ym = isMonth(month) ? month : monthOf(new Date());
     const months = Array.from({ length: 6 }, (_, i) => shiftMonth(ym, -i)); // joriy → orqaga
     const histStart = monthRange(months[months.length - 1]).start;
@@ -262,7 +282,8 @@ export class BehaviorService {
   }
 
   /** Sinf reytingi — joriy oy bali bo'yicha (eng yuqori ball tepada) */
-  async classRanking(classId: string) {
+  async classRanking(user: { id: string; role?: string }, classId: string) {
+    await assertClassAccess(this.prisma, user, classId);
     const ym = monthOf(new Date());
     const { start, end } = monthRange(ym);
     const students = await this.prisma.student.findMany({

@@ -38,34 +38,41 @@ export class GradesController {
   @Get()
   @Permissions('grades.view')
   list(
+    @CurrentUser() user: JwtUser,
     @Query('studentId') studentId?: string,
     @Query('subjectId') subjectId?: string,
     @Query('type') type?: string,
     @Query('period') period?: string,
+    @Query('classId') classId?: string,
   ) {
-    return this.service.list({ studentId, subjectId, type, period });
+    return this.service.list(user, { studentId, subjectId, type, period, classId });
   }
 
   @Get('student/:studentId/report')
   @Permissions('grades.view')
-  studentReport(@Param('studentId') studentId: string) {
-    return this.service.studentReport(studentId);
+  studentReport(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.service.studentReport(user, studentId);
   }
 
   @Get('class/:classId/subject/:subjectId')
   @Permissions('grades.view')
   gradebook(
+    @CurrentUser() user: JwtUser,
     @Param('classId') classId: string,
     @Param('subjectId') subjectId: string,
     @Query('type') type?: string,
     @Query('period') period?: string,
   ) {
-    return this.service.classGradebook(classId, subjectId, type, period);
+    return this.service.classGradebook(user, classId, subjectId, type, period);
   }
 
   @Get('class/:classId/stats')
   @Permissions('grades.view')
   classStats(
+    @CurrentUser() user: JwtUser,
     @Param('classId') classId: string,
     @Query('subjectId') subjectId?: string,
     @Query('type') type?: string,
@@ -73,7 +80,7 @@ export class GradesController {
     @Query('to') to?: string,
     @Query('period') period?: string,
   ) {
-    return this.service.classStats(classId, { subjectId, type, from, to, period });
+    return this.service.classStats(user, classId, { subjectId, type, from, to, period });
   }
 
   @Post()

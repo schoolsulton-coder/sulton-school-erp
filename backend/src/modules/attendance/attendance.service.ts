@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
 import { scheduleAccessWhere } from '../../common/schedule-weeks';
+import { assertClassAccess, assertStudentAccess } from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 
@@ -151,7 +152,8 @@ export class AttendanceService {
   }
 
   /** Sinf kunlik varaqasi: o'qiyotgan o'quvchilar + shu kungi holati (+ kim/qachon belgilagan) */
-  async classDay(classId: string, dateStr?: string) {
+  async classDay(user: JwtUser, classId: string, dateStr?: string) {
+    await assertClassAccess(this.prisma, user, classId);
     const date = dayFromStr(dateStr ?? this.schoolToday());
     const students = await this.prisma.student.findMany({
       where: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT },
@@ -184,7 +186,8 @@ export class AttendanceService {
   }
 
   /** O'quvchi davomat hisoboti (oy bo'yicha) */
-  async studentReport(studentId: string, month?: string) {
+  async studentReport(user: JwtUser, studentId: string, month?: string) {
+    await assertStudentAccess(this.prisma, user, studentId);
     const where: any = { studentId };
     if (month) {
       const [y, m] = month.split('-').map(Number);
@@ -208,7 +211,8 @@ export class AttendanceService {
   }
 
   /** Sinf statistikasi (davr bo'yicha) — umumiy + o'quvchilar reytingi (o'qiyotganlar) */
-  async classStats(classId: string, from?: string, to?: string) {
+  async classStats(user: JwtUser, classId: string, from?: string, to?: string) {
+    await assertClassAccess(this.prisma, user, classId);
     const where: any = { classId, student: { status: 'ACTIVE', contracts: ENROLLED_CONTRACT } };
     if (from || to) {
       where.date = {};

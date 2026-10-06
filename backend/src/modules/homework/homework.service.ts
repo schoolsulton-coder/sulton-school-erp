@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
-import { ownClassIds } from '../../common/own-classes';
+import {
+  assertClassAccess,
+  ownClassIds,
+} from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
@@ -39,6 +42,8 @@ export class HomeworkService {
 
   /** Vazifa yaratish — butun sinf yoki tanlangan o'quvchilarga ASSIGNED yoziladi */
   async create(user: JwtUser, dto: CreateHomeworkDto) {
+    // Ustoz/kurator/koordinator — faqat o'z sinfiga vazifa beradi
+    await assertClassAccess(this.prisma, user, dto.classId);
     // Ustoz: faqat admin/owner boshqa ustozni tanlay oladi, aks holda o'zi
     const isAdmin = canSeeAllClasses(user.role) || ADMIN_ROLES.includes(user.role);
     const teacherId = isAdmin && dto.teacherId ? dto.teacherId : user.id;
@@ -169,7 +174,7 @@ export class HomeworkService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(user: JwtUser, id: string) {
     const hw = await this.prisma.homework.findUnique({
       where: { id },
       include: {
@@ -185,6 +190,8 @@ export class HomeworkService {
       },
     });
     if (!hw) throw new NotFoundException('Vazifa topilmadi');
+    // Ustoz/kurator/koordinator — faqat o'z sinfi vazifasini ko'radi
+    await assertClassAccess(this.prisma, user, hw.classId);
 
     const total = hw.submissions.length;
     const submitted = hw.submissions.filter((s) =>

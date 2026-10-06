@@ -44,8 +44,11 @@ export class StudentsController {
 
   @Get(':id')
   @Permissions('students.view')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(
+    @CurrentUser() user: { id: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.service.findOne(id, user);
   }
 
   @Post()

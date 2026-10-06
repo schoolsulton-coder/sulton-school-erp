@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
-import { ownClassIds } from '../../common/own-classes';
+import {
+  assertClassAccess,
+  assertStudentAccess,
+  ownClassIds,
+} from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateCoinDto } from './dto/create-coin.dto';
 
@@ -67,7 +71,8 @@ export class CoinsService {
   }
 
   /** O'quvchi balansi va oxirgi yozuvlari */
-  async studentSummary(studentId: string) {
+  async studentSummary(user: JwtUser, studentId: string) {
+    await assertStudentAccess(this.prisma, user, studentId);
     const [agg, records] = await Promise.all([
       this.prisma.coinRecord.aggregate({
         where: { studentId },
@@ -84,7 +89,8 @@ export class CoinsService {
   }
 
   /** Sinf statistikasi: jami, qo'shilgan/ayirilgan va o'quvchilar reytingi */
-  async classStats(classId: string, from?: string, to?: string) {
+  async classStats(user: JwtUser, classId: string, from?: string, to?: string) {
+    await assertClassAccess(this.prisma, user, classId);
     const dateWhere: any = {};
     if (from) dateWhere.gte = dayFromStr(from);
     if (to) dateWhere.lte = dayToStr(to);

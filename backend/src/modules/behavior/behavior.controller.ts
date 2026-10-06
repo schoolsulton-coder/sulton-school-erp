@@ -39,27 +39,35 @@ export class BehaviorController {
   /** O'quvchi oylik bali (month=YYYY-MM, berilmasa joriy oy) + so'nggi 6 oy */
   @Get('student/:studentId')
   @Permissions('behavior.view')
-  studentSummary(@Param('studentId') studentId: string, @Query('month') month?: string) {
-    return this.service.studentSummary(studentId, month);
+  studentSummary(
+    @CurrentUser() user: any,
+    @Param('studentId') studentId: string,
+    @Query('month') month?: string,
+  ) {
+    return this.service.studentSummary(user, studentId, month);
   }
 
   @Get('class/:classId/ranking')
   @Permissions('behavior.view')
-  classRanking(@Param('classId') classId: string) {
-    return this.service.classRanking(classId);
+  classRanking(@CurrentUser() user: any, @Param('classId') classId: string) {
+    return this.service.classRanking(user, classId);
   }
 
   /** Sinf ahloqiy statistikasi — oy bo'yicha (month=YYYY-MM, berilmasa joriy oy) */
   @Get('class/:classId/stats')
   @Permissions('behavior.view')
-  classStats(@Param('classId') classId: string, @Query('month') month?: string) {
-    return this.service.classStats(classId, month);
+  classStats(
+    @CurrentUser() user: any,
+    @Param('classId') classId: string,
+    @Query('month') month?: string,
+  ) {
+    return this.service.classStats(user, classId, month);
   }
 
   @Post()
   @Permissions('behavior.create')
-  create(@CurrentUser('id') authorId: string, @Body() dto: CreateBehaviorDto) {
-    return this.service.create(authorId, dto);
+  create(@CurrentUser() user: any, @Body() dto: CreateBehaviorDto) {
+    return this.service.create(user, dto);
   }
 
   @Delete(':id')

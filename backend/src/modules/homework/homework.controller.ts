@@ -54,8 +54,8 @@ export class HomeworkController {
 
   @Get(':id')
   @Permissions('homework.view')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.findOne(user, id);
   }
 
   @Post()

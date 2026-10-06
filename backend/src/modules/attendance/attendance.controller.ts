@@ -38,26 +38,32 @@ export class AttendanceController {
 
   @Get('class/:classId')
   @Permissions('attendance.view')
-  classDay(@Param('classId') classId: string, @Query('date') date?: string) {
-    return this.service.classDay(classId, date);
+  classDay(
+    @CurrentUser() user: JwtUser,
+    @Param('classId') classId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.service.classDay(user, classId, date);
   }
 
   @Get('class/:classId/stats')
   @Permissions('attendance.view')
   classStats(
+    @CurrentUser() user: JwtUser,
     @Param('classId') classId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.service.classStats(classId, from, to);
+    return this.service.classStats(user, classId, from, to);
   }
 
   @Get('student/:studentId')
   @Permissions('attendance.view')
   studentReport(
+    @CurrentUser() user: JwtUser,
     @Param('studentId') studentId: string,
     @Query('month') month?: string,
   ) {
-    return this.service.studentReport(studentId, month);
+    return this.service.studentReport(user, studentId, month);
   }
 }

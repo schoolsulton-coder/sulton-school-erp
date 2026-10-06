@@ -6,6 +6,11 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { canSeeAllClasses } from '../../common/rbac-open';
 import { scheduleAccessWhere } from '../../common/schedule-weeks';
+import {
+  assertClassAccess,
+  assertStudentAccess,
+  classScopeOf,
+} from '../../common/own-classes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { BulkGradeDto } from './dto/bulk-grade.dto';
@@ -234,6 +239,8 @@ export class GradesService {
 
   async create(user: JwtUser, dto: CreateGradeDto) {
     const st = await this.prisma.student.findUnique({ where: { id: dto.studentId }, select: { classId: true } });
+    // Fan mos kelsa ham, o'quvchi o'z sinfidan bo'lishi shart
+    await assertStudentAccess(this.prisma, user, dto.studentId);
     await this.assertCanGrade(user, dto.subjectId, st?.classId ?? undefined);
     const type = dto.type ?? 'DAILY';
     const day = dto.date ? dto.date.slice(0, 10) : this.schoolToday();
@@ -255,6 +262,7 @@ export class GradesService {
 
   /** Butun sinfni bir fan+tur bo'yicha baholash — mavjudlarini yangilaydi (dublikatsiz) */
   async bulkCreate(user: JwtUser, dto: BulkGradeDto) {
+    await assertClassAccess(this.prisma, user, dto.classId);
     await this.assertCanGrade(user, dto.subjectId, dto.classId);
     const day = dto.date ? dto.date.slice(0, 10) : this.schoolToday();
     this.assertTeacherToday(user, day);
@@ -324,12 +332,32 @@ export class GradesService {
     return this.prisma.grade.delete({ where: { id } });
   }
 
-  list(params: { studentId?: string; subjectId?: string; type?: string; period?: string }) {
+  async list(
+    user: JwtUser,
+    params: {
+      studentId?: string;
+      subjectId?: string;
+      type?: string;
+      period?: string;
+      classId?: string;
+    },
+  ) {
     const where: any = {};
     if (params.studentId) where.studentId = params.studentId;
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.type) where.type = params.type;
     if (params.period) where.period = params.period;
+    // Ustoz/kurator/koordinator — faqat o'z sinflari baholari
+    const scope = await classScopeOf(this.prisma, user);
+    if (params.classId) {
+      await assertClassAccess(this.prisma, user, params.classId);
+      where.student = { classId: params.classId };
+    } else if (scope) {
+      where.student = { classId: { in: scope } };
+    }
+    if (params.studentId) {
+      await assertStudentAccess(this.prisma, user, params.studentId);
+    }
     return this.prisma.grade.findMany({
       where,
       include: { subject: true },
@@ -339,7 +367,8 @@ export class GradesService {
   }
 
   /** O'quvchi tabeli: fan bo'yicha o'rtacha + umumiy o'rtacha + progress */
-  async studentReport(studentId: string) {
+  async studentReport(user: JwtUser, studentId: string) {
+    await assertStudentAccess(this.prisma, user, studentId);
     const grades = await this.prisma.grade.findMany({
       where: { studentId },
       include: { subject: true },
@@ -363,9 +392,11 @@ export class GradesService {
 
   /** Sinf statistikasi: filtrlar (fan/tur/sana oralig'i) bo'yicha taqsimot, o'rtacha, reyting */
   async classStats(
+    user: JwtUser,
     classId: string,
     params: { subjectId?: string; type?: string; from?: string; to?: string; period?: string },
   ) {
+    await assertClassAccess(this.prisma, user, classId);
     const where: any = { student: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT } };
     if (params.subjectId) where.subjectId = params.subjectId;
     if (params.type) where.type = params.type;
@@ -429,7 +460,14 @@ export class GradesService {
   }
 
   /** Sinf jurnali: bir fan (+ tur) bo'yicha o'quvchilar va baholari */
-  async classGradebook(classId: string, subjectId: string, type?: string, period?: string) {
+  async classGradebook(
+    user: JwtUser,
+    classId: string,
+    subjectId: string,
+    type?: string,
+    period?: string,
+  ) {
+    await assertClassAccess(this.prisma, user, classId);
     const students = await this.prisma.student.findMany({
       // Faqat o'qiyotgan (shartnomasi faol/to'langan/band) o'quvchilar jurnalga kiradi
       where: { classId, status: 'ACTIVE', contracts: ENROLLED_CONTRACT },

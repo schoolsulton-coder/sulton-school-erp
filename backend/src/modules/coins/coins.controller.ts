@@ -37,18 +37,19 @@ export class CoinsController {
 
   @Get('student/:studentId')
   @Permissions('behavior.view')
-  studentSummary(@Param('studentId') studentId: string) {
-    return this.service.studentSummary(studentId);
+  studentSummary(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.studentSummary(user, studentId);
   }
 
   @Get('class/:classId/stats')
   @Permissions('behavior.view')
   classStats(
+    @CurrentUser() user: any,
     @Param('classId') classId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.service.classStats(classId, from, to);
+    return this.service.classStats(user, classId, from, to);
   }
 
   @Post()
