@@ -54,6 +54,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'contracts.view', 'contracts.create', 'contracts.update', 'contracts.delete',
     'students.view', 'students.create', 'students.update', 'students.delete',
     'classes.view',
+    // O'quv jarayonini KO'RISH (baho/davomat qo'yish emas)
+    'grades.view', 'attendance.view', 'homework.view', 'behavior.view',
   ],
   // Akademik bo'lim rahbari: Ma'lumotlar (students+classes) + O'quv jarayoni
   akademik: [

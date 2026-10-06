@@ -27,7 +27,15 @@ const SETS = {
   superadmin: allSlugs,
   owner: allSlugs,
   // Administrator: qabul, shartnoma/to'lov, o'quvchi + sinflarni ko'rish
-  admin: [...g2p(['crm', 'contracts', 'students']), 'classes.view'],
+  // Administrator: qabul, shartnoma/to'lov, o'quvchi + o'quv jarayonini KO'RISH
+  admin: [
+    ...g2p(['crm', 'contracts', 'students']),
+    'classes.view',
+    'grades.view',
+    'attendance.view',
+    'homework.view',
+    'behavior.view',
+  ],
   akademik: g2p(['students', 'classes', 'grades', 'attendance', 'homework', 'behavior']),
   sales: ['crm.view', 'crm.create', 'crm.update', 'students.view'],
   coordinator: [

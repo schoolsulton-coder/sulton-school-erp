@@ -46,9 +46,26 @@ export const ACADEMIC_HOME = '/students';
 export const canSeeAcademic = (role?: string): boolean =>
   !!role && ACADEMIC_ROLES.includes(role);
 
+/** "O'quv jarayoni" oynalarining ruxsatlari */
+export const ACADEMIC_PERMS = [
+  'grades.view',
+  'attendance.view',
+  'homework.view',
+  'behavior.view',
+];
+
 /**
- * "O'quv jarayoni" bo'limini menyuda ko'rsatish:
- * akademik rollar YOKI to'liq kirish rollari (superadmin/admin/owner).
+ * "O'quv jarayoni" bo'limini menyuda ko'rsatish: akademik rollar, to'liq kirish
+ * rollari YOKI ruxsatlar ro'yxatida akademik ruxsati bor rol (Administrator,
+ * akademik bo'lim rahbari).
+ *
+ * Ochiq rejim bu yerda ishlamaydi — aks holda sotuv/hisobchi kabi rollarga ham
+ * o'quv jarayoni ko'rinib ketardi, shuning uchun ruxsatlar ro'yxati tekshiriladi.
  */
-export const canSeeAcademicSection = (role?: string): boolean =>
-  canSeeAcademic(role) || (!!role && FULL_ACCESS_ROLES.includes(role));
+export const canSeeAcademicSection = (
+  role?: string,
+  permissions?: string[],
+): boolean =>
+  canSeeAcademic(role) ||
+  (!!role && FULL_ACCESS_ROLES.includes(role)) ||
+  (permissions ?? []).some((p) => ACADEMIC_PERMS.includes(p));

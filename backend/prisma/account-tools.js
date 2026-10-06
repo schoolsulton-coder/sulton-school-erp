@@ -7,6 +7,8 @@
  *   node prisma/account-tools.js coordinators      # COORDINATORS_JSON (+COORDINATOR_PASSWORD)
  *   node prisma/account-tools.js coordinators --dry
  *   node prisma/account-tools.js students-inactive [--dry]
+ *   node prisma/account-tools.js user-set [--dry]   # USER_PHONE yoki USER_NAME +
+ *                                                   # USER_PASSWORD/USER_STATUS/USER_ROLE
  */
 const { PrismaClient } = require('@prisma/client');
 const argon2 = require('argon2');
@@ -203,15 +205,103 @@ async function studentsInactive(dry) {
   console.log('Holatlar:', stats.map((s) => `${s.status}=${s._count._all}`).join(', '));
 }
 
+// ===================== user-set =====================
+/**
+ * Bitta hisobni yangilash: parol / holat / rol.
+ * Kim: USER_PHONE yoki USER_NAME (to'liq ism; bittagina mos kelsa "ichida bor" ham ishlaydi).
+ */
+async function userSet(dry) {
+  const phone = process.env.USER_PHONE ? normPhone(process.env.USER_PHONE) : '';
+  const name = String(process.env.USER_NAME || '').trim();
+  const password = String(process.env.USER_PASSWORD || '');
+  const status = String(process.env.USER_STATUS || '').trim().toUpperCase();
+  const roleSlug = String(process.env.USER_ROLE || '').trim();
+
+  if (!phone && !name) {
+    console.error("Xato: USER_PHONE yoki USER_NAME kerak.");
+    process.exit(1);
+  }
+  if (password && password.length < 8) {
+    console.error("Xato: parol kamida 8 ta belgi bo'lsin.");
+    process.exit(1);
+  }
+  if (status && !['ACTIVE', 'INACTIVE', 'BLOCKED'].includes(status)) {
+    console.error('Xato: USER_STATUS faqat ACTIVE | INACTIVE | BLOCKED.');
+    process.exit(1);
+  }
+  if (!password && !status && !roleSlug) {
+    console.error('Xato: USER_PASSWORD, USER_STATUS yoki USER_ROLE dan kamida bittasi kerak.');
+    process.exit(1);
+  }
+
+  const select = { id: true, fullName: true, phone: true, status: true, role: { select: { slug: true } } };
+  let users = [];
+  if (phone) {
+    const u = await prisma.user.findUnique({ where: { phone }, select });
+    if (u) users = [u];
+  } else {
+    users = await prisma.user.findMany({ where: { fullName: name }, select });
+    if (!users.length) {
+      users = await prisma.user.findMany({
+        where: { fullName: { contains: name, mode: 'insensitive' } },
+        select,
+      });
+    }
+  }
+  if (!users.length) {
+    console.error('Xato: foydalanuvchi topilmadi.');
+    process.exit(1);
+  }
+  if (users.length > 1) {
+    console.error(`Xato: ${users.length} ta hisob mos keldi — aniqroq yozing yoki USER_PHONE bering:`);
+    users.forEach((u) => console.error(`   ${u.fullName} · ${mask(u.phone)} · ${u.role.slug} · ${u.status}`));
+    process.exit(1);
+  }
+
+  const user = users[0];
+  const data = {};
+  const changes = [];
+  if (password) {
+    data.password = await argon2.hash(password);
+    changes.push('parol almashtirildi');
+  }
+  if (status && status !== user.status) {
+    data.status = status;
+    changes.push(`holat: ${user.status} → ${status}`);
+  }
+  if (roleSlug && roleSlug !== user.role.slug) {
+    const role = await prisma.role.findFirst({ where: { slug: roleSlug }, select: { id: true } });
+    if (!role) {
+      console.error(`Xato: "${roleSlug}" nomli rol yo'q.`);
+      process.exit(1);
+    }
+    data.roleId = role.id;
+    changes.push(`rol: ${user.role.slug} → ${roleSlug}`);
+  }
+  console.log(`${dry ? '[DRY-RUN] ' : ''}${user.fullName} · ${mask(user.phone)} · ${user.role.slug} · ${user.status}`);
+  if (!changes.length) {
+    console.log("  o'zgarish yo'q — hammasi so'ralgandek");
+    return;
+  }
+  if (!dry) await prisma.user.update({ where: { id: user.id }, data });
+  console.log(`  ${dry ? "bo'ladi" : 'bajarildi'}: ${changes.join(' · ')}`);
+  if (!dry && (data.roleId || data.password)) {
+    console.log('  Eslatma: hisobdan chiqib, qayta kirish kerak.');
+  }
+}
+
 (async () => {
   const cmd = process.argv[2];
   const dry = process.argv.includes('--dry');
   if (cmd === 'admin-create') await adminCreate();
+  else if (cmd === 'user-set') await userSet(dry);
   else if (cmd === 'make-owner') await makeOwner();
   else if (cmd === 'coordinators') await coordinators(dry);
   else if (cmd === 'students-inactive') await studentsInactive(dry);
   else {
-    console.error("Noma'lum buyruq. admin-create | make-owner | coordinators | students-inactive");
+    console.error(
+      "Noma'lum buyruq. admin-create | make-owner | coordinators | students-inactive | user-set",
+    );
     process.exit(1);
   }
 })()

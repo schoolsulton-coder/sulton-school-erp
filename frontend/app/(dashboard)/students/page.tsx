@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Users, Search, Plus, UserCheck, GraduationCap, UserMinus, Archive, Phone } from 'lucide-react';
+import { Users, Search, Plus, UserCheck, UserX, GraduationCap, UserMinus, Archive, Phone } from 'lucide-react';
 import { studentsApi, STATUS_LABEL, STATUS_COLOR, type StudentListItem } from '@/lib/students';
 import { StudentFormModal } from '@/components/student-form';
 import { classesApi } from '@/lib/classes';
@@ -50,9 +50,10 @@ export default function StudentsPage() {
       </div>
 
       {/* Stat kartochkalar */}
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Stat icon={Users} tone="brand" label="Jami" value={stats?.total ?? 0} />
         <Stat icon={UserCheck} tone="emerald" label="Faol" value={stats?.active ?? 0} />
+        <Stat icon={UserX} tone="amber" label="Nofaol" value={stats?.inactive ?? 0} />
         <Stat icon={GraduationCap} tone="indigo" label="Bitirgan" value={stats?.graduated ?? 0} />
         <Stat icon={UserMinus} tone="rose" label="Chetlatilgan" value={stats?.expelled ?? 0} />
         <Stat icon={Archive} tone="slate" label="Arxiv" value={stats?.archived ?? 0} />
@@ -149,6 +150,7 @@ export default function StudentsPage() {
 const TONES: Record<string, string> = {
   brand: 'bg-brand/10 text-brand',
   emerald: 'bg-emerald-50 text-emerald-500',
+  amber: 'bg-amber-50 text-amber-500',
   indigo: 'bg-indigo-50 text-indigo-500',
   rose: 'bg-rose-50 text-rose-500',
   slate: 'bg-slate-100 text-slate-500',

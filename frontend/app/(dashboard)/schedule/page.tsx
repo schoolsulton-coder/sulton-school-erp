@@ -26,6 +26,7 @@ import {
   type Subject,
 } from '@/lib/classes';
 import { usersApi, type ManagedUser } from '@/lib/users';
+import { useAuthStore } from '@/store/auth';
 import { TeacherPicker } from '@/components/teacher-picker';
 import {
   PERIODS,
@@ -123,6 +124,7 @@ function ScheduleManager() {
     queryFn: () => classesApi.schedule(classId, weekId),
     enabled: !!classId && !!week,
   });
+  const can = useAuthStore((s) => s.can);
   const { data: subjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: classesApi.subjects,
@@ -130,6 +132,9 @@ function ScheduleManager() {
   const { data: allUsers } = useQuery({
     queryKey: ['users'],
     queryFn: () => usersApi.list(),
+    // Ustoz ismlari jadval bilan birga keladi — users.view yo'q rolda bu so'rov
+    // 403 bo'lardi, shuning uchun yuborilmaydi
+    enabled: can('users.view'),
   });
   const teachers = useMemo(
     () => (allUsers ?? []).filter((u) => u.role.slug === 'teacher'),

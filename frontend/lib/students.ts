@@ -18,6 +18,7 @@ export interface StudentListItem {
 export interface StudentStats {
   total: number;
   active: number;
+  inactive: number;
   graduated: number;
   expelled: number;
   archived: number;

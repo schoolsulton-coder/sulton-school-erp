@@ -52,11 +52,13 @@ export class HomeworkService {
     let students: { id: string }[];
     if (dto.studentIds?.length) {
       students = await this.prisma.student.findMany({
-        where: { id: { in: dto.studentIds }, classId: dto.classId },
+        where: { id: { in: dto.studentIds }, classId: dto.classId, status: 'ACTIVE' },
         select: { id: true },
       });
       if (!students.length) {
-        throw new BadRequestException('Tanlangan o‘quvchilar sinfga tegishli emas');
+        throw new BadRequestException(
+          'Tanlangan o‘quvchilar sinfga tegishli emas yoki faol emas',
+        );
       }
     } else {
       students = await this.prisma.student.findMany({

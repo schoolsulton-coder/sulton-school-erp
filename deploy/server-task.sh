@@ -66,6 +66,14 @@ case "${TASK:-}" in
     echo "==> Shartnomasi bekor bo'lgan o'quvchilarni 'Nofaol' qilish"
     node prisma/account-tools.js students-inactive
     ;;
+  user-set-dry)
+    echo "==> Hisobni yangilash (dry-run — baza o'zgarmaydi)"
+    node prisma/account-tools.js user-set --dry
+    ;;
+  user-set)
+    echo "==> Hisobni yangilash (parol / holat / rol)"
+    node prisma/account-tools.js user-set
+    ;;
   roles-apply)
     echo "==> Rol ruxsatlarini qayta qo'llash (owner/admin/koordinator/ustoz/kurator)"
     node prisma/rbac-apply.js

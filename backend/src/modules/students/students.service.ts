@@ -92,6 +92,7 @@ export class StudentsService {
     const stats = {
       total: byStatus.reduce((a, b) => a + b._count._all, 0),
       active: cnt('ACTIVE'),
+      inactive: cnt('INACTIVE'),
       graduated: cnt('GRADUATED'),
       expelled: cnt('EXPELLED'),
       archived: cnt('ARCHIVED'),

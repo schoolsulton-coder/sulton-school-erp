@@ -14,6 +14,8 @@ name: Server task (qo'lda)
 #   ADMIN_NAME      — ixtiyoriy, Administrator ismi
 #   ADMIN_OVERWRITE — "1" bo'lsa, ADMIN_PHONE band bo'lsa ham o'sha hisob almashtiriladi
 #   COORDINATOR_PASSWORD — ixtiyoriy, hisobi yo'q koordinatorga ochiladigan parol
+#   user-set uchun: USER_PHONE yoki USER_NAME (kim) + USER_PASSWORD / USER_STATUS
+#                   (ACTIVE|INACTIVE|BLOCKED) / USER_ROLE (rol slug) — nimani o'zgartirish
 #   COORDINATORS_JSON — koordinator–sinf ro'yxati, masalan:
 #                     [{"name":"Ism Familiya","phone":"+998901234567","classes":["6-Ahmad Al-Farg'oniy"]}]
 
@@ -36,6 +38,8 @@ on:
           - coordinators        # koordinatorlarga sinflarni biriktirish
           - students-inactive-dry # shartnomasi bekor bo'lganlarni ko'rish
           - students-inactive   # ularni "Nofaol" qilish
+          - user-set-dry        # bitta hisobni yangilashni ko'rish
+          - user-set            # bitta hisob: parol / holat / rol
           - roles-apply         # rol ruxsatlarini qayta qo'llash
           - all-superadmin-dry  # kim superadmin bo'lishini ko'rish
           - all-superadmin      # hammani superadmin qilish
@@ -72,6 +76,11 @@ jobs:
           ADMIN_OVERWRITE: ${{ secrets.ADMIN_OVERWRITE }}
           COORDINATORS_JSON: ${{ secrets.COORDINATORS_JSON }}
           COORDINATOR_PASSWORD: ${{ secrets.COORDINATOR_PASSWORD }}
+          USER_PHONE: ${{ secrets.USER_PHONE }}
+          USER_NAME: ${{ secrets.USER_NAME }}
+          USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
+          USER_STATUS: ${{ secrets.USER_STATUS }}
+          USER_ROLE: ${{ secrets.USER_ROLE }}
           TASK: ${{ inputs.task }}
         run: |
           set -e
@@ -87,7 +96,7 @@ jobs:
           # Qiymatlar ichida apostrof/qo'shtirnoq bo'lsa ham buzilmasin (COORDINATORS_JSON) —
           # env fayl base64 qilib yuboriladi, logga chiqmaydi.
           ENV_FILE="$(mktemp)"
-          for v in TASK OWNER_PHONE OWNER_PASSWORD STAFF_PASSWORD ADMIN_PHONE ADMIN_PASSWORD ADMIN_NAME ADMIN_OVERWRITE COORDINATORS_JSON COORDINATOR_PASSWORD; do
+          for v in TASK OWNER_PHONE OWNER_PASSWORD STAFF_PASSWORD ADMIN_PHONE ADMIN_PASSWORD ADMIN_NAME ADMIN_OVERWRITE COORDINATORS_JSON COORDINATOR_PASSWORD USER_PHONE USER_NAME USER_PASSWORD USER_STATUS USER_ROLE; do
             printf 'export %s=%q\n' "$v" "${!v:-}" >> "$ENV_FILE"
           done
           ENV_B64="$(base64 -w0 < "$ENV_FILE")"

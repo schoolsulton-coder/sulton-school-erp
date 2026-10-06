@@ -16,6 +16,7 @@ export function SectionTabs() {
   const pathname = usePathname();
   const can = useAuthStore((s) => s.can);
   const role = useAuthStore((s) => s.user?.role);
+  const permissions = useAuthStore((s) => s.user?.permissions);
 
   const activeTab = useRef<HTMLAnchorElement>(null);
 
@@ -35,7 +36,7 @@ export function SectionTabs() {
   if (!section) return null;
 
   // Bo'limga huquqi yo'q rollarda tab qatori ham ko'rinmaydi (sidebar bilan bir xil qoida)
-  if (section.label === ACADEMIC_SECTION && !canSeeAcademicSection(role)) return null;
+  if (section.label === ACADEMIC_SECTION && !canSeeAcademicSection(role, permissions)) return null;
 
   const tabs = visibleChildren(section);
   if (tabs.length === 0) return null;

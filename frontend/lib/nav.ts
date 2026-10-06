@@ -18,7 +18,9 @@ export const SECTIONS: NavSection[] = [
     icon: Database,
     children: [
       { href: '/students', label: "O'quvchilar", perm: 'students.view' },
-      { href: '/guardians', label: 'Vasiylar', perm: 'students.view' },
+      // Ma'lumot /crm/guardians dan keladi — menyu ham shu ruxsatda bo'lsin,
+      // aks holda ustoz/koordinatorga doim bo'sh sahifa ko'rinardi
+      { href: '/guardians', label: 'Vasiylar', perm: 'crm.view' },
       { href: '/classes', label: 'Sinflar', perm: 'classes.view' },
       { href: '/schedule', label: 'Dars jadvali', perm: 'classes.view' },
     ],
