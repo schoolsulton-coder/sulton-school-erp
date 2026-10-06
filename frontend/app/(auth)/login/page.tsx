@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { ACADEMIC_HOME, canSeeAcademic } from '@/lib/rbac';
+import { ACADEMIC_HOME, FULL_ACCESS_HOME, FULL_ACCESS_ROLES, canSeeAcademic } from '@/lib/rbac';
 import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
@@ -29,9 +29,11 @@ export default function LoginPage() {
       router.push(
         portalRoles.includes(role)
           ? '/portal'
-          : canSeeAcademic(role)
-            ? ACADEMIC_HOME // akademik rollarda Qabulxona yo'q — Ma'lumotlarga tushadi
-            : '/crm',
+          : FULL_ACCESS_ROLES.includes(role)
+            ? FULL_ACCESS_HOME // Owner/Superadmin — boshqaruv paneli
+            : canSeeAcademic(role)
+              ? ACADEMIC_HOME // akademik rollarda Qabulxona yo'q — Ma'lumotlarga tushadi
+              : '/crm',
       );
     } catch (err: any) {
       const status = err?.response?.status;

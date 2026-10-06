@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
+import { canSeeAllClasses } from '../../common/rbac-open';
+import { ownClassIds } from '../../common/own-classes';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { AddGuardianDto } from './dto/add-guardian.dto';
@@ -27,12 +29,18 @@ export class StudentsService {
     status?: string;
     academicYear?: string;
     branchId?: string;
+    user?: { id: string; role: string };
   }) {
     const page = Number(params.page) || 1;
     const limit = Number(params.limit) || 20;
 
     // status filtridan tashqari asosiy filtr (stat kartochkalar barcha holatni ko'rsatsin)
     const base: any = {};
+    // Ustoz/kurator/koordinator — faqat o'ziga biriktirilgan sinflar o'quvchilari
+    if (params.user && !canSeeAllClasses(params.user.role)) {
+      const mine = await ownClassIds(this.prisma, params.user.id);
+      base.classId = params.classId && mine.includes(params.classId) ? params.classId : { in: mine };
+    }
     if (params.classId) base.classId = params.classId;
     if (params.branchId) base.branchId = params.branchId;
     if (params.academicYear) base.class = { academicYear: params.academicYear };

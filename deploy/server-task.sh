@@ -33,6 +33,38 @@ case "${TASK:-}" in
     OWNER_NAME="${OWNER_NAME:-Bosh administrator}" \
       node prisma/set-owner.js
     ;;
+  admin-create)
+    if [ -z "${ADMIN_PHONE:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+      echo "Xato: ADMIN_PHONE va ADMIN_PASSWORD secret'lari kerak (Settings → Secrets → Actions)" >&2
+      exit 1
+    fi
+    echo "==> Administrator hisobi (yangi login/parol)"
+    node prisma/account-tools.js admin-create
+    ;;
+  make-owner)
+    echo "==> OWNER_PHONE egasiga 'owner' roli (hamma oyna ochiladi)"
+    node prisma/account-tools.js make-owner
+    ;;
+  coordinators-dry)
+    echo "==> Koordinator–sinf biriktiruvi (dry-run — baza o'zgarmaydi)"
+    node prisma/account-tools.js coordinators --dry
+    ;;
+  coordinators)
+    echo "==> Koordinatorlarga sinflarni biriktirish"
+    node prisma/account-tools.js coordinators
+    ;;
+  students-inactive-dry)
+    echo "==> Shartnomasi bekor bo'lgan o'quvchilar (dry-run)"
+    node prisma/account-tools.js students-inactive --dry
+    ;;
+  students-inactive)
+    echo "==> Shartnomasi bekor bo'lgan o'quvchilarni 'Nofaol' qilish"
+    node prisma/account-tools.js students-inactive
+    ;;
+  roles-apply)
+    echo "==> Rol ruxsatlarini qayta qo'llash (owner/admin/koordinator/ustoz/kurator)"
+    node prisma/rbac-apply.js
+    ;;
   all-superadmin-dry)
     echo "==> Barchani superadmin qilish (dry-run)"
     node prisma/all-superadmin.js --dry
@@ -43,7 +75,7 @@ case "${TASK:-}" in
     ;;
   teachers)
     echo "==> Ustoz/kurator/koordinator: biriktirilgan fan, sinflar va dars soni"
-    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();(async()=>{const us=await p.user.findMany({where:{role:{slug:{in:['teacher','curator','coordinator']}}},select:{id:true,fullName:true,phone:true,role:{select:{slug:true}},subject:{select:{name:true}},taughtClasses:{select:{class:{select:{name:true}}}}},orderBy:{fullName:'asc'}});console.log('Jami:',us.length);for(const u of us){const sch=await p.schedule.count({where:{teacherId:u.id}});const cls=u.taughtClasses.map(t=>t.class.name).join(', ')||'-';console.log(' ',u.phone.padEnd(15),u.role.slug.padEnd(12),'fan:',(u.subject?u.subject.name:'-').padEnd(18),'sinflar:',cls.padEnd(28),'jadval:',String(sch).padEnd(3),u.fullName)}})().catch(e=>console.error(e.message)).finally(()=>p.\$disconnect())"
+    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();const m=s=>s&&s.length>8?s.slice(0,7)+'***'+s.slice(-2):'***';(async()=>{const us=await p.user.findMany({where:{role:{slug:{in:['teacher','curator','coordinator']}}},select:{id:true,fullName:true,phone:true,role:{select:{slug:true}},subject:{select:{name:true}},taughtClasses:{select:{class:{select:{name:true}}}}},orderBy:{fullName:'asc'}});console.log('Jami:',us.length);for(const u of us){const sch=await p.schedule.count({where:{teacherId:u.id}});const cls=u.taughtClasses.map(t=>t.class.name).join(', ')||'-';console.log(' ',m(u.phone).padEnd(15),u.role.slug.padEnd(12),'fan:',(u.subject?u.subject.name:'-').padEnd(18),'sinflar:',cls.padEnd(28),'jadval:',String(sch).padEnd(3),u.fullName)}})().catch(e=>console.error(e.message)).finally(()=>p.\$disconnect())"
     ;;
   employees-sync-dry)
     echo "==> Kimga xodim kartasi ochilishini ko'rish (baza o'zgarmaydi)"
@@ -69,7 +101,7 @@ case "${TASK:-}" in
     ;;
   users)
     echo "==> Foydalanuvchilar (rol · xodim kartasi holati)"
-    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.findMany({select:{fullName:true,phone:true,status:true,role:{select:{slug:true}},employee:{select:{id:true}}},orderBy:{createdAt:'asc'}}).then(u=>{console.log('Jami:',u.length,'· xodim kartasi bor:',u.filter(x=>x.employee).length);u.forEach(x=>console.log(' ',x.role.slug.padEnd(13),x.phone.padEnd(15),x.status.padEnd(8),(x.employee?'karta+':'karta-').padEnd(7),x.fullName))}).finally(()=>p.\$disconnect())"
+    node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();const m=s=>s&&s.length>8?s.slice(0,7)+'***'+s.slice(-2):'***';p.user.findMany({select:{fullName:true,phone:true,status:true,role:{select:{slug:true}},employee:{select:{id:true}}},orderBy:{createdAt:'asc'}}).then(u=>{console.log('Jami:',u.length,'· xodim kartasi bor:',u.filter(x=>x.employee).length);u.forEach(x=>console.log(' ',x.role.slug.padEnd(13),m(x.phone).padEnd(15),x.status.padEnd(8),(x.employee?'karta+':'karta-').padEnd(7),x.fullName))}).finally(()=>p.\$disconnect())"
     ;;
   *)
     echo "Noma'lum vazifa: '${TASK:-}'" >&2

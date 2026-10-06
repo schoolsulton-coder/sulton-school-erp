@@ -18,6 +18,7 @@ import { CreateAccountDto } from './dto/create-account.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('students')
 @ApiBearerAuth()
@@ -29,6 +30,7 @@ export class StudentsController {
   @Get()
   @Permissions('students.view')
   findAll(
+    @CurrentUser() user: { id: string; role: string },
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
@@ -37,7 +39,7 @@ export class StudentsController {
     @Query('academicYear') academicYear?: string,
     @Query('branchId') branchId?: string,
   ) {
-    return this.service.findAll({ page, limit, search, classId, status, academicYear, branchId });
+    return this.service.findAll({ page, limit, search, classId, status, academicYear, branchId, user });
   }
 
   @Get(':id')

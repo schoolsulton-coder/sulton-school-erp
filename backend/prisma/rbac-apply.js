@@ -25,8 +25,43 @@ const g2p = (groups) => groups.flatMap((g) => (GROUPS[g] || []).map((a) => `${g}
 
 const SETS = {
   superadmin: allSlugs,
-  admin: g2p(['crm', 'contracts', 'students']),
+  owner: allSlugs,
+  // Administrator: qabul, shartnoma/to'lov, o'quvchi + sinflarni ko'rish
+  admin: [...g2p(['crm', 'contracts', 'students']), 'classes.view'],
   akademik: g2p(['students', 'classes', 'grades', 'attendance', 'homework', 'behavior']),
+  sales: ['crm.view', 'crm.create', 'crm.update', 'students.view'],
+  coordinator: [
+    'students.view', 'classes.view',
+    'grades.view', 'grades.create', 'grades.update',
+    'attendance.view', 'attendance.create', 'attendance.update',
+    'homework.view', 'homework.create', 'homework.update',
+    'behavior.view', 'behavior.create', 'behavior.update',
+  ],
+  teacher: [
+    'students.view', 'classes.view',
+    'grades.view', 'grades.create', 'grades.update',
+    'attendance.view', 'attendance.create',
+    'homework.view', 'homework.create', 'homework.update',
+    'behavior.view', 'behavior.create',
+  ],
+  curator: [
+    'students.view', 'classes.view',
+    'grades.view',
+    'attendance.view', 'attendance.create',
+    'homework.view',
+    'behavior.view', 'behavior.create',
+  ],
+};
+
+const ROLE_NAMES = {
+  superadmin: 'Superadmin',
+  owner: 'Egasi (Owner)',
+  admin: 'Administrator',
+  akademik: "Akademik bo'lim rahbari",
+  sales: 'Sotuv menejeri',
+  coordinator: 'Koordinator',
+  teacher: 'Ustoz',
+  curator: 'Kurator',
 };
 
 async function ensureRole(slug, name) {
@@ -45,20 +80,12 @@ async function setPerms(roleId, slugs) {
 }
 
 (async () => {
-  const superadmin = await ensureRole('superadmin', 'Superadmin');
-  const admin = await ensureRole('admin', 'Administrator');
-  const akademik = await ensureRole('akademik', "Akademik bo'lim rahbari");
-
-  const c1 = await setPerms(superadmin.id, SETS.superadmin);
-  const c2 = await setPerms(admin.id, SETS.admin);
-  const c3 = await setPerms(akademik.id, SETS.akademik);
-
-  const owner = await prisma.user.updateMany({
-    where: { phone: '+998990000000' },
-    data: { roleId: superadmin.id },
-  });
-
-  console.log(`superadmin=${c1} ruxsat, admin=${c2}, akademik=${c3}, owner→superadmin=${owner.count}`);
+  const out = [];
+  for (const [slug, slugs] of Object.entries(SETS)) {
+    const role = await ensureRole(slug, ROLE_NAMES[slug] || slug);
+    out.push(`${slug}=${await setPerms(role.id, slugs)}`);
+  }
+  console.log('Rol ruxsatlari qo'llandi:', out.join(', '));
 })()
   .catch((e) => console.error('RBAC xato:', e.message))
   .finally(() => prisma.$disconnect());

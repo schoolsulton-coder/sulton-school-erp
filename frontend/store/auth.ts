@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { PORTAL_ROLES, SHOW_ALL_MENUS } from '@/lib/rbac';
+import { FULL_ACCESS_ROLES, PORTAL_ROLES, SHOW_ALL_MENUS, STRICT_ROLES } from '@/lib/rbac';
 
 export interface AuthUser {
   id: string;
@@ -34,8 +34,11 @@ export const useAuthStore = create<AuthState>()(
       can: (permission) => {
         const user = get().user;
         if (!user) return false;
-        if (user.role === 'superadmin') return true;
-        // VAQTINCHALIK: barcha oynalar hamma xodimga ochiq (lib/rbac.ts)
+        // Owner/Superadmin — hamma oyna
+        if (FULL_ACCESS_ROLES.includes(user.role)) return true;
+        // Administrator, koordinator, ustoz, kurator — faqat o'z ruxsatlari
+        if (STRICT_ROLES.includes(user.role)) return user.permissions.includes(permission);
+        // Qolgan xodim rollari — hozircha ochiq rejimda (lib/rbac.ts)
         if (SHOW_ALL_MENUS && !PORTAL_ROLES.includes(user.role)) return true;
         return user.permissions.includes(permission);
       },

@@ -29,7 +29,8 @@ enum Gender {
 }
 
 enum StudentStatus {
-  ACTIVE        // o'qiyapti
+  ACTIVE
+  INACTIVE // Nofaol — shartnomasi bekor qilingan/to'xtagan        // o'qiyapti
   GRADUATED     // bitirgan
   EXPELLED      // chetlatilgan
   ARCHIVED      // arxiv

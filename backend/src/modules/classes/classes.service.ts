@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { activeWeek } from '../../common/schedule-weeks';
+import { canSeeAllClasses } from '../../common/rbac-open';
+import { ownClassIds } from '../../common/own-classes';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignStudentsDto } from './dto/assign-students.dto';
@@ -14,9 +16,14 @@ import { AssignTeacherDto } from './dto/assign-teacher.dto';
 export class ClassesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(academicYear?: string) {
+  async findAll(academicYear?: string, user?: { id: string; role: string }) {
+    // Ustoz/kurator/koordinator faqat o'ziga biriktirilgan sinflarni ko'radi
+    const mine = user && !canSeeAllClasses(user.role) ? await ownClassIds(this.prisma, user.id) : null;
     const classes = await this.prisma.class.findMany({
-      where: academicYear ? { academicYear } : {},
+      where: {
+        ...(academicYear ? { academicYear } : {}),
+        ...(mine ? { id: { in: mine } } : {}),
+      },
       include: {
         _count: { select: { students: true } },
         branch: { select: { id: true, name: true } },

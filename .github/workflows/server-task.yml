@@ -9,6 +9,11 @@ name: Server task (qo'lda)
 #   OWNER_PHONE     — ixtiyoriy, default +998990000000
 #   STAFF_PASSWORD  — ixtiyoriy, yangi xodimlar paroli. Berilmasa har bir xodimga
 #                     tasodifiy kuchli parol beriladi (ro'yxat vazifa logida chiqadi)
+#   ADMIN_PHONE     — admin-create uchun Administrator logini (+998...)
+#   ADMIN_PASSWORD  — admin-create uchun parol (logga chiqmaydi)
+#   ADMIN_NAME      — ixtiyoriy, Administrator ismi
+#   COORDINATORS_JSON — koordinator–sinf ro'yxati, masalan:
+#                     [{"name":"Ism Familiya","phone":"+998901234567","classes":["6-Ahmad Al-Farg'oniy"]}]
 
 on:
   workflow_dispatch:
@@ -23,6 +28,13 @@ on:
           - staff-seed          # xodimlarni qo'shish
           - staff-password      # ro'yxatdagi hamma xodim parolini yangilash (default 123456)
           - set-owner           # admin parolini yangilash (OWNER_PASSWORD secret)
+          - admin-create        # Administrator hisobi (ADMIN_PHONE + ADMIN_PASSWORD)
+          - make-owner          # OWNER_PHONE egasiga "owner" roli (hamma oyna)
+          - coordinators-dry    # koordinator–sinf biriktiruvini ko'rish
+          - coordinators        # koordinatorlarga sinflarni biriktirish
+          - students-inactive-dry # shartnomasi bekor bo'lganlarni ko'rish
+          - students-inactive   # ularni "Nofaol" qilish
+          - roles-apply         # rol ruxsatlarini qayta qo'llash
           - all-superadmin-dry  # kim superadmin bo'lishini ko'rish
           - all-superadmin      # hammani superadmin qilish
           - users               # bazadagi foydalanuvchilar ro'yxati
@@ -52,6 +64,10 @@ jobs:
           OWNER_PHONE: ${{ secrets.OWNER_PHONE }}
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
           STAFF_PASSWORD: ${{ secrets.STAFF_PASSWORD }}
+          ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+          COORDINATORS_JSON: ${{ secrets.COORDINATORS_JSON }}
           TASK: ${{ inputs.task }}
         run: |
           set -e

@@ -75,6 +75,7 @@ export default function StudentsPage() {
         <select value={filters.status ?? ''} onChange={(e) => set({ status: e.target.value || undefined })} className={selCls}>
           <option value="">Barcha holatlar</option>
           <option value="ACTIVE">Faol</option>
+          <option value="INACTIVE">Nofaol</option>
           <option value="GRADUATED">Bitirgan</option>
           <option value="EXPELLED">Chetlatilgan</option>
           <option value="ARCHIVED">Arxiv</option>

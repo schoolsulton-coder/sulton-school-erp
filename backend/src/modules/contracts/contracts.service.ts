@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ContractStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { CreateContractDto } from './dto/create-contract.dto';
@@ -15,6 +15,11 @@ import { CreateFromLeadDto } from './dto/create-from-lead.dto';
 import { renderContractHtml } from './contract-template';
 
 type DiscountRow = { type: 'PERCENT' | 'FIXED'; value: number; name: string };
+
+type Db = PrismaService | Prisma.TransactionClient;
+
+/** O'quvchi "o'qiyapti" deb sanaladigan shartnoma holatlari */
+const ENROLLED_STATUSES: ContractStatus[] = ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'];
 
 @Injectable()
 export class ContractsService {
@@ -57,6 +62,26 @@ export class ContractsService {
   }
 
   /** Raqam bandligi (unique) xatosimi — bir vaqtda ikki shartnoma tuzilganda bo'ladi */
+  /**
+   * Shartnoma holatiga qarab o'quvchini faol/nofaol qiladi.
+   * Faol shartnomasi qolmasa — "Nofaol", yangi faol shartnoma paydo bo'lsa — qayta "Faol".
+   * Bitirgan/chetlatilgan/arxiv holatlariga tegilmaydi.
+   */
+  private async syncStudentStatus(studentId: string, db: Db = this.prisma) {
+    const [student, total, enrolled] = await Promise.all([
+      db.student.findUnique({ where: { id: studentId }, select: { status: true } }),
+      db.contract.count({ where: { studentId } }),
+      db.contract.count({ where: { studentId, status: { in: ENROLLED_STATUSES } } }),
+    ]);
+    // Shartnomasi umuman yo'q o'quvchiga tegilmaydi (yangi qo'shilgan bo'lishi mumkin)
+    if (!student || total === 0) return;
+    if (!enrolled && student.status === 'ACTIVE') {
+      await db.student.update({ where: { id: studentId }, data: { status: 'INACTIVE' } });
+    } else if (enrolled && student.status === 'INACTIVE') {
+      await db.student.update({ where: { id: studentId }, data: { status: 'ACTIVE' } });
+    }
+  }
+
   private isDuplicateNumber(e: any): boolean {
     return e?.code === 'P2002' && JSON.stringify(e?.meta ?? {}).includes('number');
   }
@@ -92,7 +117,7 @@ export class ContractsService {
     for (let attempt = 0; ; attempt++) {
       const number = await this.nextNumber(start.getFullYear(), attempt);
       try {
-        return await this.prisma.contract.create({
+        const created = await this.prisma.contract.create({
           data: {
             number,
             studentId: dto.studentId,
@@ -107,6 +132,9 @@ export class ContractsService {
           },
           include: { installments: { orderBy: { dueDate: 'asc' } } },
         });
+        // Yangi shartnoma — nofaol o'quvchi qayta faol bo'ladi
+        await this.syncStudentStatus(dto.studentId);
+        return created;
       } catch (e) {
         if (attempt < 5 && this.isDuplicateNumber(e)) continue;
         throw e;
@@ -514,11 +542,14 @@ export class ContractsService {
   }
 
   async cancel(id: string) {
-    await this.findOne(id);
-    return this.prisma.contract.update({
+    const contract = await this.findOne(id);
+    const res = await this.prisma.contract.update({
       where: { id },
       data: { status: 'CANCELLED', statusChangedAt: new Date() },
     });
+    // Bekor qilindi — boshqa faol shartnomasi qolmasa, o'quvchi "Nofaol" bo'ladi
+    await this.syncStudentStatus(contract.studentId);
+    return res;
   }
 
   // ===== Shartnoma statusini oylarga qarab avtomat moslash (ACTIVE <-> COMPLETED) =====
@@ -571,6 +602,11 @@ export class ContractsService {
         await tx.contract.update({ where: { id }, data });
       }
     });
+
+    // Holat o'zgargan bo'lsa — o'quvchi "Faol/Nofaol" holati moslanadi
+    if (dto.status !== undefined && dto.status !== contract.status) {
+      await this.syncStudentStatus(contract.studentId);
+    }
 
     return this.findOne(id);
   }
@@ -628,6 +664,8 @@ export class ContractsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    // Shartnoma o'chirildi — o'quvchi holati qayta hisoblanadi
+    await this.syncStudentStatus(contract.studentId);
     return { ok: true };
   }
 

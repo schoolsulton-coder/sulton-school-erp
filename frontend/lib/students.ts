@@ -1,6 +1,6 @@
 import { api } from './api';
 
-export type StudentStatus = 'ACTIVE' | 'GRADUATED' | 'EXPELLED' | 'ARCHIVED';
+export type StudentStatus = 'ACTIVE' | 'INACTIVE' | 'GRADUATED' | 'EXPELLED' | 'ARCHIVED';
 
 export interface StudentListItem {
   id: string;
@@ -41,12 +41,14 @@ export interface StudentListResponse {
 
 export const STATUS_LABEL: Record<StudentStatus, string> = {
   ACTIVE: 'Faol',
+  INACTIVE: 'Nofaol',
   GRADUATED: 'Bitirgan',
   EXPELLED: 'Chetlatilgan',
   ARCHIVED: 'Arxiv',
 };
 export const STATUS_COLOR: Record<StudentStatus, string> = {
   ACTIVE: 'bg-green-100 text-green-700',
+  INACTIVE: 'bg-amber-100 text-amber-700',
   GRADUATED: 'bg-blue-100 text-brand',
   EXPELLED: 'bg-red-100 text-red-700',
   ARCHIVED: 'bg-slate-100 text-slate-500',

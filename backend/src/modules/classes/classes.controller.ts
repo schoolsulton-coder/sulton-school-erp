@@ -18,6 +18,7 @@ import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('classes')
 @ApiBearerAuth()
@@ -28,8 +29,12 @@ export class ClassesController {
 
   @Get()
   @Permissions('classes.view')
-  findAll(@Query('academicYear') academicYear?: string) {
-    return this.service.findAll(academicYear);
+  findAll(
+    @CurrentUser() user: { id: string; role: string },
+    @Query('academicYear') academicYear?: string,
+  ) {
+    // Ustoz/kurator/koordinator — faqat o'ziga biriktirilgan sinflar
+    return this.service.findAll(academicYear, user);
   }
 
   @Get(':id')

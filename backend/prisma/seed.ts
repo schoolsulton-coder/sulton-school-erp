@@ -17,6 +17,7 @@ const prisma = new PrismaClient();
 // 7 rol
 const ROLES = [
   { slug: 'superadmin', name: 'Superadmin' },
+  { slug: 'owner', name: 'Egasi (Owner)' },
   { slug: 'admin', name: 'Administrator' },
   { slug: 'akademik', name: "Akademik bo'lim rahbari" },
   { slug: 'sales', name: 'Sotuv menejeri' },
@@ -52,6 +53,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'crm.view', 'crm.create', 'crm.update', 'crm.delete',
     'contracts.view', 'contracts.create', 'contracts.update', 'contracts.delete',
     'students.view', 'students.create', 'students.update', 'students.delete',
+    'classes.view',
   ],
   // Akademik bo'lim rahbari: Ma'lumotlar (students+classes) + O'quv jarayoni
   akademik: [
@@ -63,20 +65,18 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'behavior.view', 'behavior.create', 'behavior.update', 'behavior.delete',
   ],
   sales: ['crm.view', 'crm.create', 'crm.update', 'students.view'],
+  // Koordinator: o'quv jarayoni (faqat o'ziga biriktirilgan sinflar — kod tomonda cheklanadi)
   coordinator: [
-    'classes.view',
-    'classes.create',
-    'classes.update',
     'students.view',
-    'students.create',
-    'students.update',
-    // O'quv jarayoni ko'rinishi uchun
-    'grades.view',
-    'attendance.view',
-    'homework.view',
-    'behavior.view',
+    'classes.view',
+    'grades.view', 'grades.create', 'grades.update',
+    'attendance.view', 'attendance.create', 'attendance.update',
+    'homework.view', 'homework.create', 'homework.update',
+    'behavior.view', 'behavior.create', 'behavior.update',
   ],
   teacher: [
+    'students.view',
+    'classes.view',
     'grades.view',
     'grades.create',
     'grades.update',
@@ -90,6 +90,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   curator: [
     'students.view',
+    'classes.view',
     'grades.view',
     'attendance.view',
     'attendance.create',

@@ -6,17 +6,15 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import { isOpenAccess } from '../rbac-open';
+import { FULL_ACCESS_ROLES, isOpenAccess } from '../rbac-open';
 
 /**
  * RBAC: endpoint uchun kerakli ruxsat foydalanuvchida bor-yo'qligini tekshiradi.
  * Foydalanuvchi ruxsatlari JWT payload'ida (`permissions: string[]`) keladi.
- * Administrator (`admin`) — barcha ruxsatlarga ega.
  *
- * VAQTINCHALIK ochiq rejim: dasturning barcha oynalari hamma xodimga ochiq —
- * tizimga kirgan har qanday foydalanuvchi (o'quvchi/vasiydan tashqari) barcha
- * endpointlardan foydalana oladi (frontend'dagi SHOW_ALL_MENUS bilan juft).
- * Rollar bo'yicha qat'iy cheklovni qaytarish: `.env` da RBAC_STRICT=true.
+ *  - Owner/Superadmin — hamma narsa ochiq;
+ *  - Administrator/koordinator/ustoz/kurator — faqat o'z ruxsatlari (rbac-open.ts);
+ *  - qolgan xodim rollari — hozircha ochiq rejimda (RBAC_STRICT=true bilan yopiladi).
  */
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -35,7 +33,8 @@ export class PermissionsGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     if (!user) throw new ForbiddenException('Avtorizatsiya talab qilinadi');
 
-    if (user.role === 'superadmin') return true;
+    // Owner/Superadmin — hamma narsaga ruxsat
+    if (FULL_ACCESS_ROLES.includes(user.role)) return true;
 
     if (isOpenAccess(user.role)) return true;
 

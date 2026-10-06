@@ -1,27 +1,42 @@
 /**
- * VAQTINCHALIK ochiq rejim — dasturning barcha oynalari va ma'lumotlari
- * har qanday xodimga ochiq (frontend juftligi: `frontend/lib/rbac.ts`).
+ * Rollar bo'yicha kirish qoidalari (frontend juftligi: `frontend/lib/rbac.ts`).
  *
- * O'quvchi/vasiy portal akkauntlari bundan mustasno — ular o'z kabinetida qoladi.
- * Rollar bo'yicha qat'iy cheklovni qaytarish: `.env` da RBAC_STRICT=true.
+ *  - Owner/Superadmin — hamma oyna va ma'lumot.
+ *  - Administrator, koordinator, ustoz, kurator — FAQAT o'z ruxsatlari doirasida.
+ *  - Qolgan xodim rollari — hozircha ochiq rejimda (`.env` da RBAC_STRICT=true bilan yopiladi).
+ *  - O'quvchi/vasiy — faqat portal.
  */
 
-/** O'z kabinetida qoladigan rollar — ochiq rejim ularga tegmaydi. */
+/** O'z kabinetida qoladigan rollar — ERP oynalari ularga ochilmaydi. */
 export const PORTAL_ROLES = ['student', 'guardian'];
+
+/** Hamma oyna va ma'lumot ochiq bo'ladigan rollar. */
+export const FULL_ACCESS_ROLES = ['superadmin', 'owner'];
 
 /**
  * Faqat o'ziga biriktirilgan sinflar bilan ishlaydigan rollar.
- * Ochiq rejim bularga "hamma sinf" huquqini bermaydi — Baholash/Davomat/Vazifalar
- * oynalarida ustoz o'z sinflarini (ClassTeacher + dars jadvali) ko'radi.
+ * Baholash/Davomat/Vazifa/Ahloq oynalarida ular o'z sinflarini ko'radi
+ * (ClassTeacher + dars jadvali orqali).
  */
 export const OWN_CLASSES_ROLES = ['teacher', 'curator', 'coordinator'];
 
+/**
+ * Ruxsatlari qat'iy tekshiriladigan rollar — ochiq rejim bularga tegmaydi.
+ * Administrator shu ro'yxatda: u faqat qabul, shartnoma/to'lov va o'quvchi
+ * oynalarini ko'radi.
+ */
+export const STRICT_ROLES = ['admin', ...OWN_CLASSES_ROLES];
+
+/** Ochiq rejim (vaqtinchalik): ruxsat tekshirilmasdan hamma narsa ochiq */
 export function isOpenAccess(role?: string): boolean {
   if (process.env.RBAC_STRICT === 'true') return false;
-  return !!role && !PORTAL_ROLES.includes(role);
+  if (!role || PORTAL_ROLES.includes(role)) return false;
+  return !STRICT_ROLES.includes(role);
 }
 
-/** Ochiq rejimda ham hamma sinfni ko'ra oladimi (ustoz/kurator/koordinator — yo'q) */
+/** Hamma sinfni ko'ra oladimi (ustoz/kurator/koordinator — faqat o'zinikini) */
 export function canSeeAllClasses(role?: string): boolean {
-  return isOpenAccess(role) && !!role && !OWN_CLASSES_ROLES.includes(role);
+  if (!role) return false;
+  if (FULL_ACCESS_ROLES.includes(role)) return true;
+  return isOpenAccess(role) && !OWN_CLASSES_ROLES.includes(role);
 }
