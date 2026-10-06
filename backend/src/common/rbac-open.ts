@@ -34,9 +34,17 @@ export function isOpenAccess(role?: string): boolean {
   return !STRICT_ROLES.includes(role);
 }
 
-/** Hamma sinfni ko'ra oladimi (ustoz/kurator/koordinator — faqat o'zinikini) */
+/**
+ * Hamma sinfni ko'ra oladimi (ustoz/kurator/koordinator — faqat o'zinikini).
+ *
+ * Bu faqat MA'LUMOT doirasi: qaysi oyna ochilishini ruxsatlar hal qiladi.
+ * Shuning uchun ochiq rejimga bog'lanmaydi — aks holda Administrator
+ * (qat'iy rol, lekin sinfi yo'q) o'quvchi va sinflarni umuman ko'rmay qolardi
+ * va shartnoma ochishda sinf tanlanmasdi.
+ */
 export function canSeeAllClasses(role?: string): boolean {
   if (!role) return false;
   if (FULL_ACCESS_ROLES.includes(role)) return true;
-  return isOpenAccess(role) && !OWN_CLASSES_ROLES.includes(role);
+  if (PORTAL_ROLES.includes(role)) return false;
+  return !OWN_CLASSES_ROLES.includes(role);
 }
