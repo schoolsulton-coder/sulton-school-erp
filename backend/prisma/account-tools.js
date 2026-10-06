@@ -4,7 +4,7 @@
  *
  *   node prisma/account-tools.js admin-create      # ADMIN_PHONE + ADMIN_PASSWORD
  *   node prisma/account-tools.js make-owner        # OWNER_PHONE → "owner" roli
- *   node prisma/account-tools.js coordinators      # COORDINATORS_JSON
+ *   node prisma/account-tools.js coordinators      # COORDINATORS_JSON (+COORDINATOR_PASSWORD)
  *   node prisma/account-tools.js coordinators --dry
  *   node prisma/account-tools.js students-inactive [--dry]
  */
@@ -53,6 +53,11 @@ async function adminCreate() {
   const hash = await argon2.hash(password);
   const existing = await prisma.user.findUnique({ where: { phone }, select: { id: true, fullName: true } });
   if (existing) {
+    if (process.env.ADMIN_OVERWRITE !== '1') {
+      console.error(`Xato: ${mask(phone)} raqami allaqachon band (${existing.fullName}).`);
+      console.error("Boshqa raqam tanlang yoki ataylab shu hisobni almashtirmoqchi bo'lsangiz ADMIN_OVERWRITE=1 secret'ini qo'shing.");
+      process.exit(1);
+    }
     await prisma.user.update({ where: { id: existing.id }, data: { password: hash, roleId: role.id, status: 'ACTIVE' } });
     console.log(`Administrator yangilandi: ${existing.fullName} · ${mask(phone)} (rol: admin, parol almashtirildi)`);
   } else {
@@ -103,17 +108,19 @@ async function coordinators(dry) {
   }
 
   const role = await ensureRole('coordinator', 'Koordinator');
+  // Hisobi yo'q koordinatorga shu parol bilan hisob ochiladi (berilmasa — ochilmaydi)
+  const newPassword = String(process.env.COORDINATOR_PASSWORD || '');
   const allClasses = await prisma.class.findMany({ select: { id: true, name: true } });
   const byName = new Map(allClasses.map((c) => [normClass(c.name), c]));
 
+  let missingClasses = 0;
   console.log(`${dry ? '[DRY-RUN] ' : ''}Koordinatorlar: ${list.length} ta`);
   for (const row of list) {
     const phone = normPhone(row.phone);
-    const user = await prisma.user.findUnique({ where: { phone }, select: { id: true, fullName: true, role: { select: { slug: true } } } });
-    if (!user) {
-      console.log(`  ✗ ${row.name ?? '—'} · ${mask(phone)} — foydalanuvchi topilmadi (avval hisob oching)`);
-      continue;
-    }
+    let user = await prisma.user.findUnique({ where: { phone }, select: { id: true, fullName: true, role: { select: { slug: true } } } });
+    const label = `${user ? user.fullName : row.name ?? '—'} · ${mask(phone)}`;
+
+    // Sinf nomlarini moslash (dry-run'da ham ko'rinadi)
     const wanted = [];
     const missing = [];
     for (const cn of row.classes ?? []) {
@@ -121,15 +128,36 @@ async function coordinators(dry) {
       if (cls) wanted.push(cls);
       else missing.push(cn);
     }
-    if (!dry) {
+    missingClasses += missing.length;
+
+    if (!user) {
+      if (!newPassword) {
+        console.log(`  ✗ ${label} — hisob topilmadi. COORDINATOR_PASSWORD secret'i berilsa, hisob avtomat ochiladi.`);
+        if (missing.length) console.log(`     ⚠ sinf topilmadi: ${missing.join(', ')}`);
+        continue;
+      }
+      if (dry) {
+        console.log(`  + ${label} — yangi hisob ochiladi (rol: coordinator)`);
+      } else {
+        user = await prisma.user.create({
+          data: { fullName: row.name || 'Koordinator', phone, password: await argon2.hash(newPassword), roleId: role.id },
+          select: { id: true, fullName: true, role: { select: { slug: true } } },
+        });
+        console.log(`  + ${label} — yangi hisob ochildi (rol: coordinator, parol: COORDINATOR_PASSWORD)`);
+      }
+    }
+
+    if (!dry && user) {
       if (user.role.slug !== 'coordinator') {
         await prisma.user.update({ where: { id: user.id }, data: { roleId: role.id } });
       }
-      // Faqat ro'yxatdagi sinflar qolsin
-      await prisma.classTeacher.deleteMany({
-        where: { teacherId: user.id, classId: { notIn: wanted.map((c) => c.id) } },
-      });
+      // Faqat ro'yxatdagi sinflar qolsin. Bironta ham sinf topilmasa — tegilmaydi
+      // (aks holda noto'g'ri yozilgan nom borini ham o'chirib yuborardi).
+      // Kurator biriktiruvi saqlanadi: u alohida majburiyat.
       if (wanted.length) {
+        await prisma.classTeacher.deleteMany({
+          where: { teacherId: user.id, isCurator: false, classId: { notIn: wanted.map((c) => c.id) } },
+        });
         await prisma.classTeacher.createMany({
           data: wanted.map((c) => ({ classId: c.id, teacherId: user.id, isCurator: false })),
           skipDuplicates: true,
@@ -137,8 +165,12 @@ async function coordinators(dry) {
       }
     }
     const names = wanted.map((c) => c.name).join(', ') || '—';
-    console.log(`  ✓ ${user.fullName} · ${mask(phone)} · rol: coordinator · sinflar: ${names}`);
-    if (missing.length) console.log(`     ⚠ topilmadi: ${missing.join(', ')}`);
+    console.log(`  ✓ ${label} · rol: coordinator · sinflar: ${names}`);
+    if (missing.length) console.log(`     ⚠ sinf topilmadi: ${missing.join(', ')} — bu sinflar biriktirilmadi`);
+  }
+  if (missingClasses) {
+    console.log(`\nBazadagi sinf nomlari (${allClasses.length} ta): ${allClasses.map((c) => c.name).join(' | ')}`);
+    console.log("To'g'ri nomni COORDINATORS_JSON'ga yozib, vazifani qaytadan ishga tushiring.");
   }
   if (dry) console.log('(dry-run — baza o\'zgarmadi)');
 }

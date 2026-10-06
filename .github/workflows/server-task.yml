@@ -12,6 +12,8 @@ name: Server task (qo'lda)
 #   ADMIN_PHONE     — admin-create uchun Administrator logini (+998...)
 #   ADMIN_PASSWORD  — admin-create uchun parol (logga chiqmaydi)
 #   ADMIN_NAME      — ixtiyoriy, Administrator ismi
+#   ADMIN_OVERWRITE — "1" bo'lsa, ADMIN_PHONE band bo'lsa ham o'sha hisob almashtiriladi
+#   COORDINATOR_PASSWORD — ixtiyoriy, hisobi yo'q koordinatorga ochiladigan parol
 #   COORDINATORS_JSON — koordinator–sinf ro'yxati, masalan:
 #                     [{"name":"Ism Familiya","phone":"+998901234567","classes":["6-Ahmad Al-Farg'oniy"]}]
 
@@ -67,7 +69,9 @@ jobs:
           ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+          ADMIN_OVERWRITE: ${{ secrets.ADMIN_OVERWRITE }}
           COORDINATORS_JSON: ${{ secrets.COORDINATORS_JSON }}
+          COORDINATOR_PASSWORD: ${{ secrets.COORDINATOR_PASSWORD }}
           TASK: ${{ inputs.task }}
         run: |
           set -e
@@ -83,7 +87,7 @@ jobs:
           # Qiymatlar ichida apostrof/qo'shtirnoq bo'lsa ham buzilmasin (COORDINATORS_JSON) —
           # env fayl base64 qilib yuboriladi, logga chiqmaydi.
           ENV_FILE="$(mktemp)"
-          for v in TASK OWNER_PHONE OWNER_PASSWORD STAFF_PASSWORD ADMIN_PHONE ADMIN_PASSWORD ADMIN_NAME COORDINATORS_JSON; do
+          for v in TASK OWNER_PHONE OWNER_PASSWORD STAFF_PASSWORD ADMIN_PHONE ADMIN_PASSWORD ADMIN_NAME ADMIN_OVERWRITE COORDINATORS_JSON COORDINATOR_PASSWORD; do
             printf 'export %s=%q\n' "$v" "${!v:-}" >> "$ENV_FILE"
           done
           ENV_B64="$(base64 -w0 < "$ENV_FILE")"
