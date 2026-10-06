@@ -200,6 +200,42 @@ Birinchi push'dan so'ng GitHub → Packages → `sulton-backend`/`sulton-fronten
 
 ---
 
+## 11. Server vazifalari (Actions → "Server task (qo'lda)")
+
+Serverga SSH'siz, GitHub sahifasidan bir martalik buyruqlar: **Actions → Server task
+(qo'lda) → Run workflow → vazifani tanlang**. Maxfiy qiymatlar faqat
+**Settings → Secrets and variables → Actions** dan olinadi — repo ochiq, shuning uchun
+parol/telefon kodga yozilmaydi va log'da to'liq ko'rinmaydi (telefon niqoblanadi).
+
+| Vazifa | Nima qiladi | Kerakli secret |
+|---|---|---|
+| `admin-create` | Administrator hisobi (yo'q bo'lsa ochadi, bor bo'lsa parolini yangilaydi) | `ADMIN_PHONE`, `ADMIN_PASSWORD`, ixtiyoriy `ADMIN_NAME`, band raqamni almashtirish uchun `ADMIN_OVERWRITE=1` |
+| `make-owner` | Hisobga **Owner** roli (barcha oynalar ochiladi) | `OWNER_PHONE` |
+| `coordinators-dry` / `coordinators` | Koordinatorlarga sinflarni biriktiradi; hisobi yo'qiga hisob ochadi | `COORDINATORS_JSON`, ixtiyoriy `COORDINATOR_PASSWORD` |
+| `students-inactive-dry` / `students-inactive` | Shartnomasi bekor/muddati o'tgan o'quvchilarni **Nofaol** qiladi | — |
+| `roles-apply` | Rol ruxsatlarini qayta qo'llaydi (owner/admin/koordinator/ustoz/kurator) | — |
+| `users` / `teachers` | Hisoblar va ustoz–sinf biriktiruvi ro'yxati | — |
+| `diag` / `logs` | Server holati va backend loglari | — |
+
+**Qoida:** `-dry` versiyasi bazani o'zgartirmaydi — avval uni ishga tushirib log'ni
+o'qing, keyin asosiysini bajaring.
+
+`COORDINATORS_JSON` formati (sinf nomi bazadagidek yozilsin; apostrof va
+katta-kichik harf farqi hisobga olinmaydi):
+
+```json
+[
+  {"name":"Ism Familiya","phone":"+998901234567","classes":["6-Ahmad Al-Farg'oniy","9-Imom al-Buxoriy"]}
+]
+```
+
+Sinf nomi topilmasa, vazifa to'xtamaydi: o'sha sinf biriktirilmaydi va log oxirida
+**bazadagi barcha sinf nomlari** chiqadi — to'g'ri nomni JSON'ga yozib, qaytadan
+ishga tushirasiz. Bironta sinf topilmasa, mavjud biriktiruvlarga tegilmaydi;
+kurator biriktiruvi hamisha saqlanadi.
+
+---
+
 ## Eslatmalar
 - **Portlar:** faqat nginx (80/443) tashqariga ochiq. Backend/frontend/DB ichki tarmoqda.
 - **PDF:** backend image'ida Chromium o'rnatilgan (puppeteer `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`).
