@@ -4,6 +4,11 @@
 # Maxfiy qiymatlar (OWNER_PASSWORD, STAFF_PASSWORD) workflow'dan env orqali keladi, logga tushmaydi.
 set -euo pipefail
 
+# Workflow maxfiy qiymatlarni base64 env fayl sifatida yuboradi
+if [ -n "${TASK_ENV_B64:-}" ]; then
+  eval "$(printf '%s' "$TASK_ENV_B64" | base64 -d)"
+fi
+
 APP_DIR="${APP_DIR:-/opt/sulton-erp}"
 cd "$APP_DIR/backend"
 

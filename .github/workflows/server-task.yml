@@ -80,6 +80,14 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           PORT="${SSH_PORT:-22}"
           ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Qiymatlar ichida apostrof/qo'shtirnoq bo'lsa ham buzilmasin (COORDINATORS_JSON) —
+          # env fayl base64 qilib yuboriladi, logga chiqmaydi.
+          ENV_FILE="$(mktemp)"
+          for v in TASK OWNER_PHONE OWNER_PASSWORD STAFF_PASSWORD ADMIN_PHONE ADMIN_PASSWORD ADMIN_NAME COORDINATORS_JSON; do
+            printf 'export %s=%q\n' "$v" "${!v:-}" >> "$ENV_FILE"
+          done
+          ENV_B64="$(base64 -w0 < "$ENV_FILE")"
+          rm -f "$ENV_FILE"
           ssh -i ~/.ssh/id_ed25519 -p "$PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" \
-            "TASK='$TASK' OWNER_PHONE='$OWNER_PHONE' OWNER_PASSWORD='$OWNER_PASSWORD' STAFF_PASSWORD='$STAFF_PASSWORD' bash -s" \
+            "TASK_ENV_B64='$ENV_B64' bash -s" \
             < deploy/server-task.sh
