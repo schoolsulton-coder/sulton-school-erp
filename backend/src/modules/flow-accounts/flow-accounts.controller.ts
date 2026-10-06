@@ -14,7 +14,10 @@ import { FlowAccountsService } from './flow-accounts.service';
 import { CreateFlowAccountDto, UpdateFlowAccountDto } from './dto/flow-account.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
-import { Permissions } from '../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../common/decorators/permissions.decorator';
 
 @ApiTags('flow-accounts')
 @ApiBearerAuth()
@@ -24,7 +27,9 @@ export class FlowAccountsController {
   constructor(private readonly service: FlowAccountsService) {}
 
   @Get()
-  @Permissions('finance.view')
+  // Kassa ro'yxatini to'lov kirituvchi ham o'qiy olishi kerak (Administrator —
+  // contracts.view). Yaratish/tahrirlash esa faqat moliya ruxsati bilan.
+  @PermissionsAny('finance.view', 'contracts.view')
   list(
     @Query('branchId') branchId?: string,
     @Query('currency') currency?: string,

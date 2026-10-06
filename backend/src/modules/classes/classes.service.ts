@@ -25,7 +25,8 @@ export class ClassesService {
         ...(mine ? { id: { in: mine } } : {}),
       },
       include: {
-        _count: { select: { students: true } },
+        // Joy band qiladigan faqat o'qiyotgan o'quvchi (nofaol/bitirgan/chetlatilgan emas)
+        _count: { select: { students: { where: { status: 'ACTIVE' } } } },
         branch: { select: { id: true, name: true } },
         teachers: {
           include: { teacher: { select: { id: true, fullName: true } } },
@@ -107,7 +108,7 @@ export class ClassesService {
   async assignStudents(id: string, dto: AssignStudentsDto) {
     const cls = await this.ensureExists(id);
     const currentCount = await this.prisma.student.count({
-      where: { classId: id },
+      where: { classId: id, status: 'ACTIVE' },
     });
 
     // faqat hozir shu sinfda bo'lmagan o'quvchilar yangi qo'shiladi

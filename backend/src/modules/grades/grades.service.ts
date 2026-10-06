@@ -78,7 +78,8 @@ export class GradesService {
     const sched = await this.prisma.schedule.findFirst({
       where: {
         subjectId,
-        teacherId: user.id,
+        // Bir darsga bir nechta ustoz bo'lishi mumkin
+        OR: [{ teacherId: user.id }, { teachers: { some: { teacherId: user.id } } }],
         ...(classId ? { classId } : {}),
         ...(await scheduleAccessWhere(this.prisma)),
       },
@@ -116,7 +117,7 @@ export class GradesService {
     const weekScope = await scheduleAccessWhere(this.prisma);
     const [sched, assigned, u] = await Promise.all([
       this.prisma.schedule.findMany({
-        where: { teacherId: user.id, ...weekScope },
+        where: { OR: [{ teacherId: user.id }, { teachers: { some: { teacherId: user.id } } }], ...weekScope },
         select: {
           classId: true,
           subjectId: true,

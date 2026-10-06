@@ -85,7 +85,7 @@ async function setPerms(roleId, slugs) {
     const role = await ensureRole(slug, ROLE_NAMES[slug] || slug);
     out.push(`${slug}=${await setPerms(role.id, slugs)}`);
   }
-  console.log('Rol ruxsatlari qo'llandi:', out.join(', '));
+  console.log("Rol ruxsatlari qo'llandi:", out.join(', '));
 })()
   .catch((e) => console.error('RBAC xato:', e.message))
   .finally(() => prisma.$disconnect());

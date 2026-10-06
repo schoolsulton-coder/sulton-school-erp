@@ -12,7 +12,8 @@ const { PrismaClient } = require('@prisma/client');
 const argon2 = require('argon2');
 const prisma = new PrismaClient();
 
-const ENROLLED = ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'];
+// contracts.service.ts dagi ENROLLED_STATUSES bilan bir xil bo'lishi shart
+const ENROLLED = ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED', 'OVERDUE'];
 
 /** "+99893-770-71-77" → "+998937707177" */
 function normPhone(raw) {

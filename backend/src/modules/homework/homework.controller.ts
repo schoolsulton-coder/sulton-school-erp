@@ -70,17 +70,22 @@ export class HomeworkController {
   // Topshirish (ustoz/admin qayd etadi; o'quvchi portali keyin)
   @Post(':id/submit')
   @Permissions('homework.update')
-  submit(@Param('id') id: string, @Body() dto: SubmitHomeworkDto) {
-    return this.service.submit(id, dto);
+  submit(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: SubmitHomeworkDto,
+  ) {
+    return this.service.submit(user, id, dto);
   }
 
   @Patch('submissions/:submissionId/grade')
   @Permissions('homework.update')
   grade(
+    @CurrentUser() user: any,
     @Param('submissionId') submissionId: string,
     @Body() dto: GradeSubmissionDto,
   ) {
-    return this.service.grade(submissionId, dto);
+    return this.service.grade(user, submissionId, dto);
   }
 
   @Post('mark-overdue')

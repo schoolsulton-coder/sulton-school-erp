@@ -208,11 +208,12 @@ export class HomeworkService {
   }
 
   /** Topshirish — muddatdan keyin bo'lsa LATE belgilanadi */
-  async submit(homeworkId: string, dto: SubmitHomeworkDto) {
+  async submit(user: JwtUser, homeworkId: string, dto: SubmitHomeworkDto) {
     const hw = await this.prisma.homework.findUnique({
       where: { id: homeworkId },
     });
     if (!hw) throw new NotFoundException('Vazifa topilmadi');
+    await assertClassAccess(this.prisma, user, hw.classId);
 
     const late = new Date() > hw.dueDate;
     return this.prisma.homeworkSubmission.upsert({
@@ -237,11 +238,13 @@ export class HomeworkService {
   }
 
   /** Tekshirish — ball va izoh */
-  async grade(submissionId: string, dto: GradeSubmissionDto) {
+  async grade(user: JwtUser, submissionId: string, dto: GradeSubmissionDto) {
     const sub = await this.prisma.homeworkSubmission.findUnique({
       where: { id: submissionId },
+      include: { homework: { select: { classId: true } } },
     });
     if (!sub) throw new NotFoundException('Topshiriq topilmadi');
+    await assertClassAccess(this.prisma, user, sub.homework.classId);
 
     return this.prisma.homeworkSubmission.update({
       where: { id: submissionId },

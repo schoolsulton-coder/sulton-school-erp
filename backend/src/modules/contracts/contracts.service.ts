@@ -19,7 +19,16 @@ type DiscountRow = { type: 'PERCENT' | 'FIXED'; value: number; name: string };
 type Db = PrismaService | Prisma.TransactionClient;
 
 /** O'quvchi "o'qiyapti" deb sanaladigan shartnoma holatlari */
-const ENROLLED_STATUSES: ContractStatus[] = ['ACTIVE', 'COMPLETED', 'SUSPENDED', 'TEMP_SUSPENDED'];
+// O'quvchi "o'qiyapti" deb hisoblanadigan shartnoma holatlari.
+// OVERDUE ham shu ro'yxatda: to'lov kechikkan bo'lsa ham o'quvchi darsga keladi
+// (davomat/baholash oynalari ham shu ro'yxat bilan ishlaydi).
+const ENROLLED_STATUSES: ContractStatus[] = [
+  'ACTIVE',
+  'COMPLETED',
+  'SUSPENDED',
+  'TEMP_SUSPENDED',
+  'OVERDUE',
+];
 
 @Injectable()
 export class ContractsService {
@@ -73,8 +82,15 @@ export class ContractsService {
       db.contract.count({ where: { studentId } }),
       db.contract.count({ where: { studentId, status: { in: ENROLLED_STATUSES } } }),
     ]);
-    // Shartnomasi umuman yo'q o'quvchiga tegilmaydi (yangi qo'shilgan bo'lishi mumkin)
-    if (!student || total === 0) return;
+    if (!student) return;
+    // Shartnomasi umuman qolmasa: yangi qo'shilgan o'quvchiga tegilmaydi, lekin
+    // avval biz "Nofaol" qilganimizni qaytaramiz (aks holda u shu holatda qotib qolardi)
+    if (total === 0) {
+      if (student.status === 'INACTIVE') {
+        await db.student.update({ where: { id: studentId }, data: { status: 'ACTIVE' } });
+      }
+      return;
+    }
     if (!enrolled && student.status === 'ACTIVE') {
       await db.student.update({ where: { id: studentId }, data: { status: 'INACTIVE' } });
     } else if (enrolled && student.status === 'INACTIVE') {

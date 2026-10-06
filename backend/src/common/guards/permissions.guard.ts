@@ -5,7 +5,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import {
+  PERMISSIONS_ANY_KEY,
+  PERMISSIONS_KEY,
+} from '../decorators/permissions.decorator';
 import { FULL_ACCESS_ROLES, isOpenAccess } from '../rbac-open';
 
 /**
@@ -26,7 +29,12 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (!required || required.length === 0) {
+    const anyOf = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_ANY_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if ((!required || required.length === 0) && (!anyOf || anyOf.length === 0)) {
       return true;
     }
 
@@ -39,8 +47,10 @@ export class PermissionsGuard implements CanActivate {
     if (isOpenAccess(user.role)) return true;
 
     const userPermissions: string[] = user.permissions ?? [];
-    const hasAll = required.every((p) => userPermissions.includes(p));
-    if (!hasAll) {
+    if (required?.length && !required.every((p) => userPermissions.includes(p))) {
+      throw new ForbiddenException('Bu amal uchun ruxsat yo‘q');
+    }
+    if (anyOf?.length && !anyOf.some((p) => userPermissions.includes(p))) {
       throw new ForbiddenException('Bu amal uchun ruxsat yo‘q');
     }
     return true;

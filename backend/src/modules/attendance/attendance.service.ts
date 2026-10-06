@@ -52,7 +52,8 @@ export class AttendanceService {
     });
     if (ct) return;
     const sch = await this.prisma.schedule.findFirst({
-      where: { classId, teacherId: user.id, ...(await scheduleAccessWhere(this.prisma)) },
+      // Bir darsga bir nechta ustoz bo'lishi mumkin — ro'yxatdagilar ham belgilay oladi
+      where: { classId, OR: [{ teacherId: user.id }, { teachers: { some: { teacherId: user.id } } }], ...(await scheduleAccessWhere(this.prisma)) },
       select: { id: true },
     });
     if (sch) return;
@@ -76,7 +77,7 @@ export class AttendanceService {
         select: { class: { select: { id: true, name: true } } },
       }),
       this.prisma.schedule.findMany({
-        where: { teacherId: user.id, ...weekScope },
+        where: { OR: [{ teacherId: user.id }, { teachers: { some: { teacherId: user.id } } }], ...weekScope },
         select: { class: { select: { id: true, name: true } } },
       }),
     ]);

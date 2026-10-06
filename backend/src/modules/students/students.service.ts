@@ -39,12 +39,21 @@ export class StudentsService {
 
     // status filtridan tashqari asosiy filtr (stat kartochkalar barcha holatni ko'rsatsin)
     const base: any = {};
-    // Ustoz/kurator/koordinator — faqat o'ziga biriktirilgan sinflar o'quvchilari
-    if (params.user && !canSeeAllClasses(params.user.role)) {
-      const mine = await ownClassIds(this.prisma, params.user.id);
-      base.classId = params.classId && mine.includes(params.classId) ? params.classId : { in: mine };
+    // Ustoz/kurator/koordinator — faqat o'ziga biriktirilgan sinflar o'quvchilari.
+    // DIQQAT: so'rovdagi ?classId shu doirani bosib ketmasligi kerak —
+    // begona sinf id'si yuborilsa, o'z sinflari ro'yxati qaytadi.
+    const scope =
+      params.user && !canSeeAllClasses(params.user.role)
+        ? await ownClassIds(this.prisma, params.user.id)
+        : null;
+    if (scope) {
+      base.classId =
+        params.classId && scope.includes(params.classId)
+          ? params.classId
+          : { in: scope };
+    } else if (params.classId) {
+      base.classId = params.classId;
     }
-    if (params.classId) base.classId = params.classId;
     if (params.branchId) base.branchId = params.branchId;
     if (params.academicYear) base.class = { academicYear: params.academicYear };
     if (params.search) {
