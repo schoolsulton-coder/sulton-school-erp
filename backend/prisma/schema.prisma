@@ -191,6 +191,8 @@ model User {
   itCreated          InternalTransfer[] @relation("ITCreatedBy")
   itUpdated          InternalTransfer[] @relation("ITUpdatedBy")
   itConfirmed        InternalTransfer[] @relation("ITConfirmedBy")
+  dailyTasksCreated DailyTask[]     @relation("DailyTaskAuthor")
+  dailyTaskMarks    DailyTaskMark[] @relation("DailyTaskMarker")
   scheduleLessons    ScheduleTeacher[]  @relation("ScheduleTeachers")
 
   createdAt DateTime @default(now())
@@ -285,6 +287,7 @@ model Student {
   submissions HomeworkSubmission[]
   behavior    BehaviorRecord[]
   coins       CoinRecord[]
+  dailyTasks  DailyTaskMark[]
   debtorContacts DebtorContact[]
   lead        Lead?                @relation("LeadStudent")
 
@@ -518,6 +521,7 @@ model Class {
   homeworks  Homework[]
   admissions Lead[]
   norms      SubjectNorm[]
+  dailyTasks DailyTask[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1238,8 +1242,64 @@ model CoinRecord {
   date      DateTime @default(now())
   createdAt DateTime @default(now())
 
+  // Kunlik vazifadan kelgan bo'lsa — o'sha belgi (coin o'chirilsa belgi ham ketadi)
+  dailyTaskMark DailyTaskMark?
+
   @@index([studentId, date])
   @@map("coin_records")
+}
+
+// ============================================================================
+//  KUNLIK VAZIFALAR  (koordinator cheklisti → coin)
+// ============================================================================
+
+// Kunlik vazifa. classId bo'sh bo'lsa — maktab bo'yicha umumiy (hamma sinfda
+// chiqadi), aks holda faqat o'sha sinfning qo'shimcha vazifasi.
+model DailyTask {
+  id     String  @id @default(uuid())
+  title  String
+  coins  Int     @default(0)
+  sort   Int     @default(0)
+  active Boolean @default(true)
+
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  authorId String?
+  author   User?   @relation("DailyTaskAuthor", fields: [authorId], references: [id])
+
+  marks DailyTaskMark[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classId, active])
+  @@map("daily_tasks")
+}
+
+// Bir o'quvchiga bir kunda bir vazifa — belgilangan bo'lsa qator bor.
+model DailyTaskMark {
+  id        String @id @default(uuid())
+  taskId    String
+  task      DailyTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  date  DateTime // kun (UTC yarim tuni)
+  coins Int      @default(0) // belgilangan paytdagi qiymat — keyin vazifa o'zgarsa tarix buzilmaydi
+
+  coinRecordId String?     @unique
+  coinRecord   CoinRecord? @relation(fields: [coinRecordId], references: [id], onDelete: Cascade)
+
+  authorId String?
+  author   User?   @relation("DailyTaskMarker", fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, studentId, date])
+  @@index([studentId, date])
+  @@index([date])
+  @@map("daily_task_marks")
 }
 
 // ============================================================================

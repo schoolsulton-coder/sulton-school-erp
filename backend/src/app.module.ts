@@ -17,6 +17,7 @@ import { HrModule } from './modules/hr/hr.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { HomeworkModule } from './modules/homework/homework.module';
 import { BehaviorModule } from './modules/behavior/behavior.module';
+import { DailyTasksModule } from './modules/daily-tasks/daily-tasks.module';
 import { CoinsModule } from './modules/coins/coins.module';
 import { GradesModule } from './modules/grades/grades.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
@@ -119,6 +120,7 @@ function clientIp(req: Record<string, any>): string {
     PayrollModule,
     HomeworkModule,
     BehaviorModule,
+    DailyTasksModule,
     CoinsModule,
     NotificationsModule,
     WebhooksModule,

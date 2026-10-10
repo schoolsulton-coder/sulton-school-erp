@@ -46,6 +46,16 @@ export const ACADEMIC_HOME = '/students';
 export const canSeeAcademic = (role?: string): boolean =>
   !!role && ACADEMIC_ROLES.includes(role);
 
+/**
+ * Hamma sinf bilan ishlay oladimi (backend juftligi: rbac-open.ts canSeeAllClasses).
+ * Ustoz/kurator/koordinator — faqat o'z sinflari, shuning uchun ular maktab
+ * bo'yicha umumiy sozlamalarga tegmaydi.
+ */
+export const canSeeAllClasses = (role?: string): boolean =>
+  !!role &&
+  !PORTAL_ROLES.includes(role) &&
+  (FULL_ACCESS_ROLES.includes(role) || !ACADEMIC_ROLES.includes(role));
+
 /** "O'quv jarayoni" oynalarining ruxsatlari */
 export const ACADEMIC_PERMS = [
   'grades.view',

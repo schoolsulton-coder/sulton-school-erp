@@ -8,6 +8,7 @@ import { studentsApi, STATUS_LABEL, STATUS_COLOR, type StudentListItem } from '@
 import { StudentFormModal } from '@/components/student-form';
 import { classesApi } from '@/lib/classes';
 import { crmApi } from '@/lib/crm';
+import { useAuthStore } from '@/store/auth';
 
 const initials = (last?: string, first?: string) => `${(last ?? '').charAt(0)}${(first ?? '').charAt(0)}`.toUpperCase() || '—';
 
@@ -24,7 +25,13 @@ export default function StudentsPage() {
     queryFn: () => studentsApi.list({ search: search || undefined, page, ...filters }),
   });
   const { data: classes } = useQuery({ queryKey: ['classes-mini'], queryFn: () => classesApi.list() });
-  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: crmApi.branches });
+  // Filial ro'yxati Qabulxona ma'lumoti — ruxsati yo'q rolda so'rov yuborilmaydi (403 bo'lardi)
+  const canBranches = useAuthStore((s) => s.can)('crm.view');
+  const { data: branches } = useQuery({
+    queryKey: ['branches'],
+    queryFn: crmApi.branches,
+    enabled: canBranches,
+  });
 
   const stats = data?.stats;
   const set = (patch: Partial<typeof filters>) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };

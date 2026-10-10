@@ -31,7 +31,13 @@ export default function HomeworkPage() {
     }
   }, [scoped, classes]);
 
-  const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => usersApi.list() });
+  // Xodimlar ro'yxati users.view talab qiladi — ustoz/koordinatorda yo'q (o'zi tanlanadi)
+  const can = useAuthStore((s) => s.can);
+  const { data: staff } = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => usersApi.list(),
+    enabled: can('users.view'),
+  });
   const teachers = useMemo(() => (staff ?? []).filter((u) => !['student', 'guardian'].includes(u.role.slug)), [staff]);
   const { data: roster } = useQuery({
     queryKey: ['class-students', f.classId],
