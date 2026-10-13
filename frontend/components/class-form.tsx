@@ -7,8 +7,8 @@ import { classesApi, type ClassRow, type ClassInput } from '@/lib/classes';
 import { crmApi } from '@/lib/crm';
 import { usersApi, teacherLabel } from '@/lib/users';
 
-// Sinfga biriktirish mumkin bo'lgan rollar
-const TEACHER_ROLES = ['teacher', 'curator'];
+// Sinfga biriktirish mumkin bo'lgan akademik rollar
+const TEACHER_ROLES = ['teacher', 'curator', 'coordinator'];
 
 const LANGS = ["O'zbek", 'Rus', 'Ingliz'];
 const STATUSES = ['Faol', 'Nofaol', 'Arxiv'];

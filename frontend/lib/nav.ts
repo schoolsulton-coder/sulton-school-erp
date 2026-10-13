@@ -23,6 +23,7 @@ export const SECTIONS: NavSection[] = [
       { href: '/guardians', label: 'Vasiylar', perm: 'crm.view' },
       { href: '/classes', label: 'Sinflar', perm: 'classes.view' },
       { href: '/schedule', label: 'Dars jadvali', perm: 'classes.view' },
+      { href: '/class-staff', label: 'Sinf biriktirish', perm: 'classes.update' },
     ],
   },
   {

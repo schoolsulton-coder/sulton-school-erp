@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { activeWeek } from '../../common/schedule-weeks';
-import { canSeeAllClasses } from '../../common/rbac-open';
+import { canSeeAllClasses, PORTAL_ROLES } from '../../common/rbac-open';
+
+// Sinfga biriktirilishi mumkin bo'lgan rollar
+const ASSIGNABLE_ROLES = ['coordinator', 'teacher', 'curator'];
 import { ownClassIds } from '../../common/own-classes';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
@@ -156,9 +159,84 @@ export class ClassesService {
 
   async removeTeacher(id: string, teacherId: string) {
     await this.ensureExists(id);
-    return this.prisma.classTeacher.delete({
-      where: { classId_teacherId: { classId: id, teacherId } },
+    // deleteMany — ikki marta bosilsa ham xato bermaydi
+    const r = await this.prisma.classTeacher.deleteMany({
+      where: { classId: id, teacherId },
     });
+    return { removed: r.count };
+  }
+
+  /**
+   * Xodim–sinf biriktirish oynasi uchun ma'lumot.
+   * Xodimlar: sinfga biriktirilishi mumkin bo'lgan rollar + allaqachon
+   * biriktirilgan har qanday xodim (roli keyin o'zgargan bo'lsa ham ko'rinsin).
+   */
+  async staffWithClasses() {
+    const [staff, classes] = await Promise.all([
+      this.prisma.user.findMany({
+        where: {
+          AND: [
+            { NOT: { role: { slug: { in: PORTAL_ROLES } } } },
+            {
+              OR: [
+                { role: { slug: { in: ASSIGNABLE_ROLES } } },
+                { taughtClasses: { some: {} } },
+              ],
+            },
+          ],
+        },
+        select: {
+          id: true,
+          fullName: true,
+          phone: true,
+          status: true,
+          role: { select: { slug: true, name: true } },
+          subject: { select: { name: true } },
+          taughtClasses: { select: { classId: true, isCurator: true } },
+        },
+        orderBy: { fullName: 'asc' },
+      }),
+      this.prisma.class.findMany({
+        select: {
+          id: true,
+          name: true,
+          gradeLevel: true,
+          academicYear: true,
+          status: true,
+          _count: { select: { students: { where: { status: 'ACTIVE' } } } },
+          teachers: {
+            select: { isCurator: true, teacher: { select: { id: true, fullName: true } } },
+          },
+        },
+        orderBy: [{ gradeLevel: 'asc' }, { name: 'asc' }],
+      }),
+    ]);
+
+    return {
+      staff: staff.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        phone: u.phone,
+        status: u.status,
+        role: u.role.slug,
+        roleName: u.role.name,
+        subject: u.subject?.name ?? null,
+        classes: u.taughtClasses.map((t) => ({ id: t.classId, isCurator: t.isCurator })),
+      })),
+      classes: classes.map((c) => ({
+        id: c.id,
+        name: c.name,
+        gradeLevel: c.gradeLevel,
+        academicYear: c.academicYear,
+        status: c.status,
+        students: c._count.students,
+        staff: c.teachers.map((t) => ({
+          id: t.teacher.id,
+          fullName: t.teacher.fullName,
+          isCurator: t.isCurator,
+        })),
+      })),
+    };
   }
 
   private async ensureExists(id: string) {

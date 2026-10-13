@@ -37,6 +37,16 @@ export class ClassesController {
     return this.service.findAll(academicYear, user);
   }
 
+  /**
+   * Sinf biriktirish oynasi uchun: xodimlar + ularning sinflari + barcha sinflar.
+   * ":id" dan OLDIN turishi shart — aks holda "staff" sinf id'si deb olinadi.
+   */
+  @Get('staff')
+  @Permissions('classes.update')
+  staff() {
+    return this.service.staffWithClasses();
+  }
+
   @Get(':id')
   @Permissions('classes.view')
   findOne(@Param('id') id: string) {

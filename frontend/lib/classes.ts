@@ -105,6 +105,33 @@ export interface BulkResult {
   skipped: { weekday: number; startTime: string; reason: string }[];
 }
 
+/** Sinf biriktirish oynasi: xodimlar + sinflar */
+export interface StaffMember {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  role: string;
+  roleName: string;
+  subject: string | null;
+  classes: { id: string; isCurator: boolean }[];
+}
+
+export interface StaffClassRow {
+  id: string;
+  name: string;
+  gradeLevel: number;
+  academicYear: string;
+  status: string;
+  students: number;
+  staff: { id: string; fullName: string; isCurator: boolean }[];
+}
+
+export interface StaffClasses {
+  staff: StaffMember[];
+  classes: StaffClassRow[];
+}
+
 export const classesApi = {
   list: (academicYear?: string) =>
     api
@@ -118,6 +145,7 @@ export const classesApi = {
   remove: (id: string) => api.delete(`/classes/${id}`).then((r) => r.data),
 
   // sinfga ustoz/kurator biriktirish
+  staff: () => api.get<StaffClasses>('/classes/staff').then((r) => r.data),
   assignTeacher: (classId: string, data: { teacherId: string; isCurator?: boolean }) =>
     api.post(`/classes/${classId}/teachers`, data).then((r) => r.data),
   removeTeacher: (classId: string, teacherId: string) =>
